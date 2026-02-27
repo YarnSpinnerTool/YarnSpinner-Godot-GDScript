@@ -1,0 +1,16 @@
+# Godot
+.godot/
+*.translation
+
+# Exports
+*.pck
+*.zip
+
+# Mono/.NET
+.mono/
+data_*/
+mono_crash.*.json
+
+# OS
+.DS_Store
+Thumbs.db
