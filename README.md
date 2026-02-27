@@ -36,7 +36,7 @@ This project uses the Yarn Spinner Public License. You're free to use it in your
 
 1. Copy the `addons/yarn_spinner/` folder into your Godot project's `addons/` directory.
 2. In the Godot editor, go to **Project > Project Settings > Plugins** and enable **Yarn Spinner**.
-3. Install `ysc` (the Yarn Spinner compiler) from https://github.com/YarnSpinnerTool/YarnSpinner-Console
+3. Install `ysc` (the [Yarn Spinner Console](https://github.com/YarnSpinnerTool/YarnSpinner-Console) tool) from : `dotnet tool install YarnSpinner.Console --global --version 3.1.0-alpha1`
 4. Drop your `.yarnproject` and `.yarn` files into your Godot project. The plugin automatically compiles them via `ysc` on import -- any time a `.yarn` file or the `.yarnproject` changes, Godot reimports and recompiles.
 5. Assign the imported `.yarnproject` to a Dialogue Runner in your scene.
 
