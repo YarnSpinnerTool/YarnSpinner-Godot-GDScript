@@ -7,6 +7,9 @@ Yarn Spinner for Godot (GDScript) is a pure-GDScript implementation of the Yarn 
 
 Requires Godot 4.6 or later (not the .NET/Mono version).
 
+> [!IMPORTANT]
+> Yarn Spinner for Godot (GDScript) is not yet for sale (it will always be available here for free, too). We rely on your support to keep everything free and accessible. If you want to support us during the Alpha period, you can support us on [GitHub Sponsors](https://github.com/sponsors/YarnSpinnerTool) or [Patreon](https://patreon.com/secretlab). GitHub sponsors of $25 and above, and Patreon members of the "Scribe" or above tier will receive a license to the paid version when it is released.
+
 ## Differences from Yarn Spinner for Godot (C#)
 
 Yarn Spinner for Godot (C#) is a port of Yarn Spinner for Unity that uses the core Yarn Spinner C# library directly. 
