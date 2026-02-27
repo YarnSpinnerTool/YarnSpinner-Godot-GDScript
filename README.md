@@ -30,13 +30,13 @@ The VM, protobuf parser, library, and markup system were all written to match Un
 
 ## License
 
-This project is available under the Yarn Spinner Public License. See [LICENSE.md](LICENSE.md) for details.
+This project uses the Yarn Spinner Public License. You're free to use it in your own projects, commercial or otherwise. The only restrictions are around redistributing it as part of a competing dialogue tool, and using it to train AI models. Full details are in [LICENSE.md](LICENSE.md).
 
 ## Installation
 
 1. Copy the `addons/yarn_spinner/` folder into your Godot project's `addons/` directory.
 2. In the Godot editor, go to **Project > Project Settings > Plugins** and enable **Yarn Spinner**.
-3. Install `ysc` (the Yarn Spinner compiler) globally with `dotnet tool install -g YarnSpinner.Console`.
+3. Install `ysc` (the Yarn Spinner compiler) from https://github.com/YarnSpinnerTool/YarnSpinner-Console
 4. Drop your `.yarnproject` and `.yarn` files into your Godot project. The plugin automatically compiles them via `ysc` on import -- any time a `.yarn` file or the `.yarnproject` changes, Godot reimports and recompiles.
 5. Assign the imported `.yarnproject` to a Dialogue Runner in your scene.
 
