@@ -1,0 +1,27 @@
+# Credits
+
+## Cast
+
+* English
+  * Tom: Jon Pimentel
+  * Anne: Lola Lynn Rensink
+* Chinese:
+  * Tom: XF Li
+  * Anne: Kwok Vivian
+* Brazilian Portuguese:
+  * Tom: Barreto Locutor
+  * Anne: Liliane Camara Voz
+* German:
+  * Tom: Daniel Bierich
+  * Anne: Jana Mehmann
+
+## Translations
+
+- Spanish: Alejandra de la Torre
+- Simplified Chinese: Coral Huang
+- Brazilian Portuguese: Nat Sanmartin
+- German: Benedikt Brydern
+
+## Original Sample
+
+This sample is adapted from our Yarn Spinner for Unity VoiceOver sample.

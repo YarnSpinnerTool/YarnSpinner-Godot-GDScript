@@ -1,0 +1,165 @@
+[gd_scene format=3 uid="uid://wsyalrnwnmn0"]
+
+[ext_resource type="Script" uid="uid://dp2f2ls0ltboo" path="res://samples/instance_commands/scripts/game.gd" id="1_game"]
+[ext_resource type="Script" uid="uid://c8j3meevyb2m7" path="res://samples/instance_commands/scripts/character.gd" id="2_character"]
+[ext_resource type="Resource" uid="uid://d0blnjymr88kn" path="res://samples/instance_commands/dialogue/game.yarnproject" id="3_b5v5y"]
+[ext_resource type="Script" uid="uid://flra500ihbix" path="res://addons/yarn_spinner/dialogue_runner.gd" id="3_runner"]
+[ext_resource type="Script" uid="uid://cged8u182768u" path="res://addons/yarn_spinner/ui/line_presenter.gd" id="4_line"]
+[ext_resource type="Script" uid="uid://cogqy630mjgv7" path="res://addons/yarn_spinner/ui/options_presenter.gd" id="5_options"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+content_margin_left = 30.0
+content_margin_top = 20.0
+content_margin_right = 30.0
+content_margin_bottom = 20.0
+bg_color = Color(0.1, 0.12, 0.18, 0.95)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="Game" type="Node2D" unique_id=2069148112]
+script = ExtResource("1_game")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1611571117]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 1152.0
+offset_bottom = 648.0
+color = Color(0.15, 0.15, 0.2, 1)
+
+[node name="YarnDialogueRunner" type="Node" parent="." unique_id=1558679203]
+script = ExtResource("3_runner")
+yarn_project = ExtResource("3_b5v5y")
+
+[node name="Characters" type="Node2D" parent="." unique_id=1362428502]
+
+[node name="mae" type="Node2D" parent="Characters" unique_id=281617073]
+position = Vector2(150, 300)
+script = ExtResource("2_character")
+character_color = Color(1, 0.4, 0.7, 1)
+radius = 35.0
+
+[node name="bob" type="Node2D" parent="Characters" unique_id=853348485]
+position = Vector2(500, 300)
+script = ExtResource("2_character")
+character_color = Color(0, 0.8, 0.8, 1)
+radius = 35.0
+
+[node name="Waypoints" type="Node2D" parent="." unique_id=383687134]
+
+[node name="left_spot" type="Marker2D" parent="Waypoints" unique_id=1831050515]
+position = Vector2(150, 300)
+
+[node name="center" type="Marker2D" parent="Waypoints" unique_id=192059244]
+position = Vector2(325, 300)
+
+[node name="right_spot" type="Marker2D" parent="Waypoints" unique_id=1104361947]
+position = Vector2(500, 300)
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=2002308860]
+
+[node name="LinePresenter" type="PanelContainer" parent="UI" unique_id=947318035]
+visible = false
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 60.0
+offset_top = -220.0
+offset_right = -60.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+script = ExtResource("4_line")
+
+[node name="VBox" type="VBoxContainer" parent="UI/LinePresenter" unique_id=933753546]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="CharacterLabel" type="Label" parent="UI/LinePresenter/VBox" unique_id=757100908]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 20
+text = "Character"
+
+[node name="TextLabel" type="RichTextLabel" parent="UI/LinePresenter/VBox" unique_id=1752938592]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/normal_font_size = 24
+bbcode_enabled = true
+text = "Dialogue text..."
+fit_content = true
+
+[node name="ContinueIndicator" type="Label" parent="UI/LinePresenter/VBox" unique_id=1283208196]
+layout_mode = 2
+size_flags_horizontal = 8
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 14
+text = "Click or press Space..."
+
+[node name="OptionsPresenter" type="PanelContainer" parent="UI" unique_id=76070967]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -150.0
+offset_right = 300.0
+offset_bottom = 150.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+script = ExtResource("5_options")
+
+[node name="OptionsContainer" type="VBoxContainer" parent="UI/OptionsPresenter" unique_id=1770387973]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="UI" unique_id=101119487]
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 20.0
+offset_right = 200.0
+offset_bottom = 60.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 24
+text = "Instance Commands Example"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="StartButton" type="Button" parent="UI" unique_id=1143660213]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -80.0
+offset_top = -20.0
+offset_right = 80.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 16
+text = "Start"
+
+[node name="Instructions" type="Label" parent="UI" unique_id=1247519531]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -200.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = 60.0
+grow_horizontal = 0
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 12
+text = "SPACE = Continue"
+horizontal_alignment = 2

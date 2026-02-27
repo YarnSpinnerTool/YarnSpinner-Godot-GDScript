@@ -1,0 +1,78 @@
+{
+  "commands": [
+    {
+      "async": true,
+      "definitionName": "_yarn_command_move",
+      "fileName": "character.gd",
+      "language": "gdscript",
+      "parameters": [
+        {
+          "documentation": "the ExampleCharacter to call this command on",
+          "name": "target",
+          "subtype": "ExampleCharacter",
+          "type": "instance"
+        },
+        {
+          "name": "destination",
+          "type": "string"
+        }
+      ],
+      "yarnName": "move"
+    },
+    {
+      "async": true,
+      "definitionName": "_yarn_command_bounce",
+      "fileName": "character.gd",
+      "language": "gdscript",
+      "parameters": [
+        {
+          "documentation": "the ExampleCharacter to call this command on",
+          "name": "target",
+          "subtype": "ExampleCharacter",
+          "type": "instance"
+        }
+      ],
+      "yarnName": "bounce"
+    },
+    {
+      "async": false,
+      "definitionName": "_yarn_command_set_color",
+      "fileName": "character.gd",
+      "language": "gdscript",
+      "parameters": [
+        {
+          "documentation": "the ExampleCharacter to call this command on",
+          "name": "target",
+          "subtype": "ExampleCharacter",
+          "type": "instance"
+        },
+        {
+          "name": "color_name",
+          "type": "string"
+        }
+      ],
+      "yarnName": "set_color"
+    },
+    {
+      "async": false,
+      "definitionName": "_yarn_command_face",
+      "fileName": "character.gd",
+      "language": "gdscript",
+      "parameters": [
+        {
+          "documentation": "the ExampleCharacter to call this command on",
+          "name": "target",
+          "subtype": "ExampleCharacter",
+          "type": "instance"
+        },
+        {
+          "name": "target_name",
+          "type": "string"
+        }
+      ],
+      "yarnName": "face"
+    }
+  ],
+  "functions": [],
+  "version": 1
+}

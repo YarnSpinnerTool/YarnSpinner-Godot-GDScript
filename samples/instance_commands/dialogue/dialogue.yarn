@@ -1,0 +1,33 @@
+title: Start
+---
+Mae: Hello! Watch me move to the center!
+<<move mae center>>
+Mae: Here I am at the center.
+
+<<bounce bob>>
+Bob: Hey Mae! I just bounced!
+
+<<face mae bob>>
+Mae: Let me turn to face you.
+
+What should we do next?
+-> Swap places
+    <<move mae right_spot>>
+    <<move bob left_spot>>
+    Mae: We swapped!
+    Bob: Fun!
+-> Change colors
+    <<set_color mae purple>>
+    <<set_color bob orange>>
+    Mae: I'm purple now!
+    Bob: And I'm orange!
+-> Both bounce
+    <<bounce mae>>
+    <<bounce bob>>
+    Mae: Wheee!
+
+<<move mae left_spot>>
+<<move bob right_spot>>
+Mae: Thanks for watching!
+Bob: Goodbye!
+===

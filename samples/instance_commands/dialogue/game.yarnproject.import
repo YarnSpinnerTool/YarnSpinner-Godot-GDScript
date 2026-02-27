@@ -1,0 +1,17 @@
+[remap]
+
+importer="yarn_spinner.project"
+type="Resource"
+uid="uid://bhffu83tvna3i"
+path="res://.godot/imported/game.yarnproject-8eccec7189fc49935f26e5e7fb8c973a.res"
+
+[deps]
+
+source_file="res://samples/instance_commands/dialogue/game.yarnproject"
+dest_files=["res://.godot/imported/game.yarnproject-8eccec7189fc49935f26e5e7fb8c973a.res"]
+
+[params]
+
+ysc_path="ysc"
+generate_ysls=true
+ysls_scan_path="res://"

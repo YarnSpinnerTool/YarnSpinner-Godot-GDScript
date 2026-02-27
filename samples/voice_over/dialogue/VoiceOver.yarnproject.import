@@ -1,0 +1,17 @@
+[remap]
+
+importer="yarn_spinner.project"
+type="Resource"
+uid="uid://c005b5vpsmc56"
+path="res://.godot/imported/VoiceOver.yarnproject-cda8878a878fa2c31098ac1b5130b892.res"
+
+[deps]
+
+source_file="res://samples/voice_over/dialogue/VoiceOver.yarnproject"
+dest_files=["res://.godot/imported/VoiceOver.yarnproject-cda8878a878fa2c31098ac1b5130b892.res"]
+
+[params]
+
+ysc_path="ysc"
+generate_ysls=true
+ysls_scan_path="res://"

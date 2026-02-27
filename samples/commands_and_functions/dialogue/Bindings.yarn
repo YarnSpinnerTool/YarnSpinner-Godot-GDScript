@@ -1,0 +1,111 @@
+title: Start
+---
+// Declare variables ONCE at the very start
+// These only initialize if the variable doesn't exist yet
+<<declare $gold = 50>>
+<<declare $health = 100>>
+<<declare $has_sword = false>>
+<<declare $has_potion = false>>
+<<declare $has_key = false>>
+<<declare $initialized = false>>
+
+// Only show intro on first visit
+<<if not $initialized>>
+    <<set $initialized = true>>
+    <<shake 0.3>>
+    Merchant: Welcome, traveler! The ground shakes as you enter.
+<<else>>
+    Merchant: Welcome back!
+<<endif>>
+
+<<jump MainMenu>>
+===
+
+title: MainMenu
+---
+// Show player status
+Merchant: You have {$gold} gold coins.
+
+<<if $health < 100>>
+    Merchant: You look a bit worn. Your health is only {$health}.
+<<endif>>
+
+-> Ask about items
+    <<jump Shop>>
+-> Ask about special services
+    <<jump Services>>
+-> Leave
+    <<jump Farewell>>
+===
+
+title: Shop
+---
+Merchant: I have many fine items for sale!
+Merchant: I see you already have a sword. Nice choice! <<if $has_sword>>
+Merchant: Hmm, you only have {$gold} gold. Get mroe! <<if $gold < 30>>
+
+
+-> Buy a Health Potion (30 gold) <<if $gold >= 30>>
+    <<set $gold = $gold - 30>>
+    <<set $health = $health + 25>>
+    <<if $health > 100>>
+        <<set $health = 100>>
+    <<endif>>
+    <<set $has_potion = true>>
+    <<give_item "health_potion">>
+    <<heal 25>>
+    Merchant: Here you go! You drink it immediately.
+    Merchant: You now have {$health} health and {$gold} gold remaining.
+    <<jump Shop>>
+-> Buy a Sword (50 gold) <<if $gold >= 50 and not $has_sword>>
+    <<set $gold = $gold - 50>>
+    <<set $has_sword = true>>
+    <<give_item "sword">>
+    <<shake_and_wait 0.4 0.5>>
+    Merchant: A fine blade! The room shakes with power.
+    Merchant: You have {$gold} gold remaining.
+    <<jump Shop>>
+-> Back to main menu
+    <<jump MainMenu>>
+===
+
+title: Services
+---
+Merchant: I also offer some... special services.
+
+-> Get a dramatic entrance (free)
+    Merchant: Very well, prepare yourself!
+    <<fade_out 0.3>>
+    <<wait 0.5>>
+    <<zoom 1.5 0.3>>
+    <<fade_in 0.3>>
+    <<shake_and_wait 0.8 1.0>>
+    <<zoom 1.0 0.5>>
+    Merchant: How was that?
+    <<jump Services>>
+-> Flash the screen (free)
+    <<flash white 0.3>>
+    Merchant: Dazzling, isn't it?
+    <<jump Services>>
+-> Receive a mysterious gift <<if not $has_key>>
+    <<set $has_key = true>>
+    <<give_item "mysterious_key">>
+    Merchant: Take this key. You may need it later...
+    <<jump Services>>
+-> Back to main menu
+    <<jump MainMenu>>
+===
+
+title: Farewell
+---
+<<if $has_key>>
+    Merchant: Safe travels! And remember... that key opens something important.
+<<else>>
+    Merchant: Safe travels, adventurer!
+<<endif>>
+
+<<fade_out 0.5>>
+Merchant: Until we meet again...
+<<wait 1.0>>
+<<fade_in 0.5>>
+===

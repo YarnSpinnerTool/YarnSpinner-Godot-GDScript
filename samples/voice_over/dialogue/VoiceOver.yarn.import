@@ -1,0 +1,14 @@
+[remap]
+
+importer="yarn_spinner.yarn_file"
+type="Resource"
+uid="uid://cufu8wwk1xv3y"
+path="res://.godot/imported/VoiceOver.yarn-afcdfde1b9b8a748c94cec43c8adbdff.res"
+
+[deps]
+
+source_file="res://samples/voice_over/dialogue/VoiceOver.yarn"
+dest_files=["res://.godot/imported/VoiceOver.yarn-afcdfde1b9b8a748c94cec43c8adbdff.res"]
+
+[params]
+

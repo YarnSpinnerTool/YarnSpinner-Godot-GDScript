@@ -1,0 +1,56 @@
+title: Start
+tags:
+---
+Player: Hello there!
+NPC: Oh, hello! Nice to meet you. What brings you to our village?
+-> I'm looking for adventure.
+    NPC: Adventure, you say? Well, you've come to the right place!
+    <<set $looking_for_adventure = true>>
+    <<jump Adventure>>
+-> I'm just passing through.
+    NPC: Ah, a traveller! Safe journeys to you.
+    <<set $looking_for_adventure = false>>
+    <<jump Farewell>>
+-> Can you tell me about this place?
+    <<jump VillageInfo>>
+===
+
+title: VillageInfo
+tags:
+---
+NPC: This is the village of Willowbrook. We've been here for generations.
+NPC: We have a blacksmith, a tavern, and a small market.
+NPC: The forest to the north is said to hold many secrets...
+<<if visited("VillageInfo")>>
+    NPC: But I've already told you about all that, haven't I?
+<<endif>>
+-> Tell me about the forest.
+    NPC: The Whispering Woods... many enter, few return unchanged.
+    NPC: They say there's treasure hidden deep within, guarded by ancient magic.
+-> Thanks for the information!
+    <<jump Start>>
+===
+
+title: Adventure
+tags:
+---
+NPC: If it's adventure you seek, I might have a quest for you.
+NPC: There's been trouble in the Whispering Woods lately.
+NPC: Strange noises, missing livestock... we need someone brave to investigate.
+-> I'll take on this quest!
+    <<set $accepted_quest = true>>
+    NPC: Excellent! Here, take this map. It'll help you navigate the woods.
+    <<set $has_map = true>>
+    NPC: Be careful out there, adventurer!
+-> That sounds dangerous. Maybe later.
+    NPC: I understand. The offer stands if you change your mind.
+    <<jump Start>>
+===
+
+title: Farewell
+tags:
+---
+NPC: May the road rise to meet you, traveller.
+NPC: If you ever need help, remember the village of Willowbrook.
+Player: Thank you. Farewell!
+===

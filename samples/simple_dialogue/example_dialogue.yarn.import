@@ -1,0 +1,14 @@
+[remap]
+
+importer="yarn_spinner.yarn_file"
+type="Resource"
+uid="uid://b0ldxjadnxpco"
+path="res://.godot/imported/example_dialogue.yarn-2d1ce7a109f51dc62362d6452c86636e.res"
+
+[deps]
+
+source_file="res://samples/simple_dialogue/example_dialogue.yarn"
+dest_files=["res://.godot/imported/example_dialogue.yarn-2d1ce7a109f51dc62362d6452c86636e.res"]
+
+[params]
+

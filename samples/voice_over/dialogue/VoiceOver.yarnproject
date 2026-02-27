@@ -1,0 +1,25 @@
+{
+  "projectFileVersion": 3,
+  "sourceFiles": [
+    "**/*.yarn"
+  ],
+  "excludeFiles": [],
+  "baseLanguage": "en",
+  "localisation": {
+    "en": {
+      "assets": "audio/en"
+    },
+    "de": {
+      "strings": "VoiceOver-de.csv",
+      "assets": "audio/de"
+    },
+    "zh": {
+      "strings": "VoiceOver-zh.csv",
+      "assets": "audio/zh"
+    },
+    "pt_BR": {
+      "strings": "VoiceOver-pt_BR.csv",
+      "assets": "audio/pt_BR"
+    }
+  }
+}

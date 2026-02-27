@@ -1,0 +1,238 @@
+[gd_scene load_steps=12 format=3 uid="uid://etupux271o6q"]
+
+[ext_resource type="Script" uid="uid://bmwxg7gxw5cm6" path="res://samples/commands_and_functions/scripts/bindings_sample.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://flra500ihbix" path="res://addons/yarn_spinner/dialogue_runner.gd" id="2_runner"]
+[ext_resource type="Script" uid="uid://c5e6x50a6q1p" path="res://addons/yarn_spinner/binding_loader.gd" id="3_loader"]
+[ext_resource type="Script" uid="uid://cged8u182768u" path="res://addons/yarn_spinner/ui/line_presenter.gd" id="4_line"]
+[ext_resource type="Script" uid="uid://cogqy630mjgv7" path="res://addons/yarn_spinner/ui/options_presenter.gd" id="5_options"]
+[ext_resource type="Script" uid="uid://cvd0m2sofo7o2" path="res://samples/commands_and_functions/scripts/player.gd" id="6_player"]
+[ext_resource type="Script" uid="uid://bpoteyrq3cprs" path="res://samples/commands_and_functions/scripts/camera_effects.gd" id="7_camera"]
+[ext_resource type="Script" uid="uid://qvfowjr7y6a1" path="res://samples/commands_and_functions/scripts/screen_effects.gd" id="8_screen"]
+[ext_resource type="Resource" uid="uid://bodcsns6hsdp0" path="res://samples/commands_and_functions/dialogue/Bindings.yarnproject" id="9_project"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+content_margin_left = 40.0
+content_margin_top = 30.0
+content_margin_right = 40.0
+content_margin_bottom = 30.0
+bg_color = Color(0.12, 0.12, 0.18, 0.95)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_status"]
+content_margin_left = 20.0
+content_margin_top = 15.0
+content_margin_right = 20.0
+content_margin_bottom = 15.0
+bg_color = Color(0.08, 0.08, 0.12, 0.9)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="BindingsSample" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+script = ExtResource("7_camera")
+
+[node name="Player" type="Node" parent="."]
+script = ExtResource("6_player")
+
+[node name="YarnDialogueRunner" type="Node" parent="."]
+script = ExtResource("2_runner")
+yarn_project = ExtResource("9_project")
+run_selected_option_as_line = true
+
+[node name="YarnBindingLoader" type="Node" parent="."]
+script = ExtResource("3_loader")
+verbose = true
+
+[node name="UILayer" type="CanvasLayer" parent="."]
+
+[node name="Background" type="ColorRect" parent="UILayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.08, 0.06, 0.12, 1)
+
+[node name="LinePresenter" type="PanelContainer" parent="UILayer"]
+visible = false
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 80.0
+offset_top = -280.0
+offset_right = -80.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+script = ExtResource("4_line")
+
+[node name="VBox" type="VBoxContainer" parent="UILayer/LinePresenter"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="CharacterLabel" type="Label" parent="UILayer/LinePresenter/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Character"
+
+[node name="TextLabel" type="RichTextLabel" parent="UILayer/LinePresenter/VBox"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/normal_font_size = 36
+bbcode_enabled = true
+text = "Dialogue text goes here..."
+fit_content = true
+
+[node name="ContinueIndicator" type="Label" parent="UILayer/LinePresenter/VBox"]
+layout_mode = 2
+size_flags_horizontal = 8
+theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
+theme_override_font_sizes/font_size = 18
+text = "Press Space to continue..."
+
+[node name="OptionsPresenter" type="PanelContainer" parent="UILayer"]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -400.0
+offset_top = -180.0
+offset_right = 400.0
+offset_bottom = 180.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+script = ExtResource("5_options")
+
+[node name="OptionsContainer" type="VBoxContainer" parent="UILayer/OptionsPresenter"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="ScreenEffects" type="ColorRect" parent="UILayer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+script = ExtResource("8_screen")
+
+[node name="UI" type="Control" parent="UILayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="UILayer/UI"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -250.0
+offset_top = 40.0
+offset_right = 250.0
+offset_bottom = 85.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 32
+text = "Yarn Bindings Sample"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="UILayer/UI"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -300.0
+offset_top = 90.0
+offset_right = 300.0
+offset_bottom = 115.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.7, 1)
+theme_override_font_sizes/font_size = 16
+text = "Demonstrates YarnBindingLoader for Inspector-Based Command/Function Setup"
+horizontal_alignment = 1
+
+[node name="StatusPanel" type="PanelContainer" parent="UILayer/UI"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -220.0
+offset_top = 40.0
+offset_right = -40.0
+offset_bottom = 140.0
+grow_horizontal = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_status")
+
+[node name="StatusLabel" type="Label" parent="UILayer/UI/StatusPanel"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Health: 100/100
+Gold: 50
+Inventory: (empty)"
+
+[node name="StartButton" type="Button" parent="UILayer/UI"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -30.0
+offset_right = 100.0
+offset_bottom = 10.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Start Dialogue"
+
+[node name="RestartButton" type="Button" parent="UILayer/UI"]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -30.0
+offset_right = 100.0
+offset_bottom = 10.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Restart"
+
+[node name="Instructions" type="Label" parent="UILayer/UI"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -350.0
+offset_top = -60.0
+offset_right = 350.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.5, 0.5, 0.55, 1)
+theme_override_font_sizes/font_size = 14
+text = "This sample uses YarnBindingLoader to connect Yarn commands/functions to game nodes.
+Check the YarnBindingLoader node in the inspector to see how bindings are configured."
+horizontal_alignment = 1
