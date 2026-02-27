@@ -1,0 +1,208 @@
+[gd_scene format=3 uid="uid://du0eds7hco1vq"]
+
+[ext_resource type="Script" uid="uid://flra500ihbix" path="res://addons/yarn_spinner/dialogue_runner.gd" id="2_runner"]
+[ext_resource type="Script" uid="uid://cged8u182768u" path="res://addons/yarn_spinner/ui/line_presenter.gd" id="3_line"]
+[ext_resource type="Script" uid="uid://cogqy630mjgv7" path="res://addons/yarn_spinner/ui/options_presenter.gd" id="4_options"]
+[ext_resource type="Script" uid="uid://q487nnd1emgf" path="res://samples/voice_over/scripts/fade_effect.gd" id="5_fade"]
+[ext_resource type="Script" uid="uid://dpqvn6oabxilc" path="res://samples/voice_over/scripts/character_color_presenter.gd" id="6_color"]
+[ext_resource type="Script" uid="uid://bdkmo17inusa6" path="res://samples/voice_over/scripts/sample_voice_presenter.gd" id="7_voice"]
+[ext_resource type="Resource" uid="uid://c005b5vpsmc56" path="res://samples/voice_over/dialogue/VoiceOver.yarnproject" id="8_project"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+content_margin_left = 20.0
+content_margin_top = 15.0
+content_margin_right = 20.0
+content_margin_bottom = 15.0
+bg_color = Color(0.1, 0.1, 0.15, 0.9)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="VoiceOverSample" type="Control" unique_id=2000326352]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Background" type="ColorRect" parent="." unique_id=1936375624]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.05, 0.05, 0.1, 1)
+
+[node name="YarnDialogueRunner" type="Node" parent="." unique_id=2045027044]
+script = ExtResource("2_runner")
+yarn_project = ExtResource("8_project")
+run_selected_option_as_line = true
+
+[node name="LinePresenter" type="PanelContainer" parent="YarnDialogueRunner" unique_id=1991175960]
+visible = false
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 50.0
+offset_top = -200.0
+offset_right = -50.0
+offset_bottom = -50.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+script = ExtResource("3_line")
+
+[node name="VBox" type="VBoxContainer" parent="YarnDialogueRunner/LinePresenter" unique_id=2000570192]
+layout_mode = 2
+
+[node name="CharacterLabel" type="Label" parent="YarnDialogueRunner/LinePresenter/VBox" unique_id=133148741]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "Character"
+
+[node name="TextLabel" type="RichTextLabel" parent="YarnDialogueRunner/LinePresenter/VBox" unique_id=32607439]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/normal_font_size = 24
+bbcode_enabled = true
+text = "Dialogue text goes here..."
+fit_content = true
+
+[node name="ContinueIndicator" type="Label" parent="YarnDialogueRunner/LinePresenter/VBox" unique_id=1884475159]
+layout_mode = 2
+size_flags_horizontal = 8
+theme_override_font_sizes/font_size = 14
+text = "Press Space to continue..."
+
+[node name="OptionsPresenter" type="PanelContainer" parent="YarnDialogueRunner" unique_id=354881937]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -100.0
+offset_right = 200.0
+offset_bottom = 100.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+script = ExtResource("4_options")
+
+[node name="OptionsContainer" type="VBoxContainer" parent="YarnDialogueRunner/OptionsPresenter" unique_id=2083309892]
+layout_mode = 2
+
+[node name="CharacterColorPresenter" type="Control" parent="YarnDialogueRunner" unique_id=1785130946]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("6_color")
+
+[node name="VoicePresenter" type="Control" parent="YarnDialogueRunner" unique_id=639498802]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("7_voice")
+
+[node name="AudioPlayer" type="AudioStreamPlayer" parent="YarnDialogueRunner/VoicePresenter" unique_id=224546009]
+
+[node name="FadeOverlay" type="ColorRect" parent="." unique_id=533326457]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)
+script = ExtResource("5_fade")
+
+[node name="UI" type="Control" parent="." unique_id=85250264]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="UI" unique_id=1532771386]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 50.0
+offset_right = 200.0
+offset_bottom = 100.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 32
+text = "Voice Over Sample"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="UI" unique_id=2107383977]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -250.0
+offset_top = 100.0
+offset_right = 250.0
+offset_bottom = 130.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+theme_override_font_sizes/font_size = 16
+text = "Godot TranslationServer with Voice Acting"
+horizontal_alignment = 1
+
+[node name="LanguageMenu" type="OptionButton" parent="UI" unique_id=1080504244]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -50.0
+offset_right = 100.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StartButton" type="Button" parent="UI" unique_id=2095198308]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = 10.0
+offset_right = 100.0
+offset_bottom = 50.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "Start Dialogue"
+
+[node name="Instructions" type="Label" parent="UI" unique_id=1082164875]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -200.0
+offset_top = -80.0
+offset_right = 200.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 14
+text = "Press 1-4 to switch languages during dialogue
+1: English  2: German  3: Chinese  4: Portuguese"
+horizontal_alignment = 1
