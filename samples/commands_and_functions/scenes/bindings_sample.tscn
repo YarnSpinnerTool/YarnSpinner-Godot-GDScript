@@ -8,7 +8,7 @@
 [ext_resource type="Script" uid="uid://cvd0m2sofo7o2" path="res://samples/commands_and_functions/scripts/player.gd" id="6_player"]
 [ext_resource type="Script" uid="uid://bpoteyrq3cprs" path="res://samples/commands_and_functions/scripts/camera_effects.gd" id="7_camera"]
 [ext_resource type="Script" uid="uid://qvfowjr7y6a1" path="res://samples/commands_and_functions/scripts/screen_effects.gd" id="8_screen"]
-[ext_resource type="Resource" uid="uid://bodcsns6hsdp0" path="res://samples/commands_and_functions/dialogue/Bindings.yarnproject" id="9_project"]
+[ext_resource type="Resource" uid="uid://dbrkeqma6pwys" path="res://samples/commands_and_functions/dialogue/Bindings.yarnproject" id="9_project"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 content_margin_left = 40.0

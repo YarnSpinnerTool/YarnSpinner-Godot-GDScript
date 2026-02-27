@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://flra500ihbix" path="res://addons/yarn_spinner/dialogue_runner.gd" id="2_runner"]
 [ext_resource type="Script" uid="uid://cged8u182768u" path="res://addons/yarn_spinner/ui/line_presenter.gd" id="3_line"]
 [ext_resource type="Script" uid="uid://cogqy630mjgv7" path="res://addons/yarn_spinner/ui/options_presenter.gd" id="4_options"]
-[ext_resource type="Resource" uid="uid://dh85pux5irg2w" path="res://samples/yarn_basics/dialogue/Basics.yarnproject" id="5_project"]
+[ext_resource type="Resource" uid="uid://b6egkjo14sykk" path="res://samples/yarn_basics/dialogue/Basics.yarnproject" id="5_project"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 content_margin_left = 40.0

@@ -1,7 +1,5 @@
 title: Start
 ---
-// Declare variables ONCE at the very start
-// These only initialize if the variable doesn't exist yet
 <<declare $gold = 50>>
 <<declare $health = 100>>
 <<declare $has_sword = false>>

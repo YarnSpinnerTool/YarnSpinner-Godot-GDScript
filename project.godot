@@ -17,7 +17,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 config/name="Yarn Spinner for Godot"
 config/description="Yarn Spinner dialogue system for Godot (GDScript)"
 config/version="1.0.0"
-run/main_scene="res://samples/voice_over/scenes/voice_over.tscn"
+run/main_scene="uid://dqm7kxw2r5h8c"
 config/features=PackedStringArray("4.6", "Forward Plus")
 
 [autoload]

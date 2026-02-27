@@ -6,7 +6,6 @@ tags: tutorial beginning
 // ============================================
 
 // This is a single-line comment - ignored by Yarn
-// Multi-line comments (/* */) may not be supported by all compilers.
 
 // --- BASIC DIALOGUE ---
 This is a simple line of dialogue.

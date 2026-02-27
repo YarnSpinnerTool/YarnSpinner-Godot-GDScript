@@ -20,7 +20,7 @@
 @icon("res://addons/yarn_spinner/icons/dialogue_runner.svg")
 class_name YarnDialogueRunner
 extends Node
-## main orchestrator for yarn spinner dialogue.
+## main controller for yarn spinner dialogue.
 ## manages the virtual machine, presenters, and dialogue flow.
 
 

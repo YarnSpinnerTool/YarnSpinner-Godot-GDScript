@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dp2f2ls0ltboo" path="res://samples/instance_commands/scripts/game.gd" id="1_game"]
 [ext_resource type="Script" uid="uid://c8j3meevyb2m7" path="res://samples/instance_commands/scripts/character.gd" id="2_character"]
-[ext_resource type="Resource" uid="uid://d0blnjymr88kn" path="res://samples/instance_commands/dialogue/game.yarnproject" id="3_b5v5y"]
+[ext_resource type="Resource" uid="uid://bhffu83tvna3i" path="res://samples/instance_commands/dialogue/game.yarnproject" id="3_b5v5y"]
 [ext_resource type="Script" uid="uid://flra500ihbix" path="res://addons/yarn_spinner/dialogue_runner.gd" id="3_runner"]
 [ext_resource type="Script" uid="uid://cged8u182768u" path="res://addons/yarn_spinner/ui/line_presenter.gd" id="4_line"]
 [ext_resource type="Script" uid="uid://cogqy630mjgv7" path="res://addons/yarn_spinner/ui/options_presenter.gd" id="5_options"]
