@@ -22,6 +22,8 @@ extends Resource
 ## resource containing a compiled yarn project.
 ## created by importing .yarnproject files.
 
+const _YarnProgramParser := preload("res://addons/yarn_spinner/core/yarn_program_parser.gd")
+
 @export var compiled_program: PackedByteArray = PackedByteArray()
 ## line_id -> text
 @export var string_table: Dictionary = {}
@@ -40,7 +42,7 @@ func get_program() -> YarnProgram:
 		push_error("yarn project: no compiled program data")
 		return null
 
-	_cached_program = YarnProgramParser.parse_from_bytes(compiled_program)
+	_cached_program = _YarnProgramParser.parse_from_bytes(compiled_program)
 	if _cached_program != null:
 		_cached_program.string_table = string_table.duplicate()
 		_cached_program.line_metadata = line_metadata.duplicate()

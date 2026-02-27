@@ -205,23 +205,23 @@ func set_value(variable_name: String, value: Variant) -> void:
 	push_error("variable storage: set_value not implemented")
 
 
-## Returns [true, value] or [false, null].
-func try_get_value(variable_name: String) -> Array:
+## Returns {found: bool, value: Variant}.
+func try_get_value(variable_name: String) -> Dictionary:
 	push_error("variable storage: try_get_value not implemented")
-	return [false, null]
+	return {found = false, value = null}
 
 
 ## Checks stored, then program initial values, then smart variables.
 func get_value(variable_name: String) -> Variant:
 	var result := try_get_value(variable_name)
-	if result[0]:
-		return result[1]
+	if result.found:
+		return result.value
 	if _program != null and _program.has_initial_value(variable_name):
 		return _program.get_initial_value(variable_name)
 	if smart_variable_evaluator != null:
 		var smart_result := smart_variable_evaluator.try_get_smart_variable(variable_name)
-		if smart_result[0]:
-			return smart_result[1]
+		if smart_result.found:
+			return smart_result.value
 	# Internal Yarn variables are expected to not exist on first access
 	if not variable_name.begins_with("$Yarn.Internal."):
 		push_warning("variable storage: variable '%s' not found" % variable_name)
@@ -229,7 +229,7 @@ func get_value(variable_name: String) -> Variant:
 
 
 func get_variable_kind(variable_name: String) -> VariableKind:
-	if try_get_value(variable_name)[0]:
+	if try_get_value(variable_name).found:
 		return VariableKind.STORED
 	if _program != null:
 		var kind: int = _program.get_variable_kind(variable_name)
@@ -244,7 +244,7 @@ func get_variable_kind(variable_name: String) -> VariableKind:
 
 
 func has_value(variable_name: String) -> bool:
-	if try_get_value(variable_name)[0]:
+	if try_get_value(variable_name).found:
 		return true
 	if _program != null and _program.has_initial_value(variable_name):
 		return true
@@ -253,51 +253,51 @@ func has_value(variable_name: String) -> bool:
 	return false
 
 
-## Returns [found: bool, value: float].
-func try_get_float(variable_name: String) -> Array:
+## Returns {found: bool, value: float}.
+func try_get_float(variable_name: String) -> Dictionary:
 	var value: Variant = get_value(variable_name)
 	if value == null:
-		return [false, 0.0]
+		return {found = false, value = 0.0}
 	if value is float:
-		return [true, value]
+		return {found = true, value = value}
 	if value is int:
-		return [true, float(value)]
-	return [false, 0.0]
+		return {found = true, value = float(value)}
+	return {found = false, value = 0.0}
 
 
-## Returns [found: bool, value: String].
-func try_get_string(variable_name: String) -> Array:
+## Returns {found: bool, value: String}.
+func try_get_string(variable_name: String) -> Dictionary:
 	var value: Variant = get_value(variable_name)
 	if value == null:
-		return [false, ""]
+		return {found = false, value = ""}
 	if value is String:
-		return [true, value]
-	return [false, ""]
+		return {found = true, value = value}
+	return {found = false, value = ""}
 
 
-## Returns [found: bool, value: bool].
-func try_get_bool(variable_name: String) -> Array:
+## Returns {found: bool, value: bool}.
+func try_get_bool(variable_name: String) -> Dictionary:
 	var value: Variant = get_value(variable_name)
 	if value == null:
-		return [false, false]
+		return {found = false, value = false}
 	if value is bool:
-		return [true, value]
-	return [false, false]
+		return {found = true, value = value}
+	return {found = false, value = false}
 
 
 func get_float(variable_name: String, default_value: float = 0.0) -> float:
 	var result := try_get_float(variable_name)
-	return result[1] if result[0] else default_value
+	return result.value if result.found else default_value
 
 
 func get_string(variable_name: String, default_value: String = "") -> String:
 	var result := try_get_string(variable_name)
-	return result[1] if result[0] else default_value
+	return result.value if result.found else default_value
 
 
 func get_bool(variable_name: String, default_value: bool = false) -> bool:
 	var result := try_get_bool(variable_name)
-	return result[1] if result[0] else default_value
+	return result.value if result.found else default_value
 
 
 func clear() -> void:

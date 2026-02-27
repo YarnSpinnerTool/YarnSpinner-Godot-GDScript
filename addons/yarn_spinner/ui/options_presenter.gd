@@ -66,12 +66,12 @@ func _input(event: InputEvent) -> void:
 
 
 func on_dialogue_started() -> void:
-	visible = false
+	_set_presenter_visible(false)
 	_clear_options()
 
 
 func on_dialogue_completed() -> void:
-	visible = false
+	_set_presenter_visible(false)
 	var was_showing := _is_showing_options
 	_is_showing_options = false
 	_clear_options()
@@ -87,7 +87,7 @@ func run_options(options: Array[YarnOption]) -> int:
 	_clear_options()
 	_create_option_buttons()
 
-	visible = true
+	_set_presenter_visible(true)
 	options_shown.emit(options)
 
 	for i in range(_option_buttons.size()):
@@ -212,7 +212,7 @@ func _select_option(index: int) -> void:
 
 	_selected_index = index
 	_is_showing_options = false
-	visible = false
+	_set_presenter_visible(false)
 
 	option_selected.emit(index, option)
 	_selection_made.emit(index)

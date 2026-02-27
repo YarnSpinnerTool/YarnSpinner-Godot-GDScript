@@ -16,7 +16,6 @@
 #                                                                          #
 # ======================================================================== #
 
-class_name YarnProgramParser
 extends RefCounted
 ## Parses compiled yarn spinner programs from protobuf binary format (.yarnc files).
 

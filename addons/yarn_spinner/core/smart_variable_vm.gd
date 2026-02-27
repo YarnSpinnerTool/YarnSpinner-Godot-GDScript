@@ -22,10 +22,10 @@ extends RefCounted
 ## Matches Unity's SmartVariableEvaluator.
 
 
-## Returns [true, value] or [false, null].
-static func try_evaluate(node: YarnNode, variable_storage: YarnVariableStorage, library: YarnLibrary) -> Array:
+## Returns {found: bool, value: Variant}.
+static func try_evaluate(node: YarnNode, variable_storage: YarnVariableStorage, library: YarnLibrary) -> Dictionary:
 	if node == null or node.instructions.is_empty():
-		return [false, null]
+		return {found = false, value = null}
 
 	var stack: Array = []
 	var ip: int = 0
@@ -46,25 +46,25 @@ static func try_evaluate(node: YarnNode, variable_storage: YarnVariableStorage, 
 
 			YarnInstruction.OpCode.PUSH_VARIABLE:
 				if variable_storage == null:
-					return [false, null]
+					return {found = false, value = null}
 				var value: Variant = variable_storage.get_value(instruction.variable_name)
 				stack.push_back(value)
 
 			YarnInstruction.OpCode.CALL_FUNC:
 				if library == null:
-					return [false, null]
+					return {found = false, value = null}
 				var result: Variant = library.call_function(instruction.function_name, stack, null)
 				if result != null:
 					stack.push_back(result)
 
 			YarnInstruction.OpCode.POP:
 				if stack.is_empty():
-					return [false, null]
+					return {found = false, value = null}
 				stack.pop_back()
 
 			YarnInstruction.OpCode.JUMP_IF_FALSE:
 				if stack.is_empty():
-					return [false, null]
+					return {found = false, value = null}
 				var value: Variant = stack.back()
 				if not _is_truthy(value):
 					ip = instruction.destination
@@ -80,12 +80,12 @@ static func try_evaluate(node: YarnNode, variable_storage: YarnVariableStorage, 
 
 			_:
 				# unsupported opcode for smart variable evaluation
-				return [false, null]
+				return {found = false, value = null}
 
 	if stack.is_empty():
-		return [false, null]
+		return {found = false, value = null}
 
-	return [true, stack.back()]
+	return {found = true, value = stack.back()}
 
 
 ## Evaluates condition variables for a node group via smart variable bytecode.
@@ -166,8 +166,8 @@ static func _evaluate_smart_or_stored(
 		for smart_node in smart_nodes:
 			if smart_node.node_name == variable_name:
 				var result := try_evaluate(smart_node, variable_storage, library)
-				if result[0]:
-					return result[1]
+				if result.found:
+					return result.value
 
 	if variable_storage != null:
 		return variable_storage.get_value(variable_name)

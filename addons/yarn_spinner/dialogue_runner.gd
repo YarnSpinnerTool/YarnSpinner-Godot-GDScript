@@ -67,6 +67,7 @@ signal command_received(command_name: String, command_args: Array)
 ## show selected option's text as a line before continuing
 @export var run_selected_option_as_line: bool = false
 
+## log detailed VM execution, instruction traces, and command discovery to the output console
 @export var verbose_logging: bool = false
 
 @export var saliency_strategy: SaliencyStrategyType = SaliencyStrategyType.RANDOM_BEST_LEAST_RECENT
@@ -115,6 +116,7 @@ func _ready() -> void:
 	_asset_provider = YarnAssetProvider.new()
 
 	_vm.set_library(_library)
+	_vm.verbose_logging = verbose_logging
 
 	_vm.line_handler.connect(_on_line)
 	_vm.options_handler.connect(_on_options)
@@ -781,12 +783,6 @@ func _handle_builtin_command(command_text: String) -> bool:
 	var command := parts[0].to_lower()
 
 	match command:
-		"wait":
-			var duration := 1.0
-			if parts.size() > 1 and parts[1].is_valid_float():
-				duration = float(parts[1])
-			await get_tree().create_timer(duration).timeout
-			return true
 		"stop":
 			stop_dialogue()
 			return true

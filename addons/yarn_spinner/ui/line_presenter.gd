@@ -139,7 +139,7 @@ func on_dialogue_started() -> void:
 
 
 func on_dialogue_completed() -> void:
-	visible = false
+	_set_presenter_visible(false)
 	_is_displaying = false
 	_is_fully_revealed = false
 	_kill_typewriter_tween()
@@ -157,7 +157,7 @@ func run_line(line: YarnLine) -> Variant:
 	_is_displaying = true
 	_is_fully_revealed = false
 
-	visible = true
+	_set_presenter_visible(true)
 
 	if character_label != null:
 		character_label.text = line.character_name

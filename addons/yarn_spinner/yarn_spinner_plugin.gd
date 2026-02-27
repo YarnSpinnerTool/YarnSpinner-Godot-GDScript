@@ -17,7 +17,6 @@
 # ======================================================================== #
 
 @tool
-class_name YarnSpinnerPlugin
 extends EditorPlugin
 ## editor plugin for yarn spinner integration with godot.
 ## handles import of .yarnproject files and provides editor tooling.

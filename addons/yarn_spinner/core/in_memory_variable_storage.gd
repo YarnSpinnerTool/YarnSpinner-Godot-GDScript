@@ -69,10 +69,10 @@ func set_value(variable_name: String, value: Variant) -> void:
 		_notify_listeners(variable_name, value, old_value)
 
 
-func try_get_value(variable_name: String) -> Array:
+func try_get_value(variable_name: String) -> Dictionary:
 	if _variables.has(variable_name):
-		return [true, _variables[variable_name]]
-	return [false, null]
+		return {found = true, value = _variables[variable_name]}
+	return {found = false, value = null}
 
 
 func clear() -> void:

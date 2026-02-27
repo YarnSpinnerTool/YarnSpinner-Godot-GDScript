@@ -17,7 +17,6 @@
 # ======================================================================== #
 
 @tool
-class_name YarnProjectImporter
 extends EditorImportPlugin
 ## imports .yarnproject files by compiling them with ysc.
 

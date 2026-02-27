@@ -18,13 +18,21 @@
 
 @icon("res://addons/yarn_spinner/icons/dialogue_presenter.svg")
 class_name YarnDialoguePresenter
-extends Control
+extends Node
 ## base class for presenting yarn dialogue to the player.
+## extends Node so presenters can be non-visual (e.g., audio, signals, analytics).
+## UI presenters attached to Control nodes can use _set_presenter_visible().
 
-## untyped to avoid circular dependency with YarnDialogueRunner
-var dialogue_runner
+var dialogue_runner: YarnDialogueRunner
 
 var _cancellation_token: YarnCancellationToken
+
+
+## safely set visibility when attached to a CanvasItem node (Control, Node2D, etc.).
+## no-op if this presenter is a plain Node.
+func _set_presenter_visible(v: bool) -> void:
+	if is_class("CanvasItem"):
+		set("visible", v)
 
 
 func on_dialogue_started() -> void:

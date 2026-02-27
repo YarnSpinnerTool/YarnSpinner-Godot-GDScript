@@ -17,7 +17,6 @@
 # ======================================================================== #
 
 @tool
-class_name YarnEditor
 extends VBoxContainer
 ## Simple text editor for .yarn files.
 ## Embeds in the editor as a bottom panel.

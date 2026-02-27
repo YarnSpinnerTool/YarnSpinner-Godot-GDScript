@@ -16,7 +16,6 @@
 #                                                                          #
 # ======================================================================== #
 
-class_name YarnAsyncHandler
 extends RefCounted
 ## Handles async command execution via signals, coroutines, and awaitables.
 

@@ -17,7 +17,6 @@
 # ======================================================================== #
 
 @tool
-class_name YarnFileImporter
 extends EditorImportPlugin
 ## imports .yarn files as resources so they can be opened in the editor.
 

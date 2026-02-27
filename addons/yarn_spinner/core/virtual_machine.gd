@@ -39,6 +39,7 @@ signal prepare_for_lines_handler(line_ids: PackedStringArray)
 var program: YarnProgram
 var variable_storage: YarnVariableStorage
 var _library: YarnLibrary
+var verbose_logging: bool = false
 var current_state: ExecutionState = ExecutionState.STOPPED
 var _has_error: bool = false
 var _current_node: YarnNode
@@ -113,7 +114,7 @@ func set_node(node_name: String) -> bool:
 	_has_error = false
 	current_state = ExecutionState.RUNNING
 
-	if OS.is_debug_build():
+	if verbose_logging:
 		print("VM: Loading node '%s' with %d instructions:" % [node_name, _current_node.instructions.size()])
 		for i in range(_current_node.instructions.size()):
 			var inst := _current_node.instructions[i]
@@ -194,7 +195,7 @@ func set_selected_option(option_index: int) -> void:
 
 	if option_index == NO_OPTION_SELECTED:
 		# No option selected - push false so JUMP_IF_FALSE skips to fallthrough
-		if OS.is_debug_build():
+		if verbose_logging:
 			print("VM: set_selected_option: no option selected, pushing false for fallthrough")
 		_push(false)
 		_pending_options.clear()
@@ -206,7 +207,7 @@ func set_selected_option(option_index: int) -> void:
 		return
 
 	var selected := _pending_options[option_index]
-	if OS.is_debug_build():
+	if verbose_logging:
 		print("VM: set_selected_option index=%d line_id=%s dest=%d" % [option_index, selected.line_id, selected.destination])
 
 	_push(selected.destination)
@@ -390,7 +391,7 @@ func _execute_next_instruction() -> void:
 	var debug_ip := _instruction_pointer
 	_instruction_pointer += 1
 
-	if OS.is_debug_build():
+	if verbose_logging:
 		var opcode_name: String = YarnInstruction.OpCode.keys()[instruction.opcode] if instruction.opcode < YarnInstruction.OpCode.size() else str(instruction.opcode)
 		print("VM [%s] ip=%d %s stack=%s" % [_current_node.node_name, debug_ip, opcode_name, _stack])
 
@@ -614,7 +615,7 @@ func _execute_add_option(instruction: YarnInstruction) -> void:
 	else:
 		option.is_available = true
 
-	if OS.is_debug_build():
+	if verbose_logging:
 		print("VM: ADD_OPTION line=%s dest=%d available=%s" % [option.line_id, option.destination, option.is_available])
 	_pending_options.append(option)
 

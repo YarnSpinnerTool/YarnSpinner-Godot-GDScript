@@ -16,7 +16,6 @@
 #                                                                          #
 # ======================================================================== #
 
-class_name YarnCommandRegistration
 extends RefCounted
 ## Handles registration and discovery of yarn commands and functions.
 

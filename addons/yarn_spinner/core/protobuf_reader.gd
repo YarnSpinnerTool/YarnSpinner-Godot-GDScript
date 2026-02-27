@@ -16,7 +16,6 @@
 #                                                                          #
 # ======================================================================== #
 
-class_name YarnProtobufReader
 extends RefCounted
 ## Binary protobuf reader for parsing .yarnc files.
 

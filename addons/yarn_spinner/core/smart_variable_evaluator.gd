@@ -60,31 +60,31 @@ func is_smart_variable(variable_name: String) -> bool:
 	return false
 
 
-## Returns [true, value] or [false, null].
-func try_get_smart_variable(variable_name: String) -> Array:
+## Returns {found: bool, value: Variant}.
+func try_get_smart_variable(variable_name: String) -> Dictionary:
 	if _evaluators.has(variable_name):
 		var evaluator: Callable = _evaluators[variable_name]
 		if not evaluator.is_valid():
 			push_warning("Smart variable '%s' has invalid evaluator" % variable_name)
-			return [false, null]
+			return {found = false, value = null}
 		var value: Variant = evaluator.call()
-		return [true, value]
+		return {found = true, value = value}
 
 	if _program != null and _library != null:
 		var result := try_evaluate_from_program(variable_name, _program, _library)
-		if result[0]:
+		if result.found:
 			return result
 
-	return [false, null]
+	return {found = false, value = null}
 
 
-## Returns [true, value] or [false, null].
-func try_evaluate_from_program(variable_name: String, program: YarnProgram, library: YarnLibrary) -> Array:
+## Returns {found: bool, value: Variant}.
+func try_evaluate_from_program(variable_name: String, program: YarnProgram, library: YarnLibrary) -> Dictionary:
 	var smart_nodes := program.get_smart_variable_nodes()
 	for node in smart_nodes:
 		if node.node_name == variable_name:
 			return YarnSmartVariableVM.try_evaluate(node, _variable_storage, library)
-	return [false, null]
+	return {found = false, value = null}
 
 
 func get_smart_variable_names() -> PackedStringArray:
