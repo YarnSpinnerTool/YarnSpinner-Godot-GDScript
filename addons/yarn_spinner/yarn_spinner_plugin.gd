@@ -24,6 +24,7 @@ extends EditorPlugin
 const YarnProjectImporter := preload("res://addons/yarn_spinner/editor/yarn_project_importer.gd")
 const YarnFileImporter := preload("res://addons/yarn_spinner/editor/yarn_file_importer.gd")
 const YarnEditorScript := preload("res://addons/yarn_spinner/editor/yarn_editor.gd")
+const YarnInspectorPlugin := preload("res://addons/yarn_spinner/editor/yarn_inspector_plugin.gd")
 
 const SETTING_YSC_PATH := "yarn_spinner/compiler/ysc_path"
 const SETTING_AUTO_YSLS := "yarn_spinner/ysls/auto_regenerate"
@@ -31,6 +32,7 @@ const SETTING_AUTO_YSLS := "yarn_spinner/ysls/auto_regenerate"
 var _yarn_project_importer: EditorImportPlugin
 var _yarn_file_importer: EditorImportPlugin
 var _yarn_editor: Control
+var _inspector_plugin: EditorInspectorPlugin
 var _ysls_regenerate_timer: Timer
 var _ysls_needs_regenerate: bool = false
 var _reimport_timer: Timer
@@ -52,6 +54,9 @@ func _enter_tree() -> void:
 	add_custom_type("YarnProject", "Resource", preload("res://addons/yarn_spinner/yarn_project_resource.gd"), project_icon)
 
 	add_autoload_singleton("YarnSpinner", "res://addons/yarn_spinner/yarn_spinner.gd")
+
+	_inspector_plugin = YarnInspectorPlugin.new()
+	add_inspector_plugin(_inspector_plugin)
 
 	_yarn_editor = YarnEditorScript.new()
 	add_control_to_bottom_panel(_yarn_editor, "Yarn")
@@ -108,6 +113,10 @@ func _exit_tree() -> void:
 	if _ysls_regenerate_timer:
 		_ysls_regenerate_timer.queue_free()
 		_ysls_regenerate_timer = null
+
+	if _inspector_plugin:
+		remove_inspector_plugin(_inspector_plugin)
+		_inspector_plugin = null
 
 	if _yarn_editor:
 		remove_control_from_bottom_panel(_yarn_editor)
