@@ -18,10 +18,10 @@ Make sure you have a `.yarnproject` and your `.yarn` files, then drop them into 
 
 If `ysc` (the Yarn Spinner compiler) is on your system PATH, compilation is automatic. Whenever Godot imports or reimports the `.yarnproject`, the plugin runs `ysc compile` for all `.yarn` files in scope. Editing a `.yarn` file or the `.yarnproject` itself triggers a reimport, so you never need to compile manually.
 
-Install `ysc` globally with:
+Install the required version of `ysc` globally with:
 
 ```
-dotnet tool install -g YarnSpinner.Console
+dotnet tool install YarnSpinner.Console --global --version 3.1.0-alpha1`
 ```
 
 ### Manual compilation
