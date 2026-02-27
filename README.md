@@ -12,6 +12,17 @@ Requires Godot 4.6 or later (not the .NET/Mono version).
 
 Visit the [documentation](https://docs.yarnspinner.dev/yar-spinner-for-godot/godot-gdscript) and [Yarn Spinner site](https://yarnspiner.dev) for more information.
 
+## Samples
+
+We only have a few Samples in the Alpha period. To try them, open `project.godot` in your installation of Godot 4.6+, then open the Scene for the sample you want to try, and run it with the "Run Current Scene" (F6) button. The included samples are:
+
+- **Yarn Basics** -- An interactive tour of Yarn language features: variables, conditionals, options, jumps, detours, commands, functions, once statements, and markup. Focuses on the Yarn language itself rather than GDScript integration.
+- **Voice Over** -- Demonstrates voice acting playback synced with dialogue, with localisation across four languages (English, German, Chinese, Portuguese). Uses Godot's TranslationServer and supports live language switching during dialogue.
+- **Commands and Functions** -- Demonstrates registering custom Yarn commands and functions using the `YarnBindingLoader` system. Binds game actions (camera shake, screen fade, inventory, health) to Yarn commands so they can be called from dialogue scripts.
+- **Instance Commands** -- Shows how to call methods on specific scene nodes from Yarn using instance commands. Characters define `_yarn_command_*` methods, and Yarn scripts target them by name (e.g. `<<move mae center>>`). Supports both instant and async (dialogue-blocking) commands.
+
+The intention is that Yarn Spinner for Godot (C#) and Godot (GDScript) will ship with a full suite of samples on par with the samples supplied as part of Yarn Spinner for Unity.
+
 ## Differences from Yarn Spinner for Godot (C#)
 
 Yarn Spinner for Godot (C#) is a port of Yarn Spinner for Unity that uses the core Yarn Spinner C# library directly. 
