@@ -12,6 +12,8 @@ Requires Godot 4.6 or later (not the .NET/Mono version).
 
 Visit the [documentation](https://docs.yarnspinner.dev/yar-spinner-for-godot/godot-gdscript) and [Yarn Spinner site](https://yarnspiner.dev) for more information.
 
+**Please submit issues or feature requests via this form during the pre-release period:** https://thesecretlab.notion.site/31575227b0e280e4ab0bdf5fd0cf9310
+
 ## Samples
 
 We only have a few Samples in the Alpha period. To try them, open `project.godot` in your installation of Godot 4.6+, then open the Scene for the sample you want to try, and run it with the "Run Current Scene" (F6) button. The included samples are:
