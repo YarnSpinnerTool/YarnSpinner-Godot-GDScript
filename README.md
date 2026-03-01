@@ -12,7 +12,8 @@ Requires Godot 4.6 or later (not the .NET/Mono version).
 
 Visit the [documentation](https://docs.yarnspinner.dev/yar-spinner-for-godot/godot-gdscript) and [Yarn Spinner site](https://yarnspiner.dev) for more information.
 
-**Please submit issues or feature requests via this form during the pre-release period:** https://thesecretlab.notion.site/31575227b0e280e4ab0bdf5fd0cf9310
+> [!TIP]
+> **Please submit issues or feature requests via this form during the pre-release period:** http://yarnspinner.dev/pre-release-feedback
 
 ## Samples
 
