@@ -3,12 +3,11 @@
 importer="yarn_spinner.project"
 type="Resource"
 uid="uid://c005b5vpsmc56"
-path="res://.godot/imported/VoiceOver.yarnproject-cda8878a878fa2c31098ac1b5130b892.res"
+valid=false
 
 [deps]
 
 source_file="res://samples/voice_over/dialogue/VoiceOver.yarnproject"
-dest_files=["res://.godot/imported/VoiceOver.yarnproject-cda8878a878fa2c31098ac1b5130b892.res"]
 
 [params]
 

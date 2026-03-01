@@ -1,0 +1,14 @@
+[remap]
+
+importer="yarn_spinner.yarn_file"
+type="Resource"
+uid="uid://cv4xr02614m6r"
+path="res://.godot/imported/InstanceCommands.yarn-1ede32f382aed44acd966867cde63013.res"
+
+[deps]
+
+source_file="res://samples/instance_commands/dialogue/InstanceCommands.yarn"
+dest_files=["res://.godot/imported/InstanceCommands.yarn-1ede32f382aed44acd966867cde63013.res"]
+
+[params]
+
