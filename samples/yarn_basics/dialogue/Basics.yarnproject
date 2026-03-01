@@ -1,8 +1,9 @@
 {
-  "projectFileVersion": 3,
-  "sourceFiles": [
-    "**/*.yarn"
-  ],
-  "excludeFiles": [],
-  "baseLanguage": "en"
+    "projectFileVersion": 3,
+    "sourceFiles": [
+        "Basics.yarn"
+    ],
+    "excludeFiles": [],
+    "baseLanguage": "en",
+    "definitions": "C:\\YarnSpinner\\_SHIPPING\\YarnSpinner-Godot-GDScript\\samples\\yarn_basics\\dialogue\\Basics.ysls.json"
 }

@@ -25,6 +25,9 @@ const YarnProjectImporter := preload("res://addons/yarn_spinner/editor/yarn_proj
 const YarnFileImporter := preload("res://addons/yarn_spinner/editor/yarn_file_importer.gd")
 const YarnEditorScript := preload("res://addons/yarn_spinner/editor/yarn_editor.gd")
 const YarnInspectorPlugin := preload("res://addons/yarn_spinner/editor/yarn_inspector_plugin.gd")
+const YarnCommandsPanelScript := preload("res://addons/yarn_spinner/editor/yarn_commands_panel.gd")
+const YarnVariableInspectorPlugin := preload("res://addons/yarn_spinner/editor/yarn_variable_inspector_plugin.gd")
+const YarnProjectInspectorPlugin := preload("res://addons/yarn_spinner/editor/yarn_project_inspector_plugin.gd")
 
 const SETTING_YSC_PATH := "yarn_spinner/compiler/ysc_path"
 const SETTING_AUTO_YSLS := "yarn_spinner/ysls/auto_regenerate"
@@ -33,6 +36,9 @@ var _yarn_project_importer: EditorImportPlugin
 var _yarn_file_importer: EditorImportPlugin
 var _yarn_editor: Control
 var _inspector_plugin: EditorInspectorPlugin
+var _commands_panel: Control
+var _variable_inspector_plugin: EditorInspectorPlugin
+var _project_inspector_plugin: EditorInspectorPlugin
 var _ysls_regenerate_timer: Timer
 var _ysls_needs_regenerate: bool = false
 var _reimport_timer: Timer
@@ -58,8 +64,17 @@ func _enter_tree() -> void:
 	_inspector_plugin = YarnInspectorPlugin.new()
 	add_inspector_plugin(_inspector_plugin)
 
+	_variable_inspector_plugin = YarnVariableInspectorPlugin.new()
+	add_inspector_plugin(_variable_inspector_plugin)
+
+	_project_inspector_plugin = YarnProjectInspectorPlugin.new()
+	add_inspector_plugin(_project_inspector_plugin)
+
 	_yarn_editor = YarnEditorScript.new()
 	add_control_to_bottom_panel(_yarn_editor, "Yarn")
+
+	_commands_panel = YarnCommandsPanelScript.new()
+	add_control_to_bottom_panel(_commands_panel, "Yarn Commands")
 
 	var fs := EditorInterface.get_resource_filesystem()
 	if fs:
@@ -114,9 +129,22 @@ func _exit_tree() -> void:
 		_ysls_regenerate_timer.queue_free()
 		_ysls_regenerate_timer = null
 
+	if _project_inspector_plugin:
+		remove_inspector_plugin(_project_inspector_plugin)
+		_project_inspector_plugin = null
+
+	if _variable_inspector_plugin:
+		remove_inspector_plugin(_variable_inspector_plugin)
+		_variable_inspector_plugin = null
+
 	if _inspector_plugin:
 		remove_inspector_plugin(_inspector_plugin)
 		_inspector_plugin = null
+
+	if _commands_panel:
+		remove_control_from_bottom_panel(_commands_panel)
+		_commands_panel.queue_free()
+		_commands_panel = null
 
 	if _yarn_editor:
 		remove_control_from_bottom_panel(_yarn_editor)

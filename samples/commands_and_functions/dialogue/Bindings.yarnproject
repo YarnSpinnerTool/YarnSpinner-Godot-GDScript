@@ -1,8 +1,12 @@
 {
-  "projectFileVersion": 3,
-  "sourceFiles": [
-    "**/*.yarn"
-  ],
-  "excludeFiles": [],
-  "baseLanguage": "en"
+    "projectFileVersion": 3,
+    "sourceFiles": [
+        "Bindings.yarn"
+    ],
+    "excludeFiles": [],
+    "baseLanguage": "en",
+    "definitions": [
+        "Bindings.ysls.json",
+        "..\\..\\instance_commands\\dialogue\\game.ysls.json"
+    ]
 }

@@ -20,9 +20,19 @@
 extends EditorInspectorPlugin
 ## Adds a branded Yarn Spinner header to the YarnDialogueRunner inspector.
 
+const YarnNodePickerProperty := preload("res://addons/yarn_spinner/editor/yarn_node_picker_property.gd")
+
 
 func _can_handle(object: Object) -> bool:
 	return object is YarnDialogueRunner
+
+
+func _parse_property(_object: Object, _type: Variant.Type, name: String, _hint_type: PropertyHint, _hint_string: String, _usage_flags: int, _wide: bool) -> bool:
+	if name == "start_node":
+		var picker := YarnNodePickerProperty.new()
+		add_property_editor("start_node", picker)
+		return true
+	return false
 
 
 func _parse_begin(object: Object) -> void:

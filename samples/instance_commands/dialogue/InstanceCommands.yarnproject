@@ -1,0 +1,8 @@
+{
+    "projectFileVersion": 2,
+    "sourceFiles": [
+        "InstanceCommands.yarn"
+    ],
+    "baseLanguage": "en",
+    "definitions": "InstanceCommands.ysls.json"
+}

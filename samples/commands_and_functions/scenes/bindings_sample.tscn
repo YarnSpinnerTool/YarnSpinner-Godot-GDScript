@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://etupux271o6q"]
+[gd_scene format=3 uid="uid://etupux271o6q"]
 
 [ext_resource type="Script" uid="uid://bmwxg7gxw5cm6" path="res://samples/commands_and_functions/scripts/bindings_sample.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://flra500ihbix" path="res://addons/yarn_spinner/dialogue_runner.gd" id="2_runner"]
@@ -32,27 +32,28 @@ corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
-[node name="BindingsSample" type="Node2D"]
+[node name="BindingsSample" type="Node2D" unique_id=2061687433]
 script = ExtResource("1_main")
 
-[node name="Camera2D" type="Camera2D" parent="."]
+[node name="Camera2D" type="Camera2D" parent="." unique_id=71385710]
 script = ExtResource("7_camera")
 
-[node name="Player" type="Node" parent="."]
+[node name="Player" type="Node" parent="." unique_id=414383665]
 script = ExtResource("6_player")
 
-[node name="YarnDialogueRunner" type="Node" parent="."]
+[node name="YarnDialogueRunner" type="Node" parent="." unique_id=176966988]
 script = ExtResource("2_runner")
 yarn_project = ExtResource("9_project")
+start_node = "t"
 run_selected_option_as_line = true
 
-[node name="YarnBindingLoader" type="Node" parent="."]
+[node name="YarnBindingLoader" type="Node" parent="." unique_id=688884024]
 script = ExtResource("3_loader")
 verbose = true
 
-[node name="UILayer" type="CanvasLayer" parent="."]
+[node name="UILayer" type="CanvasLayer" parent="." unique_id=1922230738]
 
-[node name="Background" type="ColorRect" parent="UILayer"]
+[node name="Background" type="ColorRect" parent="UILayer" unique_id=993645782]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -60,7 +61,7 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.08, 0.06, 0.12, 1)
 
-[node name="LinePresenter" type="PanelContainer" parent="UILayer"]
+[node name="LinePresenter" type="PanelContainer" parent="UILayer" unique_id=245938049]
 visible = false
 anchors_preset = 12
 anchor_top = 1.0
@@ -75,16 +76,16 @@ grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 script = ExtResource("4_line")
 
-[node name="VBox" type="VBoxContainer" parent="UILayer/LinePresenter"]
+[node name="VBox" type="VBoxContainer" parent="UILayer/LinePresenter" unique_id=2140787345]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="CharacterLabel" type="Label" parent="UILayer/LinePresenter/VBox"]
+[node name="CharacterLabel" type="Label" parent="UILayer/LinePresenter/VBox" unique_id=1570171582]
 layout_mode = 2
 theme_override_font_sizes/font_size = 28
 text = "Character"
 
-[node name="TextLabel" type="RichTextLabel" parent="UILayer/LinePresenter/VBox"]
+[node name="TextLabel" type="RichTextLabel" parent="UILayer/LinePresenter/VBox" unique_id=550198575]
 custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
 size_flags_vertical = 3
@@ -93,14 +94,14 @@ bbcode_enabled = true
 text = "Dialogue text goes here..."
 fit_content = true
 
-[node name="ContinueIndicator" type="Label" parent="UILayer/LinePresenter/VBox"]
+[node name="ContinueIndicator" type="Label" parent="UILayer/LinePresenter/VBox" unique_id=835758433]
 layout_mode = 2
 size_flags_horizontal = 8
 theme_override_colors/font_color = Color(0.6, 0.6, 0.6, 1)
 theme_override_font_sizes/font_size = 18
 text = "Press Space to continue..."
 
-[node name="OptionsPresenter" type="PanelContainer" parent="UILayer"]
+[node name="OptionsPresenter" type="PanelContainer" parent="UILayer" unique_id=1785423707]
 visible = false
 anchors_preset = 8
 anchor_left = 0.5
@@ -116,11 +117,11 @@ grow_vertical = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
 script = ExtResource("5_options")
 
-[node name="OptionsContainer" type="VBoxContainer" parent="UILayer/OptionsPresenter"]
+[node name="OptionsContainer" type="VBoxContainer" parent="UILayer/OptionsPresenter" unique_id=980503050]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="ScreenEffects" type="ColorRect" parent="UILayer"]
+[node name="ScreenEffects" type="ColorRect" parent="UILayer" unique_id=1551389309]
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -130,7 +131,7 @@ mouse_filter = 2
 color = Color(0, 0, 0, 0)
 script = ExtResource("8_screen")
 
-[node name="UI" type="Control" parent="UILayer"]
+[node name="UI" type="Control" parent="UILayer" unique_id=1602592996]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -139,7 +140,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="Title" type="Label" parent="UILayer/UI"]
+[node name="Title" type="Label" parent="UILayer/UI" unique_id=1594597633]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -153,7 +154,7 @@ theme_override_font_sizes/font_size = 32
 text = "Yarn Bindings Sample"
 horizontal_alignment = 1
 
-[node name="Subtitle" type="Label" parent="UILayer/UI"]
+[node name="Subtitle" type="Label" parent="UILayer/UI" unique_id=1512563926]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -168,7 +169,7 @@ theme_override_font_sizes/font_size = 16
 text = "Demonstrates YarnBindingLoader for Inspector-Based Command/Function Setup"
 horizontal_alignment = 1
 
-[node name="StatusPanel" type="PanelContainer" parent="UILayer/UI"]
+[node name="StatusPanel" type="PanelContainer" parent="UILayer/UI" unique_id=573120862]
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
@@ -180,14 +181,14 @@ offset_bottom = 140.0
 grow_horizontal = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_status")
 
-[node name="StatusLabel" type="Label" parent="UILayer/UI/StatusPanel"]
+[node name="StatusLabel" type="Label" parent="UILayer/UI/StatusPanel" unique_id=1757662257]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
 text = "Health: 100/100
 Gold: 50
 Inventory: (empty)"
 
-[node name="StartButton" type="Button" parent="UILayer/UI"]
+[node name="StartButton" type="Button" parent="UILayer/UI" unique_id=1290219434]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -202,7 +203,7 @@ grow_horizontal = 2
 grow_vertical = 2
 text = "Start Dialogue"
 
-[node name="RestartButton" type="Button" parent="UILayer/UI"]
+[node name="RestartButton" type="Button" parent="UILayer/UI" unique_id=59165536]
 visible = false
 layout_mode = 1
 anchors_preset = 8
@@ -218,7 +219,7 @@ grow_horizontal = 2
 grow_vertical = 2
 text = "Restart"
 
-[node name="Instructions" type="Label" parent="UILayer/UI"]
+[node name="Instructions" type="Label" parent="UILayer/UI" unique_id=285691512]
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
