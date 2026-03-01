@@ -10,7 +10,9 @@ This gets you from zero to running dialogue in about five minutes. It assumes yo
 
 > [!TIP]
 > **Please submit issues or feature requests via this form during the pre-release period:** http://yarnspinner.dev/pre-release-feedback
-> 
+
+Visit the [documentation](https://docs.yarnspinner.dev/yar-spinner-for-godot/godot-gdscript) and [Yarn Spinner site](https://yarnspiner.dev) for more information.
+
 ## Install the Plugin
 
 1. Copy `addons/yarn_spinner/` into your Godot project's `addons/` directory.
