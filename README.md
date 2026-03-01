@@ -49,7 +49,7 @@ The VM, protobuf parser, library, and markup system were all written to match Un
 
 ## License
 
-This project uses the Yarn Spinner Public License. You're free to use it in your own projects, commercial or otherwise. The only restrictions are around redistributing it as part of a competing dialogue tool, and using it to train AI models. Full details are in [LICENSE.md](LICENSE.md).
+This project uses the Yarn Spinner Public License. You're free to use it in your own projects, commercial or otherwise. The only restrictions are around redistributing it as part of a competing dialogue tool, and using it to train AI models. Full details are in [LICENSE.md](LICENSE.md). For a plain-language summary of the license terms and the intent behind its use, see the [YSPL FAQ](https://yarnspinner.dev/yspl).
 
 ## Installation
 
