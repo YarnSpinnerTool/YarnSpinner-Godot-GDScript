@@ -23,20 +23,5 @@
         }
     },
     "definitions": "VoiceOver.ysls.json",
-    "compilerOptions": {
-        "playgroundOptions": {
-            "editorCharacterColors": [
-                {
-                    "id": "Anne",
-                    "name": "Anne",
-                    "colour": "#91d945"
-                },
-                {
-                    "id": "Tom",
-                    "name": "Tom",
-                    "colour": "#ba40a4"
-                }
-            ]
-        }
-    }
+    "compilerOptions": {}
 }
