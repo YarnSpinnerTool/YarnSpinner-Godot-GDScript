@@ -63,6 +63,8 @@ func _validate_variable_name(variable_name: String) -> bool:
 func set_value(variable_name: String, value: Variant) -> void:
 	if not _validate_variable_name(variable_name):
 		return
+	if not validate_value_type(variable_name, value):
+		return
 	var old_value: Variant = _variables.get(variable_name)
 	_variables[variable_name] = value
 	if old_value != value:

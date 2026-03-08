@@ -205,6 +205,56 @@ func set_value(variable_name: String, value: Variant) -> void:
 	push_error("variable storage: set_value not implemented")
 
 
+## Returns the Yarn type name for a value: "string", "number", "bool", or "unknown".
+static func yarn_type_name(value: Variant) -> String:
+	if value is bool:
+		return "bool"
+	if value is float or value is int:
+		return "number"
+	if value is String:
+		return "string"
+	return "unknown"
+
+
+## Returns true if two values have compatible Yarn types.
+## int and float are both "number" and are considered compatible.
+static func is_yarn_type_compatible(a: Variant, b: Variant) -> bool:
+	return yarn_type_name(a) == yarn_type_name(b)
+
+
+## Validate that value has the correct type for variable_name.
+## Checks against the currently stored value or the program's declared initial value.
+## Returns true if the value is acceptable, false if it should be rejected.
+func validate_value_type(variable_name: String, value: Variant) -> bool:
+	# Reject non-Yarn types (arrays, objects, etc.) regardless
+	var type_name := yarn_type_name(value)
+	if type_name == "unknown":
+		push_error("variable storage: cannot store %s in Yarn variable '%s' — Yarn variables must be string, number, or bool" % [type_string(typeof(value)), variable_name])
+		return false
+
+	# Find the existing value to check type against
+	var existing: Variant = null
+	var has_existing := false
+
+	var result := try_get_value(variable_name)
+	if result.found:
+		existing = result.value
+		has_existing = true
+	elif _program != null and _program.has_initial_value(variable_name):
+		existing = _program.get_initial_value(variable_name)
+		has_existing = true
+
+	if not has_existing:
+		# New variable with no declared type — allow any Yarn-compatible type
+		return true
+
+	if not is_yarn_type_compatible(existing, value):
+		push_error("variable storage: cannot assign %s value to variable '%s' (expected %s)" % [type_name, variable_name, yarn_type_name(existing)])
+		return false
+
+	return true
+
+
 ## Returns {found: bool, value: Variant}.
 func try_get_value(variable_name: String) -> Dictionary:
 	push_error("variable storage: try_get_value not implemented")
