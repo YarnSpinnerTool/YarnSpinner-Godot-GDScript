@@ -1,4 +1,5 @@
 title: Start
+position: 65,12
 ---
 <<declare $gold = 50>>
 <<declare $health = 100>>
@@ -20,6 +21,7 @@ title: Start
 ===
 
 title: MainMenu
+position: 65,237
 ---
 // Show player status
 Merchant: You have {$gold} gold coins.
@@ -37,6 +39,7 @@ Merchant: You have {$gold} gold coins.
 ===
 
 title: Shop
+position: 32,462
 ---
 Merchant: I have many fine items for sale!
 Merchant: I see you already have a sword. Nice choice! <<if $has_sword>>
@@ -68,6 +71,7 @@ Merchant: Hmm, you only have {$gold} gold. Get mroe! <<if $gold < 30>>
 ===
 
 title: Services
+position: 342,462
 ---
 Merchant: I also offer some... special services.
 
@@ -95,6 +99,7 @@ Merchant: I also offer some... special services.
 ===
 
 title: Farewell
+position: 622,462
 ---
 <<if $has_key>>
     Merchant: Safe travels! And remember... that key opens something important.

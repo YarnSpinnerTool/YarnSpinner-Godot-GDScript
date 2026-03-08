@@ -23,7 +23,7 @@ extends RefCounted
 
 signal variable_changed(variable_name: String)
 
-var _evaluators: Dictionary[String, Callable] = {}
+var _external_variables: Dictionary[String, Callable] = {}
 var _variable_storage: YarnVariableStorage
 
 
@@ -32,12 +32,12 @@ func attach_to_storage(storage: YarnVariableStorage) -> void:
 
 
 ## The callable should take no arguments and return the computed value.
-func register_smart_variable(variable_name: String, evaluator: Callable) -> void:
-	_evaluators[variable_name] = evaluator
+func register_external_variable(variable_name: String, evaluator: Callable) -> void:
+	_external_variables[variable_name] = evaluator
 
 
-func unregister_smart_variable(variable_name: String) -> void:
-	_evaluators.erase(variable_name)
+func unregister_external_variable(variable_name: String) -> void:
+	_external_variables.erase(variable_name)
 
 
 var _program: YarnProgram
@@ -50,7 +50,7 @@ func set_program_context(program: YarnProgram, library: YarnLibrary) -> void:
 
 
 func is_smart_variable(variable_name: String) -> bool:
-	if _evaluators.has(variable_name):
+	if _external_variables.has(variable_name):
 		return true
 	if _program != null:
 		var smart_nodes := _program.get_smart_variable_nodes()
@@ -62,10 +62,10 @@ func is_smart_variable(variable_name: String) -> bool:
 
 ## Returns {found: bool, value: Variant}.
 func try_get_smart_variable(variable_name: String) -> Dictionary:
-	if _evaluators.has(variable_name):
-		var evaluator: Callable = _evaluators[variable_name]
+	if _external_variables.has(variable_name):
+		var evaluator: Callable = _external_variables[variable_name]
 		if not evaluator.is_valid():
-			push_warning("Smart variable '%s' has invalid evaluator" % variable_name)
+			push_warning("External variable '%s' has invalid evaluator" % variable_name)
 			return {found = false, value = null}
 		var value: Variant = evaluator.call()
 		return {found = true, value = value}
@@ -89,18 +89,18 @@ func try_evaluate_from_program(variable_name: String, program: YarnProgram, libr
 
 func get_smart_variable_names() -> PackedStringArray:
 	var names := PackedStringArray()
-	for name in _evaluators.keys():
+	for name in _external_variables.keys():
 		names.append(name)
 	return names
 
 
 func notify_variable_changed(variable_name: String) -> void:
-	if _evaluators.has(variable_name):
+	if _external_variables.has(variable_name):
 		variable_changed.emit(variable_name)
 
 
 func clear() -> void:
-	_evaluators.clear()
+	_external_variables.clear()
 
 
 static func create_time_evaluator() -> Callable:
