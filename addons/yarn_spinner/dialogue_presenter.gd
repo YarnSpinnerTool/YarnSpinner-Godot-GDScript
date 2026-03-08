@@ -28,11 +28,17 @@ var dialogue_runner: YarnDialogueRunner
 var _cancellation_token: YarnCancellationToken
 
 
-## safely set visibility when attached to a CanvasItem node (Control, Node2D, etc.).
-## no-op if this presenter is a plain Node.
+## safely set visibility for this presenter's UI.
+## if the presenter itself is a CanvasItem, toggles its own visibility.
+## otherwise, toggles visibility on all direct CanvasItem children.
+## no-op for non-visual presenters (no CanvasItem children).
 func _set_presenter_visible(v: bool) -> void:
 	if is_class("CanvasItem"):
 		set("visible", v)
+	else:
+		for child in get_children():
+			if child is CanvasItem:
+				child.visible = v
 
 
 func on_dialogue_started() -> void:
