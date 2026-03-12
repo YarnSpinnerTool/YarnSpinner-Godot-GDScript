@@ -779,15 +779,17 @@ func _parse_string_with_diagnostics(input: String, locale_code: String, squish: 
 		if not has_character:
 			if _implicit_character_regex == null:
 				_implicit_character_regex = RegEx.new()
-				_implicit_character_regex.compile("^[^:]*:\\s*")
+				_implicit_character_regex.compile("^((?:[^:\\\\]|\\\\.)*?(?<!\\\\)):\\s*")
 
 			var match_result := _implicit_character_regex.search(final_text)
 			if match_result:
-				# trim only trailing : and space characters (not leading)
-				var character_name := match_result.get_string().rstrip(": ")
+				var character_name := match_result.get_string(1).strip_edges()
 				var props: Array = [YarnMarkupProperty.from_string("name", character_name)]
 				var char_marker := YarnMarkupAttribute.new(0, 0, match_result.get_string().length(), CHARACTER_ATTRIBUTE, props)
 				attributes.append(char_marker)
+
+	# unescape \: to : now that character detection is done
+	final_text = final_text.replace("\\:", ":")
 
 	if sort:
 		attributes.sort_custom(func(a, b): return a.source_position < b.source_position)
