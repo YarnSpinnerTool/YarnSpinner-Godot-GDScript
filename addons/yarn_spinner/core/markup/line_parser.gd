@@ -39,6 +39,7 @@ const NO_MARKUP_ATTRIBUTE := "nomarkup"
 const _INTERNAL_INCREMENT := "_internalIncrementingProperty"
 
 static var _implicit_character_regex: RegEx
+static var _explicit_character_regex: RegEx = RegEx.create_from_string("^\\s*\\[character")
 enum LexerTokenType {
 	TEXT,
 	OPEN_MARKER,
@@ -749,6 +750,23 @@ func _parse_string_with_diagnostics(input: String, locale_code: String, squish: 
 		push_error("Input is null")
 		return {"markup": YarnMarkupParseResult.new(), "diagnostics": []}
 
+	# Implicit character detection: inject [character] markup before parsing,
+	# so the character attribute goes through the full markup pipeline
+	# (matching the canonical C# LineParser behaviour)
+	if add_implicit_character and not _explicit_character_regex.search(input):
+		if _implicit_character_regex == null:
+			_implicit_character_regex = RegEx.new()
+			_implicit_character_regex.compile("^(?<name>(?:[^:\\\\]|\\\\.)*)(?<suffix>:\\s*)")
+
+		var match_result := _implicit_character_regex.search(input)
+		if match_result:
+			var char_name := match_result.get_string("name")
+			var char_suffix := match_result.get_string("suffix")
+			input = "[character name=\"" + char_name + "\"]" + char_name + char_suffix + "[/character]" + input.substr(match_result.get_end())
+
+	# unescape \: to : now that character detection is done
+	input = input.replace("\\:", ":")
+
 	var tokens := _lex_markup(input)
 	var parse_result := _build_markup_tree_from_tokens(tokens, input)
 
@@ -767,29 +785,6 @@ func _parse_string_with_diagnostics(input: String, locale_code: String, squish: 
 		_squish_split_attributes(attributes)
 
 	var final_text: String = builder[0]
-
-	# add implicit character attribute
-	if add_implicit_character:
-		var has_character := false
-		for attr in attributes:
-			if attr.name == CHARACTER_ATTRIBUTE:
-				has_character = true
-				break
-
-		if not has_character:
-			if _implicit_character_regex == null:
-				_implicit_character_regex = RegEx.new()
-				_implicit_character_regex.compile("^((?:[^:\\\\]|\\\\.)*?(?<!\\\\)):\\s*")
-
-			var match_result := _implicit_character_regex.search(final_text)
-			if match_result:
-				var character_name := match_result.get_string(1).strip_edges()
-				var props: Array = [YarnMarkupProperty.from_string("name", character_name)]
-				var char_marker := YarnMarkupAttribute.new(0, 0, match_result.get_string().length(), CHARACTER_ATTRIBUTE, props)
-				attributes.append(char_marker)
-
-	# unescape \: to : now that character detection is done
-	final_text = final_text.replace("\\:", ":")
 
 	if sort:
 		attributes.sort_custom(func(a, b): return a.source_position < b.source_position)
