@@ -261,17 +261,20 @@ func try_get_value(variable_name: String) -> Dictionary:
 	return {found = false, value = null}
 
 
-## Checks stored, then program initial values, then smart variables.
+## Checks stored, then smart variables, then program initial values.
+##
+## Smart variables are checked before initial values because they are
+## expression-based and should always re-evaluate.
 func get_value(variable_name: String) -> Variant:
 	var result := try_get_value(variable_name)
 	if result.found:
 		return result.value
-	if _program != null and _program.has_initial_value(variable_name):
-		return _program.get_initial_value(variable_name)
 	if smart_variable_evaluator != null:
 		var smart_result := smart_variable_evaluator.try_get_smart_variable(variable_name)
 		if smart_result.found:
 			return smart_result.value
+	if _program != null and _program.has_initial_value(variable_name):
+		return _program.get_initial_value(variable_name)
 	# Internal Yarn variables are expected to not exist on first access
 	if not variable_name.begins_with("$Yarn.Internal."):
 		push_warning("variable storage: variable '%s' not found" % variable_name)
@@ -281,6 +284,8 @@ func get_value(variable_name: String) -> Variant:
 func get_variable_kind(variable_name: String) -> VariableKind:
 	if try_get_value(variable_name).found:
 		return VariableKind.STORED
+	if smart_variable_evaluator != null and smart_variable_evaluator.is_smart_variable(variable_name):
+		return VariableKind.SMART
 	if _program != null:
 		var kind: int = _program.get_variable_kind(variable_name)
 		if kind != YarnProgram.VariableKind.UNKNOWN:
@@ -288,17 +293,15 @@ func get_variable_kind(variable_name: String) -> VariableKind:
 				return VariableKind.STORED
 			elif kind == YarnProgram.VariableKind.SMART:
 				return VariableKind.SMART
-	if smart_variable_evaluator != null and smart_variable_evaluator.is_smart_variable(variable_name):
-		return VariableKind.SMART
 	return VariableKind.UNKNOWN
 
 
 func has_value(variable_name: String) -> bool:
 	if try_get_value(variable_name).found:
 		return true
-	if _program != null and _program.has_initial_value(variable_name):
-		return true
 	if smart_variable_evaluator != null and smart_variable_evaluator.is_smart_variable(variable_name):
+		return true
+	if _program != null and _program.has_initial_value(variable_name):
 		return true
 	return false
 
