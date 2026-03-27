@@ -46,14 +46,27 @@ func _parse_begin(object: Object) -> void:
 
 	if logo_texture:
 		var aspect := float(logo_texture.get_height()) / float(logo_texture.get_width())
-		var logo_width := 500.0
+		var max_logo_width := 500.0
+		var min_visible_width := 150.0
 		var logo := TextureRect.new()
 		logo.texture = logo_texture
 		logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		logo.custom_minimum_size = Vector2(logo_width, logo_width * aspect)
 		logo.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		container.add_child(logo)
+
+		# Responsive logo: shrinks with container, capped at max, hides when tiny
+		var _update_logo := func() -> void:
+			var available_w := container.size.x
+			if available_w < min_visible_width:
+				logo.visible = false
+				logo.custom_minimum_size = Vector2.ZERO
+			else:
+				logo.visible = true
+				var w := minf(available_w, max_logo_width)
+				logo.custom_minimum_size = Vector2(w, w * aspect)
+		container.resized.connect(_update_logo)
+		container.ready.connect(_update_logo)
 
 	# Links row using RichTextLabel for consistent alignment
 	var links_label := RichTextLabel.new()
@@ -61,7 +74,7 @@ func _parse_begin(object: Object) -> void:
 	links_label.fit_content = true
 	links_label.scroll_active = false
 	links_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	links_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	links_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	links_label.meta_clicked.connect(func(meta: Variant) -> void:
 		OS.shell_open(str(meta))
 	)

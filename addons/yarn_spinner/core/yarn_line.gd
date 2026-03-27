@@ -102,6 +102,16 @@ func parse_markup() -> void:
 		markup_attributes.append(attr)
 
 
+## the text with the character name prefix removed (e.g. "Name: hello" -> "hello").
+## equivalent to Unity's TextWithoutCharacterName.
+## if no character attribute is present, returns the same as text.
+var text_without_character_name: String:
+	get:
+		if markup_result == null:
+			parse_markup()
+		return text
+
+
 func get_plain_text() -> String:
 	return text
 

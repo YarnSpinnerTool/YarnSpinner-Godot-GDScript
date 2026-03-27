@@ -428,26 +428,6 @@ func get_smart_variable_evaluator() -> YarnSmartVariableEvaluator:
 	return _smart_variable_evaluator
 
 
-## Registers an external variable: a GDScript callable that provides a value
-## for a Yarn variable on demand. The callable takes no arguments and returns
-## the current value. Unlike smart variables (which are defined in Yarn scripts),
-## external variables are provided by your game code.
-## [codeblock]
-## dialogue_runner.register_external_variable("$player_health", func():
-##     return player.health
-## )
-## [/codeblock]
-func register_external_variable(variable_name: String, evaluator: Callable) -> void:
-	if _smart_variable_evaluator == null:
-		push_error("YarnDialogueRunner: smart variable evaluator not initialized")
-		return
-	_smart_variable_evaluator.register_external_variable(variable_name, evaluator)
-
-
-func unregister_external_variable(variable_name: String) -> void:
-	if _smart_variable_evaluator == null:
-		return
-	_smart_variable_evaluator.unregister_external_variable(variable_name)
 
 
 func get_line_provider() -> YarnLineProvider:
