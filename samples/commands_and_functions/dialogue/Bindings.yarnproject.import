@@ -3,11 +3,12 @@
 importer="yarn_spinner.project"
 type="Resource"
 uid="uid://dbrkeqma6pwys"
-valid=false
+path="res://.godot/imported/Bindings.yarnproject-2981e9a6ae67fa19441accb2667bb9aa.res"
 
 [deps]
 
 source_file="res://samples/commands_and_functions/dialogue/Bindings.yarnproject"
+dest_files=["res://.godot/imported/Bindings.yarnproject-2981e9a6ae67fa19441accb2667bb9aa.res"]
 
 [params]
 

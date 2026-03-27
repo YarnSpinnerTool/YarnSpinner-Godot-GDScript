@@ -64,24 +64,44 @@ func _parse_begin(object: Object) -> void:
 	# 2. Compilation Status
 	_add_compilation_status(container, has_compiled_data, program)
 
-	# 3. Statistics Grid
-	_add_statistics(container, project, program)
+	# If the resource is completely empty, show guidance instead of empty stats
+	if not has_compiled_data:
+		var help_label := RichTextLabel.new()
+		help_label.bbcode_enabled = true
+		help_label.fit_content = true
+		help_label.scroll_active = false
+		help_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		help_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		help_label.meta_clicked.connect(func(meta: Variant) -> void:
+			OS.shell_open(str(meta))
+		)
+		help_label.text = (
+			"[center]Yarn Projects are created by importing a [b].yarnproject[/b] file.\n"
+			+ "Create one using the [url=https://marketplace.visualstudio.com/items?itemName=SecretLab.yarn-spinner]"
+			+ "Yarn Spinner VS Code extension[/url], then import it into your project.\n\n"
+			+ "[url=https://docs.yarnspinner.dev/using-yarnspinner-with-godot/overview]"
+			+ "Learn more in the docs.[/url][/center]"
+		)
+		container.add_child(help_label)
+	else:
+		# 3. Statistics Grid
+		_add_statistics(container, project, program)
 
-	# 4. Source Files
-	_add_source_files(container, project)
+		# 4. Source Files
+		_add_source_files(container, project)
 
-	if program != null:
-		# 5. Nodes
-		_add_nodes_section(container, program)
+		if program != null:
+			# 5. Nodes
+			_add_nodes_section(container, program)
 
-		# 6. Declared Variables
-		_add_variables_section(container, program)
+			# 6. Declared Variables
+			_add_variables_section(container, program)
 
-		# 7. Smart Variables
-		_add_smart_variables_section(container, program)
+			# 7. Smart Variables
+			_add_smart_variables_section(container, program)
 
-		# 8. Localization (Feature 5)
-		_add_localization_section(container, project, program)
+			# 8. Localization (Feature 5)
+			_add_localization_section(container, project, program)
 
 	var bottom_separator := HSeparator.new()
 	bottom_separator.add_theme_constant_override("separation", 8)
@@ -123,28 +143,33 @@ func _add_statistics(container: VBoxContainer, project: YarnProjectResource, pro
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	var node_count := 0
-	var string_count := project.string_table.size()
+	var st: Variant = project.get("string_table")
+	var string_count: int = st.size() if st is Dictionary else 0
 	var variable_count := 0
 
 	if program != null:
 		node_count = program.nodes.size()
 		variable_count = program.initial_values.size()
 
+	var sf: Variant = project.get("source_files")
+	var source_count: int = sf.size() if sf is Array else 0
+
 	_add_stat(grid, "Nodes:", str(node_count))
 	_add_stat(grid, "Strings:", str(string_count))
 	_add_stat(grid, "Variables:", str(variable_count))
-	_add_stat(grid, "Source Files:", str(project.source_files.size()))
+	_add_stat(grid, "Source Files:", str(source_count))
 
 	container.add_child(grid)
 
 
 func _add_source_files(container: VBoxContainer, project: YarnProjectResource) -> void:
-	if project.source_files.is_empty():
+	var sf: Variant = project.get("source_files")
+	if not sf is Array or (sf as Array).is_empty():
 		return
 
 	_add_section_header(container, "Source Files")
 
-	for path in project.source_files:
+	for path in sf:
 		var label := Label.new()
 		label.text = "  " + path.get_file()
 		label.tooltip_text = path
@@ -214,7 +239,8 @@ func _add_localization_section(container: VBoxContainer, project: YarnProjectRes
 	_add_section_header(container, "Localization")
 
 	# Total strings count
-	var total_strings := project.string_table.size()
+	var st_loc: Variant = project.get("string_table")
+	var total_strings: int = st_loc.size() if st_loc is Dictionary else 0
 	_add_info_label(container, "  Localizable strings: %d" % total_strings)
 
 	# Per-locale coverage
@@ -310,7 +336,10 @@ func _type_name_for(value: Variant) -> String:
 func _count_translated_strings(project: YarnProjectResource, locale: String) -> int:
 	var count := 0
 	var prefix := "YARN_"
-	for line_id: String in project.string_table:
+	var st_val: Variant = project.get("string_table")
+	if not st_val is Dictionary:
+		return 0
+	for line_id: String in st_val:
 		var key: String = prefix + line_id
 		var translated: String = TranslationServer.translate(key)
 		if translated != key:

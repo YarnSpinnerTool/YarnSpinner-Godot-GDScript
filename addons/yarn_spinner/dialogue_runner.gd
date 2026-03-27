@@ -638,6 +638,10 @@ func _continue_dialogue() -> void:
 
 func _continue_dialogue_safe() -> void:
 	_content_complete_pending = false
+	if _vm.current_state == _vm.ExecutionState.WAITING_FOR_INPUT:
+		return
+	if _vm.current_state == _vm.ExecutionState.STOPPED:
+		return
 	_continue_dialogue()
 
 
