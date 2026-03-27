@@ -48,6 +48,8 @@ var _reimport_needed: bool = false
 func _enter_tree() -> void:
 	_register_project_settings()
 
+	add_tool_menu_item("Create Yarn Project...", _create_yarn_project)
+
 	_yarn_project_importer = YarnProjectImporter.new()
 	_yarn_file_importer = YarnFileImporter.new()
 	add_import_plugin(_yarn_project_importer)
@@ -157,6 +159,7 @@ func _exit_tree() -> void:
 	_yarn_file_importer = null
 
 	remove_custom_type("YarnProject")
+	remove_tool_menu_item("Create Yarn Project...")
 
 	remove_autoload_singleton("YarnSpinner")
 
@@ -238,6 +241,63 @@ func _do_ysls_regenerate() -> void:
 	for project_path in yarn_projects:
 		var ysls_path := project_path.get_basename() + ".ysls.json"
 		generator.save_ysls(ysls_path)
+
+
+func _create_yarn_project() -> void:
+	var dialog := FileDialog.new()
+	dialog.file_mode = FileDialog.FILE_MODE_SAVE_FILE
+	dialog.access = FileDialog.ACCESS_RESOURCES
+	dialog.filters = PackedStringArray(["*.yarnproject ; Yarn Project Files"])
+	dialog.current_file = "Project.yarnproject"
+	dialog.title = "Create Yarn Project"
+
+	dialog.file_selected.connect(func(path: String) -> void:
+		var project := {
+			"projectFileVersion": 4,
+			"sourceFiles": ["**/*.yarn"],
+			"baseLanguage": "en",
+		}
+		var json := JSON.stringify(project, "    ")
+		var file := FileAccess.open(path, FileAccess.WRITE)
+		if file:
+			file.store_string(json)
+			file.close()
+
+			# Create a starter .yarn file if none exist in the same directory
+			var dir_path := path.get_base_dir()
+			var has_yarn_files := false
+			var dir := DirAccess.open(dir_path)
+			if dir:
+				dir.list_dir_begin()
+				var fname := dir.get_next()
+				while not fname.is_empty():
+					if fname.ends_with(".yarn"):
+						has_yarn_files = true
+						break
+					fname = dir.get_next()
+				dir.list_dir_end()
+
+			if not has_yarn_files:
+				var yarn_name := path.get_file().get_basename()
+				var yarn_path := dir_path.path_join(yarn_name + ".yarn")
+				var yarn_file := FileAccess.open(yarn_path, FileAccess.WRITE)
+				if yarn_file:
+					yarn_file.store_string("title: Start\n---\n\n===\n")
+					yarn_file.close()
+
+			EditorInterface.get_resource_filesystem().scan()
+			print("Created Yarn project: ", path)
+		else:
+			push_error("Failed to create Yarn project at: ", path)
+		dialog.queue_free()
+	)
+
+	dialog.canceled.connect(func() -> void:
+		dialog.queue_free()
+	)
+
+	EditorInterface.get_base_control().add_child(dialog)
+	dialog.popup_centered(Vector2i(600, 400))
 
 
 func _find_yarn_projects(path: String) -> PackedStringArray:

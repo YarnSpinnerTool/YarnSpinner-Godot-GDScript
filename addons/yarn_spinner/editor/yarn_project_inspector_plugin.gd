@@ -49,7 +49,10 @@ func _parse_begin(object: Object) -> void:
 	var has_compiled_data := compiled_variant is PackedByteArray and not (compiled_variant as PackedByteArray).is_empty()
 	if has_compiled_data:
 		var compiled: PackedByteArray = compiled_variant
+		var parse_error := ""
 		program = _YarnProgramParser.parse_from_bytes(compiled)
+		if program == null:
+			parse_error = "Failed to parse compiled program data"
 		if program != null:
 			var st: Variant = project.get("string_table")
 			var lm: Variant = project.get("line_metadata")

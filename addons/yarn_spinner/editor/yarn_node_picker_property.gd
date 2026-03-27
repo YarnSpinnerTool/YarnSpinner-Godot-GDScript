@@ -76,7 +76,7 @@ func _get_node_names() -> PackedStringArray:
 		return PackedStringArray()
 
 	var project_variant: Variant = obj.get("yarn_project")
-	if project_variant == null:
+	if not (project_variant is Resource):
 		return PackedStringArray()
 
 	var compiled_variant: Variant = (project_variant as Resource).get("compiled_program")
