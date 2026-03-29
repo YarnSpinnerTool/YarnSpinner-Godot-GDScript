@@ -513,6 +513,9 @@ func remove_presenter(presenter: YarnDialoguePresenter) -> void:
 
 func signal_content_complete() -> void:
 	if _waiting_for_content and not _content_complete_pending:
+		if _vm.current_state == _vm.ExecutionState.WAITING_FOR_INPUT or _vm.current_state == _vm.ExecutionState.STOPPED:
+			_waiting_for_content = false
+			return
 		_waiting_for_content = false
 		_content_complete_pending = true
 		_vm.signal_content_complete()
