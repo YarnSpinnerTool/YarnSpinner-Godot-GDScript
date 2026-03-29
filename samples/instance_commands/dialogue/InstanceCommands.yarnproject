@@ -1,5 +1,5 @@
 {
-    "projectFileVersion": 2,
+    "projectFileVersion": 4,
     "sourceFiles": [
         "InstanceCommands.yarn"
     ],
