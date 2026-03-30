@@ -19,17 +19,53 @@
 @icon("res://addons/yarn_spinner/icons/options_presenter.svg")
 class_name YarnOptionsPresenter
 extends YarnDialoguePresenter
-## built-in presenter for displaying dialogue options.
-## creates buttons for each option and handles selection.
+## Built-in presenter for displaying dialogue options.
+## Creates buttons for each option and handles selection.
+##
+## When [member show_last_line] is enabled, the most recent dialogue line
+## is shown above the options (matching Unity's OptionsPresenter behaviour).
+## The [code][lastline][/code] markup tag can be used to truncate the
+## displayed text at that point.
 
 signal options_shown(options: Array[YarnOption])
 signal option_selected(index: int, option: YarnOption)
 
+@export_group("Options")
+
 @export var options_container: Container
+
 @export var option_button_scene: PackedScene
+
+## Hide options whose is_available is false (instead of showing them greyed out).
 @export var hide_unavailable: bool = false
-## input action prefix for keyboard shortcuts (e.g. "option_1", "option_2")
+
+## Input action prefix for keyboard shortcuts (e.g. "option_" → "option_1", "option_2").
 @export var option_action_prefix: String = ""
+
+@export_group("Last Line")
+
+## Show the most recent dialogue line above the options.
+@export var show_last_line: bool = false
+
+## Label or RichTextLabel to display the last line's text.
+## Only used when [member show_last_line] is enabled.
+@export var last_line_text: Control
+
+## Container holding the last line display (hidden when no last line).
+@export var last_line_container: Control
+
+## Label for the character name of the last line.
+@export var last_line_character_name_text: Control
+
+## Container for the character name (hidden when line has no character).
+@export var last_line_character_name_container: Control
+
+
+# ---------------------------------------------------------------------------
+# Internal state
+# ---------------------------------------------------------------------------
+
+const LASTLINE_MARKUP := "lastline"
 
 var _is_showing_options: bool = false
 var _current_options: Array[YarnOption] = []
@@ -37,6 +73,8 @@ var _option_buttons: Array[BaseButton] = []
 var _button_pool: Array[BaseButton] = []
 var _max_pool_size: int = 10
 var _selected_index: int = -1
+var _last_seen_line: YarnLine = null
+var _button_callbacks: Dictionary = {}
 signal _selection_made(index: int)
 
 
@@ -48,7 +86,10 @@ func _ready() -> void:
 				break
 
 
-func run_line(_line: YarnLine) -> Variant:
+func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
+	# Remember the last line for display above options (only if feature is on)
+	if show_last_line:
+		_last_seen_line = line
 	return null
 
 
@@ -68,6 +109,8 @@ func _input(event: InputEvent) -> void:
 func on_dialogue_started() -> void:
 	_set_presenter_visible(false)
 	_clear_options()
+	_last_seen_line = null
+	_hide_last_line()
 
 
 func on_dialogue_completed() -> void:
@@ -75,16 +118,19 @@ func on_dialogue_completed() -> void:
 	var was_showing := _is_showing_options
 	_is_showing_options = false
 	_clear_options()
+	_hide_last_line()
+	_last_seen_line = null
 	if was_showing:
 		_selection_made.emit(-1)
 
 
-func run_options(options: Array[YarnOption]) -> int:
+func run_options(options: Array[YarnOption], _token: YarnCancellationToken = null) -> int:
 	_current_options = options
 	_is_showing_options = true
 	_selected_index = -1
 
 	_clear_options()
+	_show_last_line()
 	_create_option_buttons()
 
 	_set_presenter_visible(true)
@@ -97,6 +143,66 @@ func run_options(options: Array[YarnOption]) -> int:
 
 	return await _wait_for_selection()
 
+
+# ---------------------------------------------------------------------------
+# Last line display
+# ---------------------------------------------------------------------------
+
+func _show_last_line() -> void:
+	if not show_last_line or _last_seen_line == null:
+		_hide_last_line()
+		return
+
+	var line_text := _last_seen_line.text
+	var char_name := _last_seen_line.character_name
+
+	# Show character name separately if we have a nameplate
+	if last_line_character_name_container != null:
+		if char_name.is_empty():
+			last_line_character_name_container.visible = false
+		else:
+			last_line_character_name_container.visible = true
+			if last_line_character_name_text != null:
+				_set_label_text(last_line_character_name_text, char_name)
+			# Use text without character prefix when showing name separately
+			line_text = _last_seen_line.text_without_character_name
+	else:
+		# No nameplate — use text without character prefix
+		line_text = _last_seen_line.text_without_character_name
+
+	# Handle [lastline] markup — show text AFTER the marker with "..." prefix
+	# (matching Unity: truncates everything before the marker)
+	var lastline_attr := _last_seen_line.try_get_attribute(LASTLINE_MARKUP)
+	if lastline_attr != null and lastline_attr.position >= 0 and lastline_attr.position <= line_text.length():
+		line_text = "..." + line_text.substr(lastline_attr.position).strip_edges()
+
+	# Show the line text
+	if last_line_text != null:
+		_set_label_text(last_line_text, line_text)
+
+	if last_line_container != null:
+		last_line_container.visible = true
+
+
+func _hide_last_line() -> void:
+	if last_line_container != null:
+		last_line_container.visible = false
+	if last_line_character_name_container != null:
+		last_line_character_name_container.visible = false
+
+
+func _set_label_text(control: Control, value: String) -> void:
+	if control is RichTextLabel:
+		control.text = value
+	elif control is Label:
+		control.text = value
+	elif control.has_method("set_text"):
+		control.set_text(value)
+
+
+# ---------------------------------------------------------------------------
+# Option buttons
+# ---------------------------------------------------------------------------
 
 func _wait_for_selection() -> int:
 	if not _is_showing_options:
@@ -156,9 +262,6 @@ func _get_pooled_button() -> BaseButton:
 	return button
 
 
-var _button_callbacks: Dictionary = {}
-
-
 func _exit_tree() -> void:
 	for button in _button_pool:
 		if is_instance_valid(button):
@@ -178,8 +281,11 @@ func _create_option_buttons() -> void:
 
 		if button is Button:
 			button.text = option.get_plain_text()
-			button.custom_minimum_size = Vector2(0, 80)
-			button.add_theme_font_size_override("font_size", 40)
+			# Only apply default styling when no custom button scene is set.
+			# When using a custom scene, respect its existing theme/size.
+			if option_button_scene == null:
+				button.custom_minimum_size = Vector2(0, 80)
+				button.add_theme_font_size_override("font_size", 40)
 		elif button.has_method("set_option_text"):
 			button.set_option_text(option.get_plain_text())
 
@@ -213,6 +319,7 @@ func _select_option(index: int) -> void:
 	_selected_index = index
 	_is_showing_options = false
 	_set_presenter_visible(false)
+	_hide_last_line()
 
 	option_selected.emit(index, option)
 	_selection_made.emit(index)

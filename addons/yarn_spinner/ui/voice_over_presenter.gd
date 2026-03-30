@@ -59,7 +59,7 @@ func _ready() -> void:
 		add_child(audio_player)
 
 
-func run_line(line: YarnLine) -> Variant:
+func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
 	_current_line = line
 	_is_playing = false
 

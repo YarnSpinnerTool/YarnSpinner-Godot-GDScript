@@ -45,7 +45,7 @@ script = ExtResource("6_player")
 script = ExtResource("2_runner")
 yarn_project = ExtResource("9_project")
 start_node = "t"
-run_selected_option_as_line = true
+show_selected_option_as_line = true
 ysls_scan_path = "res://samples/commands_and_functions"
 
 [node name="YarnBindingLoader" type="Node" parent="." unique_id=688884024]

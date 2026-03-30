@@ -27,7 +27,7 @@ func on_dialogue_completed() -> void:
 		audio_player.stop()
 
 
-func run_line(line: YarnLine) -> Variant:
+func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
 	# try to get localised audio
 	var audio: AudioStream = dialogue_runner.get_localised_audio(line.line_id)
 
@@ -39,17 +39,17 @@ func run_line(line: YarnLine) -> Variant:
 		audio_player.play()
 
 		# connect to cancellation to stop audio if user skips
-		if _cancellation_token != null:
+		if _token != null:
 			var on_skip := func():
 				if audio_player != null and audio_player.playing:
 					audio_player.stop()
-			_cancellation_token.next_content_requested.connect(on_skip, CONNECT_ONE_SHOT)
+			_token.next_content_requested.connect(on_skip, CONNECT_ONE_SHOT)
 
 	# don't block - audio plays in background while text displays
 	return null
 
 
-func run_options_with_token(_options: Array[YarnOption], _token: YarnCancellationToken) -> int:
+func run_options(_options: Array[YarnOption], _token: YarnCancellationToken = null) -> int:
 	# don't handle options
 	return -1
 

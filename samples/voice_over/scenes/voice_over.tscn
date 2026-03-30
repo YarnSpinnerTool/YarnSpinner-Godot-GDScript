@@ -41,7 +41,7 @@ color = Color(0.05, 0.05, 0.1, 1)
 [node name="YarnDialogueRunner" type="Node" parent="." unique_id=2045027044]
 script = ExtResource("2_runner")
 yarn_project = ExtResource("8_project")
-run_selected_option_as_line = true
+show_selected_option_as_line = true
 ysls_scan_path = "res://samples/voice_over"
 
 [node name="LinePresenter" type="PanelContainer" parent="YarnDialogueRunner" unique_id=1991175960]

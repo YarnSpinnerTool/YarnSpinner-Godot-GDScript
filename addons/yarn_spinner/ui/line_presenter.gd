@@ -152,7 +152,7 @@ func _kill_typewriter_tween() -> void:
 		_typewriter_tween = null
 
 
-func run_line(line: YarnLine) -> Variant:
+func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
 	_current_line = line
 	_is_displaying = true
 	_is_fully_revealed = false

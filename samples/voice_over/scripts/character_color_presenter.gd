@@ -27,7 +27,7 @@ func on_dialogue_completed() -> void:
 	pass
 
 
-func run_line(line: YarnLine) -> Variant:
+func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
 	var color := default_color
 
 	if not line.character_name.is_empty():
@@ -46,6 +46,6 @@ func run_line(line: YarnLine) -> Variant:
 	return null
 
 
-func run_options_with_token(_options: Array[YarnOption], _token: YarnCancellationToken) -> int:
+func run_options(_options: Array[YarnOption], _token: YarnCancellationToken = null) -> int:
 	# don't handle options
 	return -1

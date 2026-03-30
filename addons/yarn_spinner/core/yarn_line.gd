@@ -18,45 +18,76 @@
 
 class_name YarnLine
 extends RefCounted
-## a line of dialogue with substitution, markup, and localisation support.
-## corresponds to Unity's LocalizedLine.
+## A line of dialogue with substitution, markup, and localisation support.
+##
+## Access [member text] and [member character_name] directly — substitutions
+## and markup are applied lazily on first access. For raw data, use
+## [member raw_text] and [member substitutions].
 
 
+## The string table ID for this line (e.g. "line:tutorial-tom-01").
 var line_id: String = ""
 
-
-## values replacing {0}, {1}, etc. placeholders in raw_text.
+## Values replacing {0}, {1}, etc. placeholders in [member raw_text].
 var substitutions: Array[String] = []
 
-
-## localised text before substitution, still containing placeholders and markup.
+## Localised text before substitution — still contains {0} placeholders
+## and markup tags. Set by the line provider.
 var raw_text: String = ""
-
-
-## final text after substitution and markup removal.
-var text: String = ""
-
-
-## extracted from [character] markup or implicit "Name:" pattern.
-var character_name: String = ""
-
 
 ## #hashtag metadata from the yarn source.
 var metadata: PackedStringArray = PackedStringArray()
 
+## BCP-47 locale for [plural] and [ordinal] rules.
+var locale_code: String = "en"
 
-## parsed markup attributes from parse_markup(), each with name, position, and length.
+## Parsed markup attributes — populated on first access to [member text].
 var markup_attributes: Array[YarnMarkupAttribute] = []
 
-
+## Full markup parse result — populated on first access to [member text].
 var markup_result: YarnMarkupParseResult = null
 
 
+# ---------------------------------------------------------------------------
+# Lazy-computed properties
+# ---------------------------------------------------------------------------
+
+var _text_computed: bool = false
+var _text: String = ""
+var _character_name: String = ""
+
+## Final text after substitution, markup processing, and character name
+## extraction. Computed lazily on first access.
+var text: String:
+	get:
+		_ensure_processed()
+		return _text
+	set(value):
+		_text = value
+		_text_computed = true
+
+## Character name extracted from [character] markup or implicit "Name:" pattern.
+## Computed lazily alongside [member text].
+var character_name: String:
+	get:
+		_ensure_processed()
+		return _character_name
+	set(value):
+		_character_name = value
+
+## The text with the character name prefix removed.
+## Equivalent to Unity's TextWithoutCharacterName.
+var text_without_character_name: String:
+	get:
+		_ensure_processed()
+		return _text
+
+
+# ---------------------------------------------------------------------------
+# Processing
+# ---------------------------------------------------------------------------
+
 static var _line_parser: YarnLineParser
-
-
-## BCP-47 locale for [plural] and [ordinal] rules.
-var locale_code: String = "en"
 
 
 static func _ensure_parser_initialized() -> void:
@@ -68,98 +99,116 @@ static func _ensure_parser_initialized() -> void:
 		_line_parser.register_marker_processor("ordinal", builtin_replacer)
 
 
-func apply_substitutions() -> void:
-	text = YarnLineParser.expand_substitutions(raw_text, substitutions)
+func _ensure_processed() -> void:
+	if _text_computed:
+		return
+	_text_computed = true
 
+	# Step 1: Apply substitutions
+	_text = YarnLineParser.expand_substitutions(raw_text, substitutions)
 
-## extracts markup attributes, sets plain text, and populates character_name.
-## removes the character prefix (e.g. "Name: ") from the text so presenters
-## can show it separately in a nameplate.
-func parse_markup() -> void:
+	# Step 2: Parse markup
 	_ensure_parser_initialized()
+	markup_result = _line_parser.parse_string(_text, locale_code, true)
+	_text = markup_result.text
 
-	markup_result = _line_parser.parse_string(text, locale_code, true)
-	text = markup_result.text
-
-	# find and extract the character attribute first
+	# Step 3: Extract character name
 	var char_attr: YarnMarkupAttribute = null
 	for attr in markup_result.attributes:
-		if attr.name == YarnLineParser.CHARACTER_ATTRIBUTE and character_name.is_empty():
+		if attr.name == YarnLineParser.CHARACTER_ATTRIBUTE and _character_name.is_empty():
 			char_attr = attr
 			var name_prop: YarnMarkupValue = attr.try_get_property(YarnLineParser.CHARACTER_ATTRIBUTE_NAME_PROPERTY)
 			if name_prop != null:
-				character_name = name_prop.string_value
+				_character_name = name_prop.string_value
 			else:
-				character_name = markup_result.text_for_attribute(attr).strip_edges().trim_suffix(":")
+				_character_name = markup_result.text_for_attribute(attr).strip_edges().trim_suffix(":")
 
-	# strip the character prefix from the displayed text
+	# Step 4: Strip character prefix from displayed text
 	if char_attr != null and char_attr.length > 0:
 		markup_result = markup_result.delete_range(char_attr)
-		text = markup_result.text
+		_text = markup_result.text
 
+	# Step 5: Populate markup_attributes
 	markup_attributes.clear()
 	for attr in markup_result.attributes:
 		markup_attributes.append(attr)
 
 
-## the text with the character name prefix removed (e.g. "Name: hello" -> "hello").
-## equivalent to Unity's TextWithoutCharacterName.
-## if no character attribute is present, returns the same as text.
-var text_without_character_name: String:
-	get:
-		if markup_result == null:
-			parse_markup()
-		return text
+## Force reprocessing (e.g. if raw_text or substitutions changed after creation).
+func invalidate() -> void:
+	_text_computed = false
+	_text = ""
+	_character_name = ""
+	markup_attributes.clear()
+	markup_result = null
 
 
+# ---------------------------------------------------------------------------
+# Legacy / compatibility methods (still callable but processing is automatic)
+# ---------------------------------------------------------------------------
+
+## Substitutions and markup are now applied automatically on first access
+## to [member text]. This method triggers processing early if needed.
+func apply_substitutions() -> void:
+	_ensure_processed()
+
+
+## Markup is now parsed automatically on first access to [member text].
+## This method triggers processing early if needed.
+func parse_markup() -> void:
+	_ensure_processed()
+
+
+## Returns [member text] (substitutions and markup already applied).
 func get_plain_text() -> String:
 	return text
 
 
-## returns text with markup converted to BBCode for RichTextLabel.
+## Returns text with markup converted to BBCode for RichTextLabel.
 func get_bbcode_text(parser: YarnMarkupParser = null) -> String:
 	if parser == null:
 		parser = YarnMarkupParser.new()
 	parser.locale_code = locale_code
-	var source_text := raw_text if not raw_text.is_empty() else text
+	var source_text := raw_text if not raw_text.is_empty() else _text
 	source_text = YarnLineParser.expand_substitutions(source_text, substitutions)
 	var result := parser.parse(source_text)
-	if result.character_name and character_name.is_empty():
-		character_name = result.character_name
+	if result.character_name and _character_name.is_empty():
+		_character_name = result.character_name
 	return result.text
 
 
-## ensures parse_markup() has been called, then returns the result.
+## Ensures processing, then returns the full markup result.
 func get_markup_result() -> YarnMarkupParseResult:
-	if markup_result == null:
-		parse_markup()
+	_ensure_processed()
 	return markup_result
 
 
+## Deletes the text covered by an attribute and re-parses.
 func delete_attribute_text(attr: YarnMarkupAttribute) -> void:
+	_ensure_processed()
 	if markup_result == null:
 		return
-
 	for result_attr in markup_result.attributes:
 		if result_attr.name == attr.name and result_attr.position == attr.position:
 			markup_result = markup_result.delete_range(result_attr)
-			text = markup_result.text
-			parse_markup()
+			_text = markup_result.text
 			break
 
 
-## returns the first attribute with the given name, or null.
+## Returns the first attribute with the given name, or null.
 func try_get_attribute(attr_name: String) -> YarnMarkupAttribute:
+	_ensure_processed()
 	for attr in markup_attributes:
 		if attr.name == attr_name:
 			return attr
 	return null
 
 
-## returns the substring of text covered by an attribute.
+## Returns the substring of text covered by an attribute.
 func text_for_attribute(attr: YarnMarkupAttribute) -> String:
+	_ensure_processed()
 	if attr.length == 0:
 		return ""
-	if text.length() < attr.position + attr.length:
+	if _text.length() < attr.position + attr.length:
 		return ""
-	return text.substr(attr.position, attr.length)
+	return _text.substr(attr.position, attr.length)

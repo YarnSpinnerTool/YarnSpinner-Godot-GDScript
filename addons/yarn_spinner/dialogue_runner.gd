@@ -40,10 +40,15 @@ signal node_started(node_name: String)
 
 signal node_completed(node_name: String)
 
-signal unhandled_command(command_text: String)
+## Emitted when a command is not handled by any registered handler.
+## If a handler is connected, dialogue pauses until [method signal_content_complete]
+## is called. If no handler is connected, an error is logged and dialogue continues.
+signal command_unhandled(command_text: String)
 
-## emitted for every command before dispatch, parsed into name and args
+## Emitted for every command before dispatch, parsed into name and args.
 signal command_received(command_name: String, command_args: Array)
+
+@export_group("Dialogue Setup")
 
 @export var yarn_project: YarnProjectResource:
 	set(value):
@@ -55,32 +60,38 @@ signal command_received(command_name: String, command_args: Array)
 
 @export var auto_start: bool = false
 
-## if null, an in-memory storage is created automatically
+## If null, an in-memory storage is created automatically.
 @export var variable_storage: YarnVariableStorage
 
-## continue dialogue if no presenter selects an option
+@export_group("Dialogue Behaviour")
+
+## Continue dialogue if no presenter selects an option.
 @export var allow_option_fallthrough: bool = false
 
-## seconds before option fallthrough triggers (0 = no timeout)
+## Seconds before option fallthrough triggers (0 = no timeout).
 @export var option_timeout: float = 0.0
 
-## show selected option's text as a line before continuing
-@export var run_selected_option_as_line: bool = false
+## Show the selected option's text as a dialogue line before continuing.
+@export var show_selected_option_as_line: bool = false
 
-## log detailed VM execution, instruction traces, and command discovery to the output console
+@export_group("Localisation")
+
+## Prefix for Godot TranslationServer keys (e.g., "YARN_").
+@export var translation_prefix: String = "YARN_"
+
+@export_group("Advanced")
+
+## Log detailed VM execution, instruction traces, and command discovery.
 @export var verbose_logging: bool = false
 
 @export var saliency_strategy: SaliencyStrategyType = SaliencyStrategyType.RANDOM_BEST_LEAST_RECENT
 
-## prefix for Godot TranslationServer keys (e.g., "YARN_")
-@export var translation_prefix: String = "YARN_"
-
 @export_group("Auto-Discovery")
 
-## scan scene for _yarn_command_* methods at startup
+## Scan scene for _yarn_command_* methods at startup.
 @export var auto_discover_commands: bool = true
 
-## root node for command scanning (empty = scene root)
+## Root node for command scanning (empty = scene root).
 @export var discovery_root: NodePath = ^""
 
 @export_group("YSLS Generation")
@@ -469,6 +480,7 @@ func get_cancellation_token() -> YarnCancellationToken:
 	return _current_cancellation_token
 
 
+## Internal — prefer add_command(), add_function() etc. on the DialogueRunner.
 func get_library() -> YarnLibrary:
 	return _library
 
@@ -558,7 +570,7 @@ func select_option(option_index: int) -> void:
 	_vm.set_selected_option(option_index)
 	_current_options.clear()
 
-	if run_selected_option_as_line and selected_option != null:
+	if show_selected_option_as_line and selected_option != null:
 		await _run_option_as_line(selected_option)
 
 	call_deferred("_continue_dialogue")
@@ -585,8 +597,7 @@ func _run_option_as_line(option: YarnOption) -> void:
 	for presenter in presenters_copy:
 		if not _is_running:
 			return
-		presenter._cancellation_token = _current_cancellation_token
-		var result: Variant = presenter.run_line(line)
+		var result: Variant = presenter.run_line(line, _current_cancellation_token)
 		if result is Signal:
 			completion_signals.append(result)
 
@@ -692,8 +703,7 @@ func _on_line(line: YarnLine) -> void:
 	for presenter in presenters_copy:
 		if not _is_running:
 			return
-		presenter._cancellation_token = _current_cancellation_token
-		var result: Variant = presenter.run_line(line)
+		var result: Variant = presenter.run_line(line, _current_cancellation_token)
 		if result is Signal:
 			completion_signals.append(result)
 
@@ -734,8 +744,7 @@ func _on_options(options: Array[YarnOption]) -> void:
 	for presenter in presenters_copy:
 		if not _is_running or timeout_triggered:
 			break
-		presenter._cancellation_token = _current_cancellation_token
-		var result: Variant = presenter.run_options(options)
+		var result: Variant = presenter.run_options(options, _current_cancellation_token)
 		if result is Signal:
 			pending_signals.append(result)
 		elif result is int and result >= 0 and selected_option_index < 0:
@@ -764,7 +773,12 @@ func _on_options(options: Array[YarnOption]) -> void:
 		_current_options.clear()
 		call_deferred("_continue_dialogue")
 	else:
-		push_error("dialogue runner: no presenter handled options and fallthrough disabled")
+		push_error("yarn spinner: no presenter handled the dialogue options and " +
+			"'Allow Option Fallthrough' is disabled. Either:\n" +
+			"  - Connect an options presenter (YarnOptionsPresenter) to the dialogue runner\n" +
+			"  - Enable 'Allow Option Fallthrough' in the dialogue runner inspector\n" +
+			"  - Set 'Option Timeout' to a non-zero value\n" +
+			"Dialogue has been stopped.")
 		stop_dialogue()
 
 
@@ -795,8 +809,8 @@ func _on_command(command_text: String) -> void:
 		# for calling signal_content_complete() when ready to proceed.
 		# If no handler is connected, log an error and continue to avoid
 		# silently hanging.
-		if unhandled_command.get_connections().size() > 0:
-			unhandled_command.emit(command_text)
+		if command_unhandled.get_connections().size() > 0:
+			command_unhandled.emit(command_text)
 			return
 		else:
 			push_error("yarn spinner: no handler for command '%s'. Did you forget to register it? Dialogue will continue." % command_text)
