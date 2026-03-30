@@ -29,16 +29,22 @@ var _cancellation_token: YarnCancellationToken
 
 
 ## safely set visibility for this presenter's UI.
-## if the presenter itself is a CanvasItem, toggles its own visibility.
-## otherwise, toggles visibility on all direct CanvasItem children.
-## no-op for non-visual presenters (no CanvasItem children).
+## handles three common layouts:
+##   1. presenter IS a CanvasItem (e.g. extends Control) — toggles own visibility
+##   2. presenter has CanvasItem children — toggles their visibility
+##   3. presenter has CanvasLayer children — toggles their visibility
+##      (CanvasLayer inherits Node, not CanvasItem, so needs separate handling)
+## no-op for non-visual presenters with no visual children.
 func _set_presenter_visible(v: bool) -> void:
-	if is_class("CanvasItem"):
-		set("visible", v)
-	else:
-		for child in get_children():
-			if child is CanvasItem:
-				child.visible = v
+	if self is CanvasItem:
+		visible = v
+		return
+
+	for child in get_children():
+		if child is CanvasItem:
+			child.visible = v
+		elif child is CanvasLayer:
+			child.visible = v
 
 
 func on_dialogue_started() -> void:

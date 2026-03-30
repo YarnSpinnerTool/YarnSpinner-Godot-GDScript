@@ -726,15 +726,30 @@ func _on_options(options: Array[YarnOption]) -> void:
 			if _current_cancellation_token != null:
 				_current_cancellation_token.request_next_content())
 
+	# Start all presenters concurrently (matching Unity's WhenAll pattern).
+	# The first presenter to return a valid selection wins.
 	var selected_option_index := -1
+	var pending_signals: Array[Signal] = []
+
 	for presenter in presenters_copy:
 		if not _is_running or timeout_triggered:
 			break
 		presenter._cancellation_token = _current_cancellation_token
-		var result: int = await presenter.run_options_with_token(options, _current_cancellation_token)
-		if result >= 0 and selected_option_index < 0:
+		var result: Variant = presenter.run_options(options)
+		if result is Signal:
+			pending_signals.append(result)
+		elif result is int and result >= 0 and selected_option_index < 0:
 			selected_option_index = result
-			break
+
+	# If no presenter returned synchronously, await their signals
+	if selected_option_index < 0:
+		for sig: Signal in pending_signals:
+			if not _is_running or timeout_triggered:
+				break
+			var result: Variant = await sig
+			if result is int and result >= 0 and selected_option_index < 0:
+				selected_option_index = int(result)
+				break
 
 	if not _is_running:
 		return
@@ -775,9 +790,18 @@ func _on_command(command_text: String) -> void:
 			signal_content_complete()
 			return
 
-		unhandled_command.emit(command_text)
-		signal_content_complete()
-		return
+		# Emit the unhandled command signal. Matching Unity behaviour:
+		# dialogue does NOT auto-continue. The signal handler is responsible
+		# for calling signal_content_complete() when ready to proceed.
+		# If no handler is connected, log an error and continue to avoid
+		# silently hanging.
+		if unhandled_command.get_connections().size() > 0:
+			unhandled_command.emit(command_text)
+			return
+		else:
+			push_error("yarn spinner: no handler for command '%s'. Did you forget to register it? Dialogue will continue." % command_text)
+			signal_content_complete()
+			return
 
 	if result.is_async:
 		var async_result: Variant = result.result
