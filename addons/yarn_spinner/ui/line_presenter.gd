@@ -135,7 +135,10 @@ func _input(event: InputEvent) -> void:
 
 
 func on_dialogue_started() -> void:
-	pass
+	_set_presenter_visible(false)
+	_is_displaying = false
+	_is_fully_revealed = false
+	_current_line = null
 
 
 func on_dialogue_completed() -> void:

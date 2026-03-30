@@ -92,7 +92,10 @@ func on_dialogue_completed() -> void:
 
 
 func request_hurry_up() -> void:
-	pass
+	# Hurry up for voice-over means fade out the audio quickly
+	# (matching Unity's behaviour of interrupting on hurry)
+	if _is_playing:
+		_stop_audio_with_fade()
 
 
 func request_next() -> void:
