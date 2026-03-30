@@ -755,7 +755,7 @@ func _on_options(options: Array[YarnOption]) -> void:
 	for presenter in presenters_copy:
 		if not _is_running or timeout_triggered:
 			break
-		var result: Variant = presenter.run_options(options, _current_cancellation_token)
+		var result: Variant = await presenter.run_options(options, _current_cancellation_token)
 		if result is Signal:
 			pending_signals.append(result)
 		elif result is int and result >= 0 and selected_option_index < 0:
