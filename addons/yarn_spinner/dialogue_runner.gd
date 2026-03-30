@@ -161,6 +161,7 @@ func _ready() -> void:
 	_library.set_vm_context(_vm.saliency_strategy, variable_storage)
 	_configure_localisation()
 	_register_builtin_commands()
+	_register_global_commands()
 	_library.set_target_root(get_tree().root)
 	_discover_presenters()
 
@@ -260,17 +261,27 @@ func _scan_node_for_commands(node: Node, registered_scripts: Dictionary) -> void
 
 		for method in methods:
 			var method_name: String = method["name"]
+			var is_static := (method.get("flags", 0) & METHOD_FLAG_STATIC) != 0
+
 			if method_name.begins_with("_yarn_command_"):
 				var yarn_name := method_name.substr(14)  # remove "_yarn_command_"
 
 				if not _library.has_command(yarn_name) and not _library.has_instance_command(yarn_name):
-					_library.register_instance_command(yarn_name, script)
+					if is_static:
+						# Static commands are global — no target node needed.
+						# Call via the class directly: <<foo args>>
+						_library.register_command(yarn_name, Callable(node, method_name))
+					else:
+						# Instance commands resolve a target node at dispatch:
+						# <<foo targetNode args>>
+						_library.register_instance_command(yarn_name, script)
 
 					found_commands = true
 
 					if verbose_logging:
 						var script_class := _get_script_class_name(script)
-						print("dialogue runner: auto-registered command '%s' on %s" % [yarn_name, script_class])
+						var kind := "static command" if is_static else "instance command"
+						print("dialogue runner: auto-registered %s '%s' on %s" % [kind, yarn_name, script_class])
 
 			elif method_name.begins_with("_yarn_function_"):
 				var yarn_name := method_name.substr(15)  # remove "_yarn_function_"
@@ -936,6 +947,30 @@ func get_current_options_as_array() -> Array:
 
 func _register_builtin_commands() -> void:
 	_library.register_command("wait", _cmd_wait)
+
+
+func _register_global_commands() -> void:
+	# Pull commands and functions registered on the YarnSpinner autoload
+	# singleton (via YarnSpinner.register_command / register_function).
+	var ys := Engine.get_singleton("YarnSpinner") if Engine.has_singleton("YarnSpinner") else null
+	if ys == null:
+		# Try autoload path
+		ys = get_node_or_null("/root/YarnSpinner")
+	if ys == null:
+		return
+
+	if ys.has_method("get_global_commands"):
+		var cmds: Dictionary = ys.get_global_commands()
+		for cmd_name in cmds:
+			if not _library.has_command(cmd_name):
+				_library.register_command(cmd_name, cmds[cmd_name])
+
+	if ys.has_method("get_global_functions"):
+		var funcs: Dictionary = ys.get_global_functions()
+		for func_name in funcs:
+			if not _library.has_function(func_name):
+				var info: Dictionary = funcs[func_name]
+				_library.register_function(func_name, info.get("callable"), info.get("param_count", -1))
 
 
 func _cmd_wait(duration_str: String = "1.0") -> Signal:

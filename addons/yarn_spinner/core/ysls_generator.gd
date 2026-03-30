@@ -196,7 +196,10 @@ func _scan_gdscript_file(path: String) -> void:
 
 		if method_name.begins_with("_yarn_command_"):
 			var yarn_name := method_name.substr(14)  # remove "_yarn_command_"
-			var info := _build_command_info(yarn_name, method_name, method, file_name, is_node_script, script_class)
+			# Static methods don't need a target instance
+			var is_static := (method.get("flags", 0) & METHOD_FLAG_STATIC) != 0
+			var is_instance := is_node_script and not is_static
+			var info := _build_command_info(yarn_name, method_name, method, file_name, is_instance, script_class)
 			_commands[yarn_name] = info
 
 		elif method_name.begins_with("_yarn_function_"):
