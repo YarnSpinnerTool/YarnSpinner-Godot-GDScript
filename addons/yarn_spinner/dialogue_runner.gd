@@ -183,7 +183,7 @@ func _exit_tree() -> void:
 			_vm.prepare_for_lines_handler.disconnect(_on_prepare_for_lines)
 
 	if is_running():
-		cancel_dialogue()
+		stop_dialogue()
 
 
 func _configure_localisation() -> void:

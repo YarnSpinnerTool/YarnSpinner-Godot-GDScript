@@ -32,6 +32,7 @@ color = Color(0.15, 0.15, 0.2, 1)
 [node name="YarnDialogueRunner" type="Node" parent="." unique_id=1558679203]
 script = ExtResource("3_runner")
 yarn_project = ExtResource("3_b5v5y")
+ysls_scan_path = "res://samples/instance_commands"
 
 [node name="Characters" type="Node2D" parent="." unique_id=1362428502]
 

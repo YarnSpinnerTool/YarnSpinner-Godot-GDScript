@@ -24,6 +24,7 @@ script = ExtResource("1_main")
 script = ExtResource("2_runner")
 yarn_project = ExtResource("5_project")
 run_selected_option_as_line = true
+ysls_scan_path = "res://samples/yarn_basics"
 
 [node name="UILayer" type="CanvasLayer" parent="." unique_id=1803291823]
 
