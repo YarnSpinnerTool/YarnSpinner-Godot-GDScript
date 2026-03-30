@@ -30,11 +30,13 @@ enum WireType {
 
 var _buffer: PackedByteArray
 var _position: int = 0
+var has_error: bool = false
 
 
 func init_from_bytes(data: PackedByteArray) -> void:
 	_buffer = data
 	_position = 0
+	has_error = false
 
 
 func init_from_file(path: String) -> Error:
@@ -65,7 +67,8 @@ func set_position(pos: int) -> void:
 
 func read_byte() -> int:
 	if _position >= _buffer.size():
-		push_error("protobuf reader: attempted to read past end of buffer")
+		push_error("protobuf reader: attempted to read past end of buffer (pos=%d, size=%d)" % [_position, _buffer.size()])
+		has_error = true
 		return 0
 	var b := _buffer[_position]
 	_position += 1
@@ -75,15 +78,18 @@ func read_byte() -> int:
 func read_varint() -> int:
 	var result: int = 0
 	var shift: int = 0
-	while true:
+	while not has_error:
 		var b := read_byte()
+		if has_error:
+			return 0
 		result |= (b & 0x7F) << shift
 		if (b & 0x80) == 0:
 			break
 		shift += 7
 		if shift >= 64:
 			push_error("protobuf reader: varint too long")
-			break
+			has_error = true
+			return 0
 	return result
 
 

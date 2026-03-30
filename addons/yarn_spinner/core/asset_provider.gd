@@ -97,9 +97,13 @@ func get_asset(line_id: String) -> Resource:
 
 	if ResourceLoader.exists(path):
 		var resource := ResourceLoader.load(path)
+		if resource == null:
+			push_warning("asset provider: failed to load resource at '%s' for line '%s'" % [path, line_id])
+			return null
 		_add_to_cache(line_id, resource, "_cache")
 		return resource
 
+	push_warning("asset provider: resource not found at '%s' for line '%s'" % [path, line_id])
 	return null
 
 

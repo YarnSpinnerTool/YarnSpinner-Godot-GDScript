@@ -48,7 +48,7 @@ func execute_command(callable: Callable, args: Array) -> void:
 
 
 func _complete() -> void:
-	if _dialogue_runner != null and _dialogue_runner.has_method("signal_content_complete"):
+	if is_instance_valid(_dialogue_runner) and _dialogue_runner.has_method("signal_content_complete"):
 		_dialogue_runner.signal_content_complete()
 
 

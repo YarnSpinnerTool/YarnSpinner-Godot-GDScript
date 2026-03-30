@@ -271,6 +271,9 @@ func _safe_call(target: Object, method_name: String, args: Array) -> Dictionary:
 					coerced_args[i] = _coerce_value(args[i], expected_type, expected_class)
 				break
 
+	if not is_instance_valid(target):
+		return {"success": false, "status": CommandDispatchStatus.TARGET_NOT_FOUND, "error": "target node for '%s' has been freed" % method_name, "result": null}
+
 	var result: Variant = target.callv(method_name, coerced_args)
 	return {"success": true, "status": CommandDispatchStatus.SUCCESS, "error": "", "result": result}
 
@@ -300,6 +303,9 @@ func _safe_callv(callable: Callable, args: Array, command_name: String) -> Dicti
 					var expected_class: String = expected_args[i].get("class_name", "")
 					coerced_args[i] = _coerce_value(args[i], expected_type, expected_class)
 				break
+
+	if not callable.is_valid():
+		return {"success": false, "status": CommandDispatchStatus.COMMAND_NOT_FOUND, "error": "callable for '%s' is no longer valid" % command_name, "result": null}
 
 	var result: Variant = callable.callv(coerced_args)
 	return {"success": true, "status": CommandDispatchStatus.SUCCESS, "error": "", "result": result}

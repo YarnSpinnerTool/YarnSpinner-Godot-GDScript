@@ -73,6 +73,14 @@ func _find_dialogue_runner() -> YarnDialogueRunner:
 	return null
 
 
+func _exit_tree() -> void:
+	if dialogue_runner != null:
+		if dialogue_runner.dialogue_started.is_connected(_on_dialogue_started):
+			dialogue_runner.dialogue_started.disconnect(_on_dialogue_started)
+		if dialogue_runner.dialogue_completed.is_connected(_on_dialogue_completed):
+			dialogue_runner.dialogue_completed.disconnect(_on_dialogue_completed)
+
+
 func _connect_dialogue_runner_signals() -> void:
 	if dialogue_runner == null:
 		return

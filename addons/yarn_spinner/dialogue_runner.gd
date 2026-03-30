@@ -163,6 +163,29 @@ func _ready() -> void:
 		call_deferred("start_dialogue")
 
 
+func _exit_tree() -> void:
+	# Clean up signal connections and cancel any in-progress dialogue.
+	# Matches Unity's OnDestroy pattern.
+	if _vm != null:
+		if _vm.line_handler.is_connected(_on_line):
+			_vm.line_handler.disconnect(_on_line)
+		if _vm.options_handler.is_connected(_on_options):
+			_vm.options_handler.disconnect(_on_options)
+		if _vm.command_handler.is_connected(_on_command):
+			_vm.command_handler.disconnect(_on_command)
+		if _vm.node_start_handler.is_connected(_on_node_start):
+			_vm.node_start_handler.disconnect(_on_node_start)
+		if _vm.node_complete_handler.is_connected(_on_node_complete):
+			_vm.node_complete_handler.disconnect(_on_node_complete)
+		if _vm.dialogue_complete_handler.is_connected(_on_dialogue_complete):
+			_vm.dialogue_complete_handler.disconnect(_on_dialogue_complete)
+		if _vm.prepare_for_lines_handler.is_connected(_on_prepare_for_lines):
+			_vm.prepare_for_lines_handler.disconnect(_on_prepare_for_lines)
+
+	if is_running():
+		cancel_dialogue()
+
+
 func _configure_localisation() -> void:
 	_line_provider.set_translation_prefix(translation_prefix)
 
