@@ -23,5 +23,12 @@
         }
     },
     "definitions": "VoiceOver.ysls.json",
-    "compilerOptions": {}
+    "compilerOptions": {},
+    "editorOptions": {
+        "yarnScriptEditor": {
+            "characters": [],
+            "characterColourMode": "defined",
+            "defaultCharacterColour": "#187728"
+        }
+    }
 }

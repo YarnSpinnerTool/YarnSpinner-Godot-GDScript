@@ -180,7 +180,8 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 	var save_err := ResourceSaver.save(resource, save_file)
 
 	if options.get("generate_ysls", true):
-		_generate_ysls_file(source_file, options.get("ysls_scan_path", "res://"))
+		var scan_path: String = options.get("ysls_scan_path", "")
+		_generate_ysls_file(source_file, scan_path)
 
 	return save_err
 
@@ -294,7 +295,9 @@ func _find_files_recursive(dir_path: String, pattern: String, results: PackedStr
 
 func _generate_ysls_file(yarn_project_path: String, scan_path: String) -> void:
 	var generator := YarnYSLSGenerator.new()
-	generator.scan_directory(scan_path)
+	# Use the static helper to find the best scan root, or use explicit path
+	var root := scan_path if not scan_path.is_empty() else YarnYSLSGenerator.find_scan_root(yarn_project_path)
+	generator.scan_directory(root)
 
 	var ysls_path := yarn_project_path.get_basename() + ".ysls.json"
 	var err := generator.save_ysls(ysls_path)

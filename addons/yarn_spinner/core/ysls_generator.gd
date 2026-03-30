@@ -176,13 +176,19 @@ func _scan_gdscript_file(path: String) -> void:
 		return
 	_scanned_paths[path] = true
 
+	var file_name := path.get_file()
+
+	# Scan source for runtime binding registrations (add_binding, add_command, etc.)
+	var source := FileAccess.get_file_as_string(path)
+	if not source.is_empty():
+		_scan_runtime_bindings(source, file_name)
+
 	var script := ResourceLoader.load(path, "GDScript", ResourceLoader.CACHE_MODE_IGNORE) as GDScript
 	if script == null:
 		return
 
 	var is_node_script := _script_extends_node(script)
 	var methods := script.get_script_method_list()
-	var file_name := path.get_file()
 	var script_class := _get_script_class_name(script, path)
 
 	for method in methods:
@@ -462,13 +468,142 @@ func _get_script_class_name(script: Script, path: String) -> String:
 
 
 # =============================================================================
+# RUNTIME BINDING CALL-SITE DETECTION
+# =============================================================================
+#
+# Scans .gd source for calls to add_binding(), add_command(),
+# add_command_handler(), register_command(), register_function() etc.
+# Extracts the yarn name from the first string argument so the YSLS
+# file includes commands/functions that are only registered at runtime.
+#
+# Since we can't resolve parameter types from call sites (the target is
+# a runtime variable), entries are emitted with empty parameter lists.
+# This still gives users autocomplete for command/function names.
+
+var _binding_call_regex: RegEx
+
+
+func _get_binding_call_regex() -> RegEx:
+	if _binding_call_regex == null:
+		_binding_call_regex = RegEx.new()
+		# Matches calls like:
+		#   .add_binding("yarn_name", TYPE.COMMAND, ...)
+		#   .add_command("yarn_name", ...)
+		#   .add_command_handler("yarn_name", ...)
+		#   .register_command("yarn_name", ...)
+		#   .register_function("yarn_name", ...)
+		#   .register_instance_command("yarn_name", ...)
+		# Captures: (1) method name, (2) yarn name string, (3) optional second arg for type
+		_binding_call_regex.compile(
+			"\\.(add_binding|add_command|add_command_handler|register_command|register_function|register_instance_command)\\s*\\(\\s*\"([^\"]+)\"\\s*(?:,\\s*([^,)]+))?"
+		)
+	return _binding_call_regex
+
+
+func _scan_runtime_bindings(source: String, file_name: String) -> void:
+	# Collapse multi-line calls into single lines so the regex can match
+	# calls where arguments are on separate lines, e.g.:
+	#   binding_loader.add_binding(
+	#       "give_item",
+	#       YarnCommandBinding.Type.COMMAND,
+	#       ...
+	#   )
+	var collapsed := source.replace("\n", " ").replace("\r", " ")
+	# Collapse multiple spaces to single
+	while collapsed.contains("  "):
+		collapsed = collapsed.replace("  ", " ")
+
+	var regex := _get_binding_call_regex()
+	var results := regex.search_all(collapsed)
+
+	for result in results:
+		var method_name := result.get_string(1)
+		var yarn_name := result.get_string(2)
+		var second_arg := result.get_string(3).strip_edges() if result.get_string(3) else ""
+
+		if yarn_name.is_empty():
+			continue
+
+		# Determine if this is a command or function
+		var is_function := method_name == "register_function"
+
+		# For add_binding, check the Type enum argument
+		if method_name == "add_binding" and second_arg.contains("FUNCTION"):
+			is_function = true
+
+		# register_instance_command is always a command
+		# (already false by default, but explicit for clarity)
+
+		if is_function:
+			if not _functions.has(yarn_name):
+				_functions[yarn_name] = {
+					"yarnName": yarn_name,
+					"definitionName": yarn_name,
+					"fileName": file_name,
+					"language": "gdscript",
+					"parameters": [],
+					"return": {"type": "any"},
+				}
+		else:
+			if not _commands.has(yarn_name):
+				_commands[yarn_name] = {
+					"yarnName": yarn_name,
+					"definitionName": yarn_name,
+					"fileName": file_name,
+					"language": "gdscript",
+					"parameters": [],
+					"async": false,
+				}
+
+
+# =============================================================================
 # STATIC HELPERS
 # =============================================================================
 
-static func generate_for_project(yarn_project_path: String, scan_root: String = "res://") -> Error:
+## Generate YSLS for a project. scan_root defaults to the nearest ancestor
+## directory containing .gd scripts (walks up from the .yarnproject).
+## Pass "res://" to scan the entire Godot project.
+static func generate_for_project(yarn_project_path: String, scan_root: String = "") -> Error:
 	var generator := YarnYSLSGenerator.new()
-	generator.scan_directory(scan_root)
+	var root := scan_root if not scan_root.is_empty() else find_scan_root(yarn_project_path)
+	generator.scan_directory(root)
 	return generator.save_ysls_for_project(yarn_project_path)
+
+
+## Find the best directory to scan for a .yarnproject file. Walks up from
+## the project file's directory looking for .gd files in the directory or
+## its immediate children (e.g. a sibling "scripts/" folder).
+static func find_scan_root(yarn_project_path: String) -> String:
+	var dir := yarn_project_path.get_base_dir()
+	while dir != "res://" and dir != "res:/" and not dir.is_empty():
+		var d := DirAccess.open(dir)
+		if d != null:
+			d.list_dir_begin()
+			var fname := d.get_next()
+			var has_gd := false
+			while not fname.is_empty():
+				if fname.ends_with(".gd"):
+					has_gd = true
+					break
+				if d.current_is_dir() and not fname.begins_with(".") and fname != "addons":
+					var sub := DirAccess.open(dir.path_join(fname))
+					if sub != null:
+						sub.list_dir_begin()
+						var sf := sub.get_next()
+						while not sf.is_empty():
+							if sf.ends_with(".gd"):
+								has_gd = true
+								break
+							sf = sub.get_next()
+						sub.list_dir_end()
+				if has_gd:
+					break
+				fname = d.get_next()
+			d.list_dir_end()
+			if has_gd:
+				return dir
+		dir = dir.get_base_dir()
+	return yarn_project_path.get_base_dir()
 
 
 static func generate_from_runner(yarn_project_path: String, dialogue_runner) -> Error:

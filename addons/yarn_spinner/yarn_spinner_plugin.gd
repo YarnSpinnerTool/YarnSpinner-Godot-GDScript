@@ -235,12 +235,9 @@ func _do_ysls_regenerate() -> void:
 	if yarn_projects.is_empty():
 		return
 
-	var generator := YarnYSLSGenerator.new()
-	generator.scan_directory("res://")
-
+	# Generate per-project YSLS — each scoped to its own directory tree
 	for project_path in yarn_projects:
-		var ysls_path := project_path.get_basename() + ".ysls.json"
-		generator.save_ysls(ysls_path)
+		YarnYSLSGenerator.generate_for_project(project_path)
 
 
 func _create_yarn_project() -> void:

@@ -5,5 +5,11 @@
     ],
     "excludeFiles": [],
     "baseLanguage": "en",
-    "definitions": "Bindings.ysls.json"
+    "definitions": "Bindings.ysls.json",
+    "editorOptions": {
+        "yarnScriptEditor": {
+            "characterColourMode": "uniform",
+            "defaultCharacterColour": "#ff8800"
+        }
+    }
 }

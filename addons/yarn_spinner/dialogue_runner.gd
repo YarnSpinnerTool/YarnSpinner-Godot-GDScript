@@ -86,7 +86,10 @@ signal command_received(command_name: String, command_args: Array)
 @export_group("YSLS Generation")
 
 ## directory to scan for _yarn_command_* and _yarn_function_* methods
-@export_dir var ysls_scan_path: String = "res://"
+## Directory to scan for Yarn command/function definitions when generating
+## the .ysls.json file. Defaults to the Yarn project's directory. Set to
+## "res://" to scan the entire project (all commands visible to all projects).
+@export_dir var ysls_scan_path: String = ""
 
 @export_tool_button("Regenerate YSLS", "Reload") var _regenerate_ysls_button = _regenerate_ysls_pressed
 
@@ -896,7 +899,9 @@ func regenerate_ysls() -> void:
 
 	var generator := YarnYSLSGenerator.new()
 
-	generator.scan_directory(ysls_scan_path)
+	# Default to nearest ancestor with scripts if no scan path configured
+	var scan_root := ysls_scan_path if not ysls_scan_path.is_empty() else YarnYSLSGenerator.find_scan_root(project_path)
+	generator.scan_directory(scan_root)
 
 	if _library != null:
 		generator.scan_library(_library)

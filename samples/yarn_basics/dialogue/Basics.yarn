@@ -1,4 +1,5 @@
 title: Start
+position: 54,12
 tags: tutorial beginning
 ---
 // ============================================
@@ -55,6 +56,7 @@ Guide: What would you like to learn about first?
 ===
 
 title: Variables
+position: 852,377
 tags: tutorial math
 ---
 Guide: Let's explore variables and math!
@@ -98,6 +100,7 @@ Guide: Are you ready for adventure? {$is_ready}!
 ===
 
 title: Conditionals
+position: 1692,377
 tags: tutorial logic
 ---
 Guide: Now let's look at conditionals!
@@ -178,6 +181,7 @@ Guide: Let me demonstrate comparisons:
 ===
 
 title: Commands
+position: 292,377
 tags: tutorial commands
 ---
 Guide: Commands let you trigger game actions!
@@ -207,6 +211,7 @@ Guide: Want me to demonstrate?
 ===
 
 title: Functions
+position: 1412,377
 tags: tutorial functions
 ---
 Guide: Functions return values you can use in dialogue!
@@ -239,6 +244,7 @@ Guide: Your score is {10 * 5}!
 ===
 
 title: Advanced
+position: 1132,377
 tags: tutorial advanced
 ---
 Guide: Time for advanced features!
@@ -283,6 +289,7 @@ Guide: Detour visits a node then comes back here!
 ===
 
 title: DetourExample
+position: 1132,602
 tags: example
 ---
 Guide: This is the detour node!
@@ -291,6 +298,7 @@ Guide: Detours are great for side conversations or tutorials.
 ===
 
 title: OnceFeatures
+position: 572,377
 tags: tutorial once
 ---
 Guide: Let me show you the "once" statement!
@@ -345,6 +353,7 @@ Guide: - Options that disappear after being chosen
 ===
 
 title: Menu
+position: 352,12
 tags: navigation
 ---
 // --- CONDITIONAL OPTIONS ---
@@ -381,6 +390,7 @@ Guide: What would you like to do?
 ===
 
 title: Goodbye
+position: 12,377
 tags: ending
 ---
 // --- VISITED TRACKING ---

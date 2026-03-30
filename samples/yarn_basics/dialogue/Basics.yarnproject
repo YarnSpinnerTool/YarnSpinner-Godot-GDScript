@@ -5,5 +5,15 @@
     ],
     "excludeFiles": [],
     "baseLanguage": "en",
-    "definitions": "Basics.ysls.json"
+    "definitions": "Basics.ysls.json",
+    "editorOptions": {
+        "yarnScriptEditor": {
+            "projectGraphPositions": {
+                "Basics.yarn": {
+                    "x": -3271,
+                    "y": 12
+                }
+            }
+        }
+    }
 }

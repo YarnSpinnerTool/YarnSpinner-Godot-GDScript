@@ -1,76 +1,68 @@
 {
   "commands": [
     {
-      "async": true,
-      "definitionName": "_yarn_command_move",
-      "fileName": "character.gd",
+      "async": false,
+      "definitionName": "give_item",
+      "fileName": "bindings_sample.gd",
       "language": "gdscript",
-      "parameters": [
-        {
-          "documentation": "the ExampleCharacter to call this command on",
-          "name": "target",
-          "subtype": "ExampleCharacter",
-          "type": "instance"
-        },
-        {
-          "name": "destination",
-          "type": "string"
-        }
-      ],
-      "yarnName": "move"
-    },
-    {
-      "async": true,
-      "definitionName": "_yarn_command_bounce",
-      "fileName": "character.gd",
-      "language": "gdscript",
-      "parameters": [
-        {
-          "documentation": "the ExampleCharacter to call this command on",
-          "name": "target",
-          "subtype": "ExampleCharacter",
-          "type": "instance"
-        }
-      ],
-      "yarnName": "bounce"
+      "parameters": [],
+      "yarnName": "give_item"
     },
     {
       "async": false,
-      "definitionName": "_yarn_command_set_color",
-      "fileName": "character.gd",
+      "definitionName": "heal",
+      "fileName": "bindings_sample.gd",
       "language": "gdscript",
-      "parameters": [
-        {
-          "documentation": "the ExampleCharacter to call this command on",
-          "name": "target",
-          "subtype": "ExampleCharacter",
-          "type": "instance"
-        },
-        {
-          "name": "color_name",
-          "type": "string"
-        }
-      ],
-      "yarnName": "set_color"
+      "parameters": [],
+      "yarnName": "heal"
     },
     {
       "async": false,
-      "definitionName": "_yarn_command_face",
-      "fileName": "character.gd",
+      "definitionName": "shake",
+      "fileName": "bindings_sample.gd",
       "language": "gdscript",
-      "parameters": [
-        {
-          "documentation": "the ExampleCharacter to call this command on",
-          "name": "target",
-          "subtype": "ExampleCharacter",
-          "type": "instance"
-        },
-        {
-          "name": "target_name",
-          "type": "string"
-        }
-      ],
-      "yarnName": "face"
+      "parameters": [],
+      "yarnName": "shake"
+    },
+    {
+      "async": false,
+      "definitionName": "shake_and_wait",
+      "fileName": "bindings_sample.gd",
+      "language": "gdscript",
+      "parameters": [],
+      "yarnName": "shake_and_wait"
+    },
+    {
+      "async": false,
+      "definitionName": "zoom",
+      "fileName": "bindings_sample.gd",
+      "language": "gdscript",
+      "parameters": [],
+      "yarnName": "zoom"
+    },
+    {
+      "async": false,
+      "definitionName": "fade_out",
+      "fileName": "bindings_sample.gd",
+      "language": "gdscript",
+      "parameters": [],
+      "yarnName": "fade_out"
+    },
+    {
+      "async": false,
+      "definitionName": "fade_in",
+      "fileName": "bindings_sample.gd",
+      "language": "gdscript",
+      "parameters": [],
+      "yarnName": "fade_in"
+    },
+    {
+      "async": false,
+      "definitionName": "flash",
+      "fileName": "bindings_sample.gd",
+      "language": "gdscript",
+      "parameters": [],
+      "yarnName": "flash"
     }
   ],
   "functions": [],
