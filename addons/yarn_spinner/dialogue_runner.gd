@@ -261,7 +261,7 @@ func _scan_node_for_commands(node: Node, registered_scripts: Dictionary) -> void
 
 		for method in methods:
 			var method_name: String = method["name"]
-			var is_static := (method.get("flags", 0) & METHOD_FLAG_STATIC) != 0
+			var is_static: bool = (method.get("flags", 0) & METHOD_FLAG_STATIC) != 0
 
 			if method_name.begins_with("_yarn_command_"):
 				var yarn_name := method_name.substr(14)  # remove "_yarn_command_"
