@@ -264,6 +264,7 @@ func _complete_line() -> void:
 	if continue_indicator != null:
 		continue_indicator.visible = false
 
+	_set_presenter_visible(false)
 	_line_complete.emit()
 
 
