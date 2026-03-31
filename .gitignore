@@ -14,6 +14,14 @@ mono_crash.*.json
 # GUT (install via AssetLib or clone from https://github.com/bitwes/Gut)
 addons/gut/
 
+# Native compiler build artifacts (built via native/build.sh)
+native/bin/
+native/YarnSpinner.NativeCompiler/bin/
+native/YarnSpinner.NativeCompiler/obj/
+native/YarnSpinner.NativeCompilerCLI/bin/
+native/YarnSpinner.NativeCompilerCLI/obj/
+addons/yarn_spinner/native/bin/
+
 # OS
 .DS_Store
 Thumbs.db

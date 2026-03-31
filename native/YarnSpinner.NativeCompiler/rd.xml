@@ -1,0 +1,13 @@
+<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+  <Application>
+    <!-- ANTLR uses reflection for parser/lexer construction -->
+    <Assembly Name="Antlr4.Runtime.Standard" Dynamic="Required All" />
+
+    <!-- Protobuf uses reflection for message serialization -->
+    <Assembly Name="Google.Protobuf" Dynamic="Required All" />
+
+    <!-- Preserve Yarn Spinner types that protobuf/ANTLR access via reflection -->
+    <Assembly Name="YarnSpinner" Dynamic="Required All" />
+    <Assembly Name="YarnSpinner.Compiler" Dynamic="Required All" />
+  </Application>
+</Directives>

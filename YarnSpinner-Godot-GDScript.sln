@@ -1,0 +1,36 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "native", "native", "{2F2BA0B1-8447-348E-8DA4-622F0257D38B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YarnSpinner.NativeCompilerCLI", "native\YarnSpinner.NativeCompilerCLI\YarnSpinner.NativeCompilerCLI.csproj", "{D1A7FA41-B593-26DA-6209-6CB7ACD9C9FF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "YarnSpinner.NativeCompiler", "native\YarnSpinner.NativeCompiler\YarnSpinner.NativeCompiler.csproj", "{ECFFAEF4-519D-AB32-CCD5-D0DCFC3D9E05}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D1A7FA41-B593-26DA-6209-6CB7ACD9C9FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D1A7FA41-B593-26DA-6209-6CB7ACD9C9FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D1A7FA41-B593-26DA-6209-6CB7ACD9C9FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D1A7FA41-B593-26DA-6209-6CB7ACD9C9FF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ECFFAEF4-519D-AB32-CCD5-D0DCFC3D9E05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ECFFAEF4-519D-AB32-CCD5-D0DCFC3D9E05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ECFFAEF4-519D-AB32-CCD5-D0DCFC3D9E05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ECFFAEF4-519D-AB32-CCD5-D0DCFC3D9E05}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{D1A7FA41-B593-26DA-6209-6CB7ACD9C9FF} = {2F2BA0B1-8447-348E-8DA4-622F0257D38B}
+		{ECFFAEF4-519D-AB32-CCD5-D0DCFC3D9E05} = {2F2BA0B1-8447-348E-8DA4-622F0257D38B}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {85B50E7E-DDE1-4899-B5DE-405CC6BC0802}
+	EndGlobalSection
+EndGlobal

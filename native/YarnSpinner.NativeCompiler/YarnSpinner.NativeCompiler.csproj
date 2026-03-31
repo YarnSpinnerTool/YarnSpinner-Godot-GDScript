@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- NativeAOT shared library output -->
+    <PublishAot>true</PublishAot>
+    <NativeLib>Shared</NativeLib>
+
+    <!-- Trimming config -->
+    <TrimMode>link</TrimMode>
+    <IlcOptimizationPreference>Size</IlcOptimizationPreference>
+
+    <!-- Suppress trimming warnings from dependencies -->
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+  </PropertyGroup>
+
+  <!-- Reference the compiler from the main YarnSpinner repo -->
+  <ItemGroup>
+    <ProjectReference Include="../../../YarnSpinner/YarnSpinner.Compiler/YarnSpinner.Compiler.csproj" />
+  </ItemGroup>
+
+  <!-- NativeAOT reflection/trimming hints -->
+  <ItemGroup>
+    <RdXmlFile Include="rd.xml" />
+  </ItemGroup>
+
+</Project>

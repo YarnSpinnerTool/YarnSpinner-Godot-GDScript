@@ -93,14 +93,30 @@ func _get_icon() -> Texture2D:
 
 
 func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> Error:
+	var abs_path := ProjectSettings.globalize_path(source_file)
+	var source_dir := abs_path.get_base_dir()
+	var source_files := _parse_project_sources(abs_path, source_dir)
+
+	# Try native compiler first (bundled, no .NET dependency)
+	if YarnNativeCompiler.is_available():
+		var result := _compile_native(source_file, abs_path, source_files)
+		if result.error == OK:
+			var save_file := save_path + "." + _get_save_extension()
+			var save_err := ResourceSaver.save(result.resource, save_file)
+			if options.get("generate_ysls", true):
+				_generate_ysls_file(source_file, options.get("ysls_scan_path", ""))
+			return save_err
+		# Native compiler failed — fall through to ysc CLI
+		print("yarn project importer: native compiler failed, falling back to ysc CLI")
+
+	# Fall back to ysc CLI
 	var ysc_path: String = _find_ysc_path(options)
 
 	if ysc_path.is_empty():
-		push_error("yarn project importer: ysc compiler not found. install it with: dotnet tool install -g YarnSpinner.Console\nor set the path in Project Settings > Yarn Spinner > Compiler > Ysc Path")
+		push_error("yarn project importer: no compiler available. either build the native compiler (native/build.sh) or install ysc: dotnet tool install -g YarnSpinner.Console")
 		return ERR_FILE_NOT_FOUND
 
-	var abs_path := ProjectSettings.globalize_path(source_file)
-	var source_dir := abs_path.get_base_dir()
+	print("yarn project importer: using ysc CLI at '%s'" % ysc_path)
 
 	var temp_dir := OS.get_temp_dir().path_join("yarn_spinner_compile")
 	DirAccess.make_dir_recursive_absolute(temp_dir)
@@ -164,8 +180,6 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 					line_metadata[line_id] = PackedStringArray(tags.split(" "))
 		metadata_file.close()
 
-	var source_files := _parse_project_sources(abs_path, source_dir)
-
 	var resource := YarnProjectResource.new()
 	resource.compiled_program = compiled_data
 	resource.string_table = string_table
@@ -184,6 +198,71 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		_generate_ysls_file(source_file, scan_path)
 
 	return save_err
+
+
+## Compile using the bundled native compiler (no .NET required).
+func _compile_native(source_file: String, abs_path: String, source_files: PackedStringArray) -> Dictionary:
+	print("yarn project importer: using native compiler at '%s'" % YarnNativeCompiler.get_native_bin_path())
+
+	# Read all source .yarn files
+	var files: Array[Dictionary] = []
+	for src_path in source_files:
+		var file := FileAccess.open(src_path, FileAccess.READ)
+		if file != null:
+			files.append({
+				"fileName": src_path.get_file(),
+				"source": file.get_as_text(),
+			})
+			file.close()
+
+	# If no source files resolved from the project, try the project directory
+	if files.is_empty():
+		var project_dir := abs_path.get_base_dir()
+		var dir := DirAccess.open(project_dir)
+		if dir != null:
+			dir.list_dir_begin()
+			var fname := dir.get_next()
+			while not fname.is_empty():
+				if fname.get_extension() == "yarn":
+					var fpath := project_dir.path_join(fname)
+					var file := FileAccess.open(fpath, FileAccess.READ)
+					if file != null:
+						files.append({"fileName": fname, "source": file.get_as_text()})
+						file.close()
+				fname = dir.get_next()
+			dir.list_dir_end()
+
+	if files.is_empty():
+		return {"error": ERR_FILE_NOT_FOUND, "resource": null}
+
+	var result := YarnNativeCompiler.compile(files)
+
+	if not result.success:
+		for diag in result.diagnostics:
+			push_error("yarn project importer (native): %s" % diag.get("message", "unknown error"))
+		return {"error": ERR_COMPILATION_FAILED, "resource": null}
+
+	var resource := YarnProjectResource.new()
+	resource.compiled_program = result.program
+	resource.source_files = source_files
+
+	# Build string table and metadata from native compiler output
+	var string_table := {}
+	var line_metadata := {}
+	for line_id in result.string_table:
+		var entry: Dictionary = result.string_table[line_id]
+		string_table[line_id] = entry.get("text", "")
+		var meta: Array = entry.get("metadata", [])
+		if not meta.is_empty():
+			var tags := PackedStringArray()
+			for tag in meta:
+				tags.append(str(tag))
+			line_metadata[line_id] = tags
+
+	resource.string_table = string_table
+	resource.line_metadata = line_metadata
+
+	return {"error": OK, "resource": resource}
 
 
 func _find_ysc_path(options: Dictionary) -> String:
