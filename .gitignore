@@ -11,6 +11,9 @@
 data_*/
 mono_crash.*.json
 
+# GUT (install via AssetLib or clone from https://github.com/bitwes/Gut)
+addons/gut/
+
 # OS
 .DS_Store
 Thumbs.db
