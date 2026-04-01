@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cqinapewqdf0v" path="res://samples/voice_over/scripts/voice_over_sample.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://flra500ihbix" path="res://addons/yarn_spinner/dialogue_runner.gd" id="2_runner"]
+[ext_resource type="Resource" uid="uid://c005b5vpsmc56" path="res://samples/voice_over/dialogue/VoiceOver.yarnproject" id="3_ddm2h"]
 [ext_resource type="Script" uid="uid://cged8u182768u" path="res://addons/yarn_spinner/ui/line_presenter.gd" id="3_line"]
 [ext_resource type="Script" uid="uid://cogqy630mjgv7" path="res://addons/yarn_spinner/ui/options_presenter.gd" id="4_options"]
 [ext_resource type="Script" uid="uid://q487nnd1emgf" path="res://samples/voice_over/scripts/fade_effect.gd" id="5_fade"]
@@ -39,6 +40,7 @@ color = Color(0.05, 0.05, 0.1, 1)
 
 [node name="YarnDialogueRunner" type="Node" parent="." unique_id=2045027044]
 script = ExtResource("2_runner")
+yarn_project = ExtResource("3_ddm2h")
 show_selected_option_as_line = true
 ysls_scan_path = "res://samples/voice_over"
 

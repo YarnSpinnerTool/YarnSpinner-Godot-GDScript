@@ -26,7 +26,7 @@ YarnSpinner="*uid://bhiw7fae5n1e8"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/gut/plugin.cfg", "res://addons/yarn_spinner/plugin.cfg")
+enabled=PackedStringArray("res://addons/yarn_spinner/plugin.cfg")
 
 [input]
 
