@@ -1,0 +1,12 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://c5ig2wa0gs47"]
+
+[ext_resource type="Shader" uid="uid://uvffyyj0v370" path="res://samples/shared/art/characters/mouth/mouth_shader.tres" id="1_dxswn"]
+[ext_resource type="Texture2D" uid="uid://bmr6e8oka6wgl" path="res://samples/shared/art/characters/mouth/MouthShape-Smile-X.png" id="2_x2eku"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_dxswn")
+shader_parameter/Mouth_Colour = Color(0, 0, 0, 1)
+shader_parameter/Tongue_Colour = Color(1, 0, 0, 1)
+shader_parameter/Texture = ExtResource("2_x2eku")
+shader_parameter/Teeth_Colour = Color(0.698039, 0.698039, 0.698039, 1)

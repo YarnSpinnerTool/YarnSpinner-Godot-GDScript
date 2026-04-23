@@ -1,0 +1,17 @@
+[remap]
+
+importer="yarn_spinner.project"
+type="Resource"
+uid="uid://bdm0vgwo2yfgf"
+path="res://.godot/imported/Simple3D.yarnproject-0b5b8e4a6b192e3b5fe958fd88e8a18b.res"
+
+[deps]
+
+source_file="res://samples/simple_3d/dialogue/Simple3D.yarnproject"
+dest_files=["res://.godot/imported/Simple3D.yarnproject-0b5b8e4a6b192e3b5fe958fd88e8a18b.res"]
+
+[params]
+
+ysc_path="ysc"
+generate_ysls=true
+ysls_scan_path="res://"

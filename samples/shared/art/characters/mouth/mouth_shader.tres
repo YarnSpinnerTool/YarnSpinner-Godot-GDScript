@@ -1,0 +1,62 @@
+[gd_resource type="VisualShader" format=3 uid="uid://uvffyyj0v370"]
+
+[sub_resource type="VisualShaderNodeColorParameter" id="VisualShaderNodeColorParameter_uxt8q"]
+parameter_name = "Teeth_Colour"
+default_value_enabled = true
+default_value = Color(0.69803923, 0.69803923, 0.69803923, 1)
+
+[sub_resource type="VisualShaderNodeMix" id="VisualShaderNodeMix_ip2r1"]
+output_port_for_preview = 0
+default_input_values = [0, Vector3(0, 0, 0), 1, Vector3(1, 1, 1), 2, 0.5]
+op_type = 4
+
+[sub_resource type="VisualShaderNodeColorParameter" id="VisualShaderNodeColorParameter_2xnao"]
+parameter_name = "Mouth_Colour"
+default_value_enabled = true
+default_value = Color(0, 0, 0, 1)
+
+[sub_resource type="VisualShaderNodeColorParameter" id="VisualShaderNodeColorParameter_6b6xd"]
+parameter_name = "Tongue_Colour"
+default_value_enabled = true
+default_value = Color(0.7058824, 0.07058824, 0.07058824, 1)
+
+[sub_resource type="VisualShaderNodeTexture2DParameter" id="VisualShaderNodeTexture2DParameter_uxt8q"]
+parameter_name = "Texture"
+texture_type = 1
+
+[sub_resource type="VisualShaderNodeTexture" id="VisualShaderNodeTexture_ip2r1"]
+output_port_for_preview = 0
+source = 5
+texture_type = 1
+
+[sub_resource type="VisualShaderNodeMix" id="VisualShaderNodeMix_soiyb"]
+output_port_for_preview = 0
+default_input_values = [0, Vector3(0, 0, 0), 1, Vector3(1, 1, 1), 2, 0.5]
+op_type = 4
+
+[sub_resource type="VisualShaderNodeVectorDecompose" id="VisualShaderNodeVectorDecompose_q15wl"]
+output_port_for_preview = 1
+default_input_values = [0, Quaternion(0, 0, 0, 0)]
+op_type = 2
+
+[resource]
+modes/depth_draw = 1
+preview_params/Texture = "Resource(\"uid://d1g6hqneoak5c\", \"res://samples/shared/art/characters/mouth/MouthShape-Smile-C.png\")"
+nodes/fragment/0/position = Vector2(720, -200)
+nodes/fragment/2/node = SubResource("VisualShaderNodeColorParameter_2xnao")
+nodes/fragment/2/position = Vector2(-1580, 880)
+nodes/fragment/3/node = SubResource("VisualShaderNodeColorParameter_6b6xd")
+nodes/fragment/3/position = Vector2(-1600, 1360)
+nodes/fragment/5/node = SubResource("VisualShaderNodeTexture2DParameter_uxt8q")
+nodes/fragment/5/position = Vector2(-2420, -380)
+nodes/fragment/6/node = SubResource("VisualShaderNodeTexture_ip2r1")
+nodes/fragment/6/position = Vector2(-1740, -240)
+nodes/fragment/8/node = SubResource("VisualShaderNodeMix_soiyb")
+nodes/fragment/8/position = Vector2(-680, 1080)
+nodes/fragment/9/node = SubResource("VisualShaderNodeVectorDecompose_q15wl")
+nodes/fragment/9/position = Vector2(-1140, -220)
+nodes/fragment/10/node = SubResource("VisualShaderNodeColorParameter_uxt8q")
+nodes/fragment/10/position = Vector2(-1580, 1840)
+nodes/fragment/11/node = SubResource("VisualShaderNodeMix_ip2r1")
+nodes/fragment/11/position = Vector2(-260, 1340)
+nodes/fragment/connections = PackedInt32Array(5, 0, 6, 2, 6, 0, 9, 0, 2, 0, 8, 0, 9, 0, 0, 1, 9, 2, 8, 2, 3, 0, 8, 1, 8, 0, 11, 0, 10, 0, 11, 1, 9, 1, 11, 2, 11, 0, 0, 0)

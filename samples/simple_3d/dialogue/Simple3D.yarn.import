@@ -1,0 +1,14 @@
+[remap]
+
+importer="yarn_spinner.yarn_file"
+type="Resource"
+uid="uid://ds8q0yg3a6jof"
+path="res://.godot/imported/Simple3D.yarn-7c77e24a22997ceb74c7ab5cd01d8e53.res"
+
+[deps]
+
+source_file="res://samples/simple_3d/dialogue/Simple3D.yarn"
+dest_files=["res://.godot/imported/Simple3D.yarn-7c77e24a22997ceb74c7ab5cd01d8e53.res"]
+
+[params]
+

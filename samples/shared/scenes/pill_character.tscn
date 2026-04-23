@@ -1,0 +1,80 @@
+[gd_scene format=3 uid="uid://bbj41hxggtbc1"]
+
+[ext_resource type="Script" uid="uid://d03rwih7ojyup" path="res://samples/shared/scripts/simple_character.gd" id="1_sry8v"]
+[ext_resource type="PackedScene" uid="uid://q6k1rl2jh25p" path="res://samples/shared/art/characters/PillCharacter.glb" id="2_jlihl"]
+[ext_resource type="Script" uid="uid://b537231y64fgi" path="res://samples/shared/scripts/simple_character_animation.gd" id="2_nfpeb"]
+[ext_resource type="Material" uid="uid://6mvqfqm8cysm" path="res://samples/shared/art/characters/ConfigurableGradient.tres" id="2_sry8v"]
+[ext_resource type="Material" uid="uid://c5ig2wa0gs47" path="res://samples/shared/art/characters/mouth/mouth.tres" id="4_axqwb"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_jwmc5"]
+radius = 0.22998047
+height = 0.81220704
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_axqwb"]
+animation = &"Blink"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jwmc5"]
+animation = &"Walk"
+
+[sub_resource type="AnimationNodeBlend2" id="AnimationNodeBlend2_jpu87"]
+
+[sub_resource type="AnimationNodeOneShot" id="AnimationNodeOneShot_nfpeb"]
+filter_enabled = true
+filters = ["PillCharacter/Skeleton3D:Eye-Bottom.L", "PillCharacter/Skeleton3D:Eye-Bottom.R", "PillCharacter/Skeleton3D:Eye-Top.L", "PillCharacter/Skeleton3D:Eye-Top.R"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jpu87"]
+animation = &"Idle"
+
+[sub_resource type="AnimationNodeBlendTree" id="AnimationNodeBlendTree_jwmc5"]
+graph_offset = Vector2(-160.5376, 42.115738)
+nodes/output/position = Vector2(920, 180)
+nodes/Idle/node = SubResource("AnimationNodeAnimation_jpu87")
+nodes/Idle/position = Vector2(230, 240)
+nodes/Animation/node = SubResource("AnimationNodeAnimation_jwmc5")
+nodes/Animation/position = Vector2(230, 430)
+nodes/Blend2/node = SubResource("AnimationNodeBlend2_jpu87")
+nodes/Blend2/position = Vector2(460, 140)
+nodes/Blink/node = SubResource("AnimationNodeOneShot_nfpeb")
+nodes/Blink/position = Vector2(700, 150)
+"nodes/Animation 2/node" = SubResource("AnimationNodeAnimation_axqwb")
+"nodes/Animation 2/position" = Vector2(528.5395, 416.96646)
+node_connections = [&"output", 0, &"Blink", &"Blend2", 0, &"Idle", &"Blend2", 1, &"Animation", &"Blink", 0, &"Blend2", &"Blink", 1, &"Animation 2"]
+
+[node name="CharacterBody3D" type="CharacterBody3D" unique_id=914088189]
+script = ExtResource("1_sry8v")
+speed = 5
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=572227611]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.40610352, 0)
+shape = SubResource("CapsuleShape3D_jwmc5")
+
+[node name="AnimationTree" type="AnimationTree" parent="." unique_id=1009335546]
+root_node = NodePath("../PillCharacter2")
+tree_root = SubResource("AnimationNodeBlendTree_jwmc5")
+anim_player = NodePath("../PillCharacter2/AnimationPlayer")
+parameters/Blend2/blend_amount = 0.0
+parameters/Blink/active = false
+parameters/Blink/internal_active = false
+parameters/Blink/request = 0
+script = ExtResource("2_nfpeb")
+
+[node name="PillCharacter2" parent="." unique_id=2028345057 instance=ExtResource("2_jlihl")]
+
+[node name="Skeleton3D" parent="PillCharacter2/PillCharacter" index="0"]
+bones/0/rotation = Quaternion(0, 0.7071068, 0.7071068, 0)
+bones/1/rotation = Quaternion(0.00023676435, 0.7071067, 0.7071067, -0.00023687122)
+bones/2/rotation = Quaternion(-4.9053872e-11, -1.1924799e-08, 0.0041135666, 0.99999154)
+bones/3/rotation = Quaternion(5.9216087e-17, 2.303104e-15, 0.007288015, 0.99997354)
+bones/4/rotation = Quaternion(4.2032207e-17, -4.8964555e-16, 0.008788812, 0.9999614)
+bones/5/rotation = Quaternion(-4.6117377e-17, -4.270326e-15, 0.006809013, 0.9999769)
+bones/7/rotation = Quaternion(0.7030023, -0.70300215, -0.07607793, 0.07607929)
+bones/8/rotation = Quaternion(0.7030024, 0.70300215, 0.076077305, 0.076078646)
+bones/10/position = Vector3(-0.054763872, 0.09883218, 0.19973081)
+bones/11/position = Vector3(0.05476434, 0.006787456, 0.1997307)
+bones/12/position = Vector3(-0.054763872, 0.0067874216, 0.19973081)
+
+[node name="PillCharacter_Mesh" parent="PillCharacter2/PillCharacter/Skeleton3D" index="0"]
+surface_material_override/1 = ExtResource("2_sry8v")
+surface_material_override/2 = ExtResource("4_axqwb")
+
+[editable path="PillCharacter2"]
