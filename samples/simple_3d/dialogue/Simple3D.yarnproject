@@ -1,0 +1,8 @@
+{
+    "projectFileVersion": 3,
+    "sourceFiles": [
+        "**/*.yarn"
+    ],
+    "baseLanguage": "en",
+    "definitions": "Simple3D.ysls.json"
+}

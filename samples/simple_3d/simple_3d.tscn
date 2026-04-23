@@ -1,0 +1,559 @@
+[gd_scene format=3 uid="uid://cebmhgwr1ratp"]
+
+[ext_resource type="PackedScene" uid="uid://c53dt42idct4w" path="res://samples/shared/art/environment/prototype/floor-small-square.fbx" id="1_tchmn"]
+[ext_resource type="PackedScene" uid="uid://ddstl5c6os85k" path="res://samples/shared/art/environment/prototype/wall-low.fbx" id="2_cth4n"]
+[ext_resource type="PackedScene" uid="uid://bda2g3jgvqq7r" path="res://samples/shared/art/environment/prototype/wall-corner-low.fbx" id="3_3ede0"]
+[ext_resource type="Environment" uid="uid://bf6x5prjfs851" path="res://samples/shared/art/materials/samples-environment.tres" id="4_yv5up"]
+[ext_resource type="Script" uid="uid://flra500ihbix" path="res://addons/yarn_spinner/dialogue_runner.gd" id="5_vemq2"]
+[ext_resource type="Resource" uid="uid://bdm0vgwo2yfgf" path="res://samples/simple_3d/dialogue/Simple3D.yarnproject" id="6_ess7m"]
+[ext_resource type="Script" uid="uid://cged8u182768u" path="res://addons/yarn_spinner/ui/line_presenter.gd" id="7_nku58"]
+[ext_resource type="Script" uid="uid://cogqy630mjgv7" path="res://addons/yarn_spinner/ui/options_presenter.gd" id="8_in6mk"]
+[ext_resource type="PackedScene" uid="uid://bckc4kcvgfsly" path="res://samples/shared/art/environment/fantasy-town/tree-small.fbx" id="9_o0shl"]
+[ext_resource type="PackedScene" uid="uid://dc25376ga8psc" path="res://samples/shared/art/environment/fantasy-town/tree-large.fbx" id="10_jw1y7"]
+[ext_resource type="PackedScene" uid="uid://le6c0y7pc8gt" path="res://samples/shared/scenes/explanation_character.tscn" id="11_mhnjb"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0f7vu"]
+content_margin_left = 40.0
+content_margin_top = 30.0
+content_margin_right = 40.0
+content_margin_bottom = 30.0
+bg_color = Color(0.1, 0.12, 0.18, 0.95)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[node name="VoiceOver3d" type="Node3D" unique_id=46424985]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=24530079]
+transform = Transform3D(0.8660253, -0.38302222, 0.3213938, 0, 0.64278764, 0.7660444, -0.49999997, -0.66341394, 0.55667037, 0, 0, 0)
+shadow_enabled = true
+
+[node name="Arena" type="Node3D" parent="." unique_id=1043168642]
+
+[node name="floor-small-square" parent="Arena" unique_id=739375828 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, -0.1)
+
+[node name="floor-small-square2" parent="Arena" unique_id=1909960506 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 0, -0.1)
+
+[node name="floor-small-square3" parent="Arena" unique_id=1217387945 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0, -0.1)
+
+[node name="floor-small-square4" parent="Arena" unique_id=1983397922 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1, 0, -0.1)
+
+[node name="floor-small-square7" parent="Arena" unique_id=1788921944 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, 0.9)
+
+[node name="floor-small-square8" parent="Arena" unique_id=2129926748 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 0, 0.9)
+
+[node name="floor-small-square9" parent="Arena" unique_id=1654246269 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0, 0.9)
+
+[node name="floor-small-square10" parent="Arena" unique_id=165588902 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1, 0, 0.9)
+
+[node name="floor-small-square5" parent="Arena" unique_id=2049960103 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 0, -0.1)
+
+[node name="floor-small-square11" parent="Arena" unique_id=1432939193 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, -1.1)
+
+[node name="floor-small-square12" parent="Arena" unique_id=352826387 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 0, -1.1)
+
+[node name="floor-small-square13" parent="Arena" unique_id=1615511936 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0, -1.1)
+
+[node name="floor-small-square14" parent="Arena" unique_id=228725293 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1, 0, -1.1)
+
+[node name="floor-small-square15" parent="Arena" unique_id=1063070139 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 0, -1.1)
+
+[node name="floor-small-square16" parent="Arena" unique_id=1181478683 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, -2.1)
+
+[node name="floor-small-square17" parent="Arena" unique_id=917291083 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 0, -2.1)
+
+[node name="floor-small-square18" parent="Arena" unique_id=2135073853 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0, -2.1)
+
+[node name="floor-small-square19" parent="Arena" unique_id=995972180 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1, 0, -2.1)
+
+[node name="floor-small-square30" parent="Arena" unique_id=120665040 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, -2.1)
+
+[node name="floor-small-square31" parent="Arena" unique_id=1988553646 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0, -2.1)
+
+[node name="floor-small-square32" parent="Arena" unique_id=819240523 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.1, 0, -2.1)
+
+[node name="floor-small-square42" parent="Arena" unique_id=787142029 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, 5.9)
+
+[node name="floor-small-square43" parent="Arena" unique_id=53041872 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 0, 5.9)
+
+[node name="floor-small-square44" parent="Arena" unique_id=1819052313 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0, 5.9)
+
+[node name="floor-small-square45" parent="Arena" unique_id=972505354 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1, 0, 5.9)
+
+[node name="floor-small-square46" parent="Arena" unique_id=1006725219 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, 5.9)
+
+[node name="floor-small-square47" parent="Arena" unique_id=469360373 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0, 5.9)
+
+[node name="floor-small-square48" parent="Arena" unique_id=560461646 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.1, 0, 5.9)
+
+[node name="floor-small-square49" parent="Arena" unique_id=1608496553 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, 4.9)
+
+[node name="floor-small-square50" parent="Arena" unique_id=1697053989 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 0, 4.9)
+
+[node name="floor-small-square51" parent="Arena" unique_id=1191177732 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0, 4.9)
+
+[node name="floor-small-square52" parent="Arena" unique_id=1505523081 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1, 0, 4.9)
+
+[node name="floor-small-square53" parent="Arena" unique_id=1614291703 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, 4.9)
+
+[node name="floor-small-square54" parent="Arena" unique_id=807171491 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0, 4.9)
+
+[node name="floor-small-square55" parent="Arena" unique_id=1592100093 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.1, 0, 4.9)
+
+[node name="floor-small-square56" parent="Arena" unique_id=1905040662 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, 3.9)
+
+[node name="floor-small-square57" parent="Arena" unique_id=2054609533 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 0, 3.9)
+
+[node name="floor-small-square58" parent="Arena" unique_id=250452726 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0, 3.9)
+
+[node name="floor-small-square59" parent="Arena" unique_id=740878411 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1, 0, 3.9)
+
+[node name="floor-small-square60" parent="Arena" unique_id=761609606 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, 3.9)
+
+[node name="floor-small-square61" parent="Arena" unique_id=1822715298 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0, 3.9)
+
+[node name="floor-small-square62" parent="Arena" unique_id=1810232862 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.1, 0, 3.9)
+
+[node name="floor-small-square63" parent="Arena" unique_id=1899197752 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, 2.9)
+
+[node name="floor-small-square64" parent="Arena" unique_id=151731544 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 0, 2.9)
+
+[node name="floor-small-square65" parent="Arena" unique_id=959456673 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0, 2.9)
+
+[node name="floor-small-square66" parent="Arena" unique_id=311549443 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1, 0, 2.9)
+
+[node name="floor-small-square67" parent="Arena" unique_id=1118407653 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, 2.9)
+
+[node name="floor-small-square68" parent="Arena" unique_id=1178416262 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0, 2.9)
+
+[node name="floor-small-square69" parent="Arena" unique_id=1730722322 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.1, 0, 2.9)
+
+[node name="floor-small-square33" parent="Arena" unique_id=73497042 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 0, -2.1)
+
+[node name="floor-small-square20" parent="Arena" unique_id=647349481 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 0, -2.1)
+
+[node name="floor-small-square6" parent="Arena" unique_id=380389881 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 0, 0.9)
+
+[node name="floor-small-square26" parent="Arena" unique_id=1144262556 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 0, 4.9)
+
+[node name="floor-small-square27" parent="Arena" unique_id=706562395 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 0, 3.9)
+
+[node name="floor-small-square28" parent="Arena" unique_id=1097688212 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 0, 2.9)
+
+[node name="floor-small-square29" parent="Arena" unique_id=869457977 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 0, 5.9)
+
+[node name="floor-small-square21" parent="Arena" unique_id=782534766 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.1, 0, 1.9)
+
+[node name="floor-small-square22" parent="Arena" unique_id=1691292332 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.1, 0, 1.9)
+
+[node name="floor-small-square23" parent="Arena" unique_id=852858855 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.9, 0, 1.9)
+
+[node name="floor-small-square24" parent="Arena" unique_id=322630465 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1, 0, 1.9)
+
+[node name="floor-small-square70" parent="Arena" unique_id=1415614058 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0, -0.1)
+
+[node name="floor-small-square71" parent="Arena" unique_id=171307306 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0, 0.9)
+
+[node name="floor-small-square72" parent="Arena" unique_id=647670132 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0, -1.1)
+
+[node name="floor-small-square73" parent="Arena" unique_id=1128442822 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.1, 0, 1.9)
+
+[node name="floor-small-square74" parent="Arena" unique_id=136157528 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, -0.1)
+
+[node name="floor-small-square75" parent="Arena" unique_id=815566042 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, 0.9)
+
+[node name="floor-small-square76" parent="Arena" unique_id=686644385 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, -1.1)
+
+[node name="floor-small-square77" parent="Arena" unique_id=24543801 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1, 0, 1.9)
+
+[node name="floor-small-square78" parent="Arena" unique_id=1761479527 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.1, 0, -0.1)
+
+[node name="floor-small-square79" parent="Arena" unique_id=390270584 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.1, 0, 0.9)
+
+[node name="floor-small-square80" parent="Arena" unique_id=7084109 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.1, 0, -1.1)
+
+[node name="floor-small-square81" parent="Arena" unique_id=1312595310 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.1, 0, 1.9)
+
+[node name="floor-small-square25" parent="Arena" unique_id=1763211118 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9, 0, 1.9)
+
+[node name="floor-small-square34" parent="Arena" unique_id=1457321376 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 0, -0.1)
+
+[node name="floor-small-square35" parent="Arena" unique_id=1273318381 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 0, -1.1)
+
+[node name="floor-small-square36" parent="Arena" unique_id=576941761 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 0, 0.9)
+
+[node name="floor-small-square37" parent="Arena" unique_id=98762836 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 0, 4.9)
+
+[node name="floor-small-square38" parent="Arena" unique_id=1683270606 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 0, 3.9)
+
+[node name="floor-small-square39" parent="Arena" unique_id=524665145 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 0, 2.9)
+
+[node name="floor-small-square40" parent="Arena" unique_id=415648287 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 0, 5.9)
+
+[node name="floor-small-square41" parent="Arena" unique_id=1286078322 instance=ExtResource("1_tchmn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 0, 1.9)
+
+[node name="wall-low2" parent="Arena" unique_id=651403165 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 0, -1.1)
+
+[node name="wall-low3" parent="Arena" unique_id=241655377 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 0, -0.1)
+
+[node name="wall-low4" parent="Arena" unique_id=1986798960 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 0, 0.9)
+
+[node name="wall-low5" parent="Arena" unique_id=200306597 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 0, 1.9)
+
+[node name="wall-low6" parent="Arena" unique_id=86286975 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 0, 2.9)
+
+[node name="wall-low7" parent="Arena" unique_id=352052303 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 0, 3.9)
+
+[node name="wall-low8" parent="Arena" unique_id=1105302723 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 0, 4.9)
+
+[node name="wall-low9" parent="Arena" unique_id=706441729 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.3, 0, -1.1)
+
+[node name="wall-low10" parent="Arena" unique_id=547363926 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.3, 0, -0.1)
+
+[node name="wall-low11" parent="Arena" unique_id=1298940433 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.3, 0, 0.9)
+
+[node name="wall-low12" parent="Arena" unique_id=1263306926 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.3, 0, 1.9)
+
+[node name="wall-low13" parent="Arena" unique_id=893120555 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.3, 0, 2.9)
+
+[node name="wall-low14" parent="Arena" unique_id=1638457477 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.3, 0, 3.9)
+
+[node name="wall-low15" parent="Arena" unique_id=340899636 instance=ExtResource("2_cth4n")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.3, 0, 4.9)
+
+[node name="wall-low16" parent="Arena" unique_id=51531574 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -0.9000002, 0, -2.5)
+
+[node name="wall-low17" parent="Arena" unique_id=805846191 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.09999976, 0, -2.5)
+
+[node name="wall-low18" parent="Arena" unique_id=338774814 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.0999998, 0, -2.5)
+
+[node name="wall-low19" parent="Arena" unique_id=1531761030 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.0999997, 0, -2.5)
+
+[node name="wall-low20" parent="Arena" unique_id=1897704320 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 3.0999997, 0, -2.5)
+
+[node name="wall-low21" parent="Arena" unique_id=69050801 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 4.1, 0, -2.5)
+
+[node name="wall-low22" parent="Arena" unique_id=1121553261 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 5.1, 0, -2.5)
+
+[node name="wall-low23" parent="Arena" unique_id=826601572 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -0.89999974, 0, 6.3)
+
+[node name="wall-low24" parent="Arena" unique_id=612788720 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0.10000024, 0, 6.3)
+
+[node name="wall-low25" parent="Arena" unique_id=365266329 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 1.1000003, 0, 6.3)
+
+[node name="wall-low26" parent="Arena" unique_id=1653612808 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 2.1000001, 0, 6.3)
+
+[node name="wall-low27" parent="Arena" unique_id=229968174 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 3.1000001, 0, 6.3)
+
+[node name="wall-low28" parent="Arena" unique_id=1505005954 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 4.1, 0, 6.3)
+
+[node name="wall-low29" parent="Arena" unique_id=1312579198 instance=ExtResource("2_cth4n")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 5.1, 0, 6.3)
+
+[node name="wall-corner-low" parent="Arena" unique_id=859496301 instance=ExtResource("3_3ede0")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.1, 0, -2.1)
+
+[node name="wall-corner-low2" parent="Arena" unique_id=697946026 instance=ExtResource("3_3ede0")]
+transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, -1.9000001, 0, -2.1)
+
+[node name="wall-corner-low3" parent="Arena" unique_id=245762114 instance=ExtResource("3_3ede0")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.9000001, 0, 5.9)
+
+[node name="wall-corner-low4" parent="Arena" unique_id=297733719 instance=ExtResource("3_3ede0")]
+transform = Transform3D(1.3113416e-07, 0, -1, 0, 1, 0, 1, 0, 1.3113416e-07, 6.1000004, 0, 5.9)
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1647297290]
+environment = ExtResource("4_yv5up")
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=1729104788]
+transform = Transform3D(0.9723699, -0.02804539, 0.2317546, 0, 0.9927573, 0.12013684, -0.23344538, -0.11681745, 0.9653273, 0.31, 0.74, 1.4)
+
+[node name="YarnDialogueRunner" type="Node" parent="." unique_id=1583879027]
+script = ExtResource("5_vemq2")
+yarn_project = ExtResource("6_ess7m")
+auto_start = true
+verbose_logging = true
+
+[node name="UILayer" type="CanvasLayer" parent="." unique_id=1954229040]
+
+[node name="Background" type="ColorRect" parent="UILayer" unique_id=1903100555]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.05, 0.07, 0.1, 1)
+
+[node name="LinePresenter" type="PanelContainer" parent="UILayer" unique_id=1391660594]
+visible = false
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 60.0
+offset_top = -260.0
+offset_right = -60.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_0f7vu")
+script = ExtResource("7_nku58")
+
+[node name="VBox" type="VBoxContainer" parent="UILayer/LinePresenter" unique_id=1112520972]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="CharacterLabel" type="Label" parent="UILayer/LinePresenter/VBox" unique_id=529660718]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "Character"
+
+[node name="TextLabel" type="RichTextLabel" parent="UILayer/LinePresenter/VBox" unique_id=547978159]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_font_sizes/normal_font_size = 32
+bbcode_enabled = true
+text = "Dialogue text goes here..."
+fit_content = true
+
+[node name="ContinueIndicator" type="Label" parent="UILayer/LinePresenter/VBox" unique_id=748311217]
+layout_mode = 2
+size_flags_horizontal = 8
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 16
+text = "Click or press Space to continue..."
+
+[node name="OptionsPresenter" type="PanelContainer" parent="UILayer" unique_id=1557484482]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -450.0
+offset_top = -200.0
+offset_right = 450.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_0f7vu")
+script = ExtResource("8_in6mk")
+
+[node name="OptionsContainer" type="VBoxContainer" parent="UILayer/OptionsPresenter" unique_id=678346108]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="UI" type="Control" parent="UILayer" unique_id=322969042]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="UILayer/UI" unique_id=384935486]
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -200.0
+offset_top = 30.0
+offset_right = 200.0
+offset_bottom = 70.0
+grow_horizontal = 2
+theme_override_font_sizes/font_size = 28
+text = "Yarn Basics Sample"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="UILayer/UI" unique_id=966549693]
+visible = false
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -300.0
+offset_top = 75.0
+offset_right = 300.0
+offset_bottom = 100.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.6, 0.6, 0.65, 1)
+theme_override_font_sizes/font_size = 14
+text = "A tour of all Yarn language features"
+horizontal_alignment = 1
+
+[node name="StartButton" type="Button" parent="UILayer/UI" unique_id=1302385684]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -25.0
+offset_right = 100.0
+offset_bottom = 25.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 18
+text = "Start Tour"
+
+[node name="RestartButton" type="Button" parent="UILayer/UI" unique_id=751632654]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -100.0
+offset_top = -25.0
+offset_right = 100.0
+offset_bottom = 25.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 18
+text = "Restart Tour"
+
+[node name="Instructions" type="Label" parent="UILayer/UI" unique_id=1764493964]
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -300.0
+offset_top = -30.0
+offset_right = 300.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.4, 0.4, 0.45, 1)
+theme_override_font_sizes/font_size = 12
+text = "Read the Basics.yarn file to see how each feature is written"
+horizontal_alignment = 1
+
+[node name="tree-small" parent="." unique_id=1652844060 instance=ExtResource("9_o0shl")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.99869174, 1.4901161e-08, -0.422735)
+
+[node name="tree-large" parent="." unique_id=392244042 instance=ExtResource("10_jw1y7")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0, -1.1)
+
+[node name="CharacterBody3D" parent="." unique_id=914088189 instance=ExtResource("11_mhnjb")]
+transform = Transform3D(0.98228073, 0, 0.1874156, 0, 1, 0, -0.1874156, 0, 0.98228073, -0.062, 0, 0.155)
+
+[connection signal="pressed" from="UILayer/UI/StartButton" to="YarnDialogueRunner" method="start_dialogue"]

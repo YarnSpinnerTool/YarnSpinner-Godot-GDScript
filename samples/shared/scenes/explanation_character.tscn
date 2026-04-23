@@ -1,0 +1,42 @@
+[gd_scene format=3 uid="uid://le6c0y7pc8gt"]
+
+[ext_resource type="PackedScene" uid="uid://bbj41hxggtbc1" path="res://samples/shared/scenes/pill_character.tscn" id="1_ibt7i"]
+[ext_resource type="PackedScene" uid="uid://duel0xvyu0iww" path="res://samples/shared/art/characters/attachments/Attach_Tie.fbx" id="2_eym35"]
+[ext_resource type="PackedScene" uid="uid://drmqdl7y7fqhf" path="res://samples/shared/art/characters/attachments/Attach_Badge.fbx" id="3_j7ecs"]
+[ext_resource type="PackedScene" uid="uid://bvdvt7optgkag" path="res://samples/shared/art/characters/attachments/cup-coffee.fbx" id="4_wigx3"]
+
+[node name="CharacterBody3D" unique_id=914088189 instance=ExtResource("1_ibt7i")]
+
+[node name="Skeleton3D" parent="PillCharacter2/PillCharacter" index="0"]
+bones/1/rotation = Quaternion(-5.3385087e-08, 0.7071068, 0.7071068, -5.3385087e-08)
+bones/2/rotation = Quaternion(0, -1.1924897e-08, 0, 1)
+bones/3/rotation = Quaternion(0, 0, 0, 1)
+bones/4/rotation = Quaternion(0, 0, 0, 1)
+bones/5/rotation = Quaternion(0, 0, 0, 1)
+bones/7/rotation = Quaternion(0.70300233, -0.7030021, -0.076077916, 0.07607929)
+bones/8/rotation = Quaternion(0.7030024, 0.70300215, 0.076077305, 0.07607863)
+bones/9/position = Vector3(0.05476434, 0.09883217, 0.1997307)
+bones/10/position = Vector3(-0.054763865, 0.09883217, 0.19973083)
+bones/11/position = Vector3(0.05476434, 0.0067874338, 0.1997307)
+bones/12/position = Vector3(-0.054763865, 0.0067874338, 0.19973083)
+
+[node name="BoneAttachment3D" type="BoneAttachment3D" parent="PillCharacter2/PillCharacter/Skeleton3D" index="1" unique_id=1619294525]
+transform = Transform3D(1, 0, 1.2714604e-07, 0, 1, 0, -1.2714604e-07, 0, 1, -7.820193e-07, 0.48000002, 0)
+bone_name = "Spine_3"
+bone_idx = 4
+
+[node name="Attach_Tie" parent="PillCharacter2/PillCharacter/Skeleton3D/BoneAttachment3D" index="0" unique_id=778516255 instance=ExtResource("2_eym35")]
+transform = Transform3D(-1, 0, 8.742278e-08, 0, 1, 0, -8.742278e-08, 0, -1, 2.1282176e-09, -0.50441056, -0.01673843)
+
+[node name="BoneAttachment3D2" type="BoneAttachment3D" parent="PillCharacter2/PillCharacter/Skeleton3D" index="2" unique_id=2026161690]
+transform = Transform3D(1, 0, 1.5099583e-07, 0, 1, 0, -1.5099583e-07, 0, 1, -7.820193e-07, 0, 0)
+bone_name = "Spine_0"
+bone_idx = 1
+
+[node name="Attach_Badge" parent="PillCharacter2/PillCharacter/Skeleton3D/BoneAttachment3D2" index="0" unique_id=855489476 instance=ExtResource("3_j7ecs")]
+transform = Transform3D(-0.6427876, 0, -0.7660445, 0, 1, 0, 0.7660445, 0, -0.6427876, 0, 0, 0)
+
+[node name="cup-coffee" parent="PillCharacter2/PillCharacter/Skeleton3D/BoneAttachment3D2" index="1" unique_id=1295545795 instance=ExtResource("4_wigx3")]
+transform = Transform3D(-0.3617093, 0, 0.5993049, 0, 0.7, 0, -0.5993049, 0, -0.3617093, -0.30312598, 0.27747473, 0.122161165)
+
+[editable path="PillCharacter2"]

@@ -1,0 +1,10 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://6mvqfqm8cysm"]
+
+[ext_resource type="Shader" uid="uid://dneb8pffavgr" path="res://samples/shared/art/characters/configurable_gradient.tres" id="1_khdaj"]
+[ext_resource type="Texture2D" uid="uid://duikd47pnfuj4" path="res://samples/shared/art/textures/colormap.png" id="2_4ja8v"]
+
+[resource]
+resource_name = "ConfigurableGradient"
+render_priority = 0
+shader = ExtResource("1_khdaj")
+shader_parameter/Colour = ExtResource("2_4ja8v")
