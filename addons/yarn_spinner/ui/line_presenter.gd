@@ -117,6 +117,10 @@ func _input(event: InputEvent) -> void:
 	if not _is_displaying:
 		return
 
+	# Don't consume input when options are showing — let buttons handle it
+	if dialogue_runner != null and not dialogue_runner._current_options.is_empty():
+		return
+
 	if event.is_action_pressed(continue_action):
 		if _is_fully_revealed:
 			_complete_line()
