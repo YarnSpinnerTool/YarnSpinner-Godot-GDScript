@@ -60,6 +60,10 @@ signal command_received(command_name: String, command_args: Array)
 
 @export var auto_start: bool = false
 
+## Presenters assigned in the inspector. Merged with any YarnDialoguePresenter
+## nodes found as direct children of this runner.
+@export var presenters: Array[YarnDialoguePresenter] = []
+
 ## If null, an in-memory storage is created automatically.
 @export var variable_storage: YarnVariableStorage
 
@@ -228,6 +232,11 @@ func _apply_saliency_strategy() -> void:
 
 
 func _discover_presenters() -> void:
+	for presenter in presenters:
+		if presenter != null and presenter not in _presenters:
+			_presenters.append(presenter)
+			presenter.dialogue_runner = self
+
 	for child in get_children():
 		if child is YarnDialoguePresenter:
 			if child not in _presenters:
