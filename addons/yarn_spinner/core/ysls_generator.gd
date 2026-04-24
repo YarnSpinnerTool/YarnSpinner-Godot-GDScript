@@ -135,6 +135,17 @@ func generate_ysls_json(pretty: bool = true) -> String:
 
 func save_ysls(path: String) -> Error:
 	var json := generate_ysls_json(true)
+
+	# Skip the write if contents are unchanged. Godot's filesystem_changed
+	# signal retriggers YSLS regeneration, so a no-op write would loop forever.
+	if FileAccess.file_exists(path):
+		var existing := FileAccess.open(path, FileAccess.READ)
+		if existing != null:
+			var existing_text := existing.get_as_text()
+			existing.close()
+			if existing_text == json:
+				return OK
+
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file == null:
 		var err := FileAccess.get_open_error()
