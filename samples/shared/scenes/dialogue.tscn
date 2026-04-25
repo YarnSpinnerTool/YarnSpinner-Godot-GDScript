@@ -1,11 +1,11 @@
-[gd_scene format=3 uid="uid://dqm7kxw2r5h8c"]
+[gd_scene format=3 uid="uid://cwyx0udsah02p"]
 
-[ext_resource type="Script" uid="uid://dceegqr14qt25" path="res://samples/yarn_basics/scripts/yarn_basics_sample.gd" id="1_main"]
-[ext_resource type="Script" uid="uid://flra500ihbix" path="res://addons/yarn_spinner/dialogue_runner.gd" id="2_runner"]
-[ext_resource type="Script" uid="uid://cged8u182768u" path="res://addons/yarn_spinner/ui/line_presenter.gd" id="3_line"]
-[ext_resource type="Script" uid="uid://cogqy630mjgv7" path="res://addons/yarn_spinner/ui/options_presenter.gd" id="4_options"]
+[ext_resource type="Script" uid="uid://flra500ihbix" path="res://addons/yarn_spinner/dialogue_runner.gd" id="1_5tv8o"]
+[ext_resource type="Resource" uid="uid://bdm0vgwo2yfgf" path="res://samples/simple_3d/dialogue/Simple3D.yarnproject" id="2_225xr"]
+[ext_resource type="Script" uid="uid://cged8u182768u" path="res://addons/yarn_spinner/ui/line_presenter.gd" id="3_ttjgy"]
+[ext_resource type="Script" uid="uid://cogqy630mjgv7" path="res://addons/yarn_spinner/ui/options_presenter.gd" id="4_gsd2y"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0f7vu"]
 content_margin_left = 40.0
 content_margin_top = 30.0
 content_margin_right = 40.0
@@ -16,17 +16,19 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
-[node name="YarnBasicsSample" type="Node2D" unique_id=860895190]
-script = ExtResource("1_main")
+[node name="Dialogue" type="Node" unique_id=1497124993]
 
-[node name="YarnDialogueRunner" type="Node" parent="." unique_id=113657643]
-script = ExtResource("2_runner")
-show_selected_option_as_line = true
-ysls_scan_path = "res://samples/yarn_basics"
+[node name="YarnDialogueRunner" type="Node" parent="." unique_id=394517124 node_paths=PackedStringArray("presenters")]
+script = ExtResource("1_5tv8o")
+yarn_project = ExtResource("2_225xr")
+auto_start = true
+presenters = [NodePath("../UILayer/LinePresenter"), NodePath("../UILayer/OptionsPresenter")]
+verbose_logging = true
 
-[node name="UILayer" type="CanvasLayer" parent="." unique_id=1803291823]
+[node name="UILayer" type="CanvasLayer" parent="." unique_id=545680971]
 
-[node name="Background" type="ColorRect" parent="UILayer" unique_id=1462988941]
+[node name="Background" type="ColorRect" parent="UILayer" unique_id=1731487522]
+visible = false
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -34,32 +36,31 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.05, 0.07, 0.1, 1)
 
-[node name="LinePresenter" type="PanelContainer" parent="UILayer" unique_id=590131497]
-visible = false
+[node name="LinePresenter" type="PanelContainer" parent="UILayer" unique_id=293326979]
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 60.0
-offset_top = -260.0
+offset_top = -269.0
 offset_right = -60.0
 offset_bottom = -40.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
-script = ExtResource("3_line")
+theme_override_styles/panel = SubResource("StyleBoxFlat_0f7vu")
+script = ExtResource("3_ttjgy")
 
-[node name="VBox" type="VBoxContainer" parent="UILayer/LinePresenter" unique_id=861534386]
+[node name="VBox" type="VBoxContainer" parent="UILayer/LinePresenter" unique_id=339703954]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="CharacterLabel" type="Label" parent="UILayer/LinePresenter/VBox" unique_id=1214357705]
+[node name="CharacterLabel" type="Label" parent="UILayer/LinePresenter/VBox" unique_id=1892756645]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.8, 1, 1)
 theme_override_font_sizes/font_size = 24
 text = "Character"
 
-[node name="TextLabel" type="RichTextLabel" parent="UILayer/LinePresenter/VBox" unique_id=1007695030]
+[node name="TextLabel" type="RichTextLabel" parent="UILayer/LinePresenter/VBox" unique_id=90342410]
 custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
 size_flags_vertical = 3
@@ -68,14 +69,14 @@ bbcode_enabled = true
 text = "Dialogue text goes here..."
 fit_content = true
 
-[node name="ContinueIndicator" type="Label" parent="UILayer/LinePresenter/VBox" unique_id=1412921707]
+[node name="ContinueIndicator" type="Label" parent="UILayer/LinePresenter/VBox" unique_id=91906036]
 layout_mode = 2
 size_flags_horizontal = 8
 theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
 theme_override_font_sizes/font_size = 16
 text = "Click or press Space to continue..."
 
-[node name="OptionsPresenter" type="PanelContainer" parent="UILayer" unique_id=1334238045]
+[node name="OptionsPresenter" type="PanelContainer" parent="UILayer" unique_id=1541540199]
 visible = false
 anchors_preset = 8
 anchor_left = 0.5
@@ -88,14 +89,14 @@ offset_right = 450.0
 offset_bottom = 200.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
-script = ExtResource("4_options")
+theme_override_styles/panel = SubResource("StyleBoxFlat_0f7vu")
+script = ExtResource("4_gsd2y")
 
-[node name="OptionsContainer" type="VBoxContainer" parent="UILayer/OptionsPresenter" unique_id=656297899]
+[node name="OptionsContainer" type="VBoxContainer" parent="UILayer/OptionsPresenter" unique_id=1006129454]
 layout_mode = 2
 theme_override_constants/separation = 12
 
-[node name="UI" type="Control" parent="UILayer" unique_id=1708642760]
+[node name="UI" type="Control" parent="UILayer" unique_id=919767972]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -104,7 +105,8 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="Title" type="Label" parent="UILayer/UI" unique_id=1472639384]
+[node name="Title" type="Label" parent="UILayer/UI" unique_id=933030570]
+visible = false
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -118,7 +120,8 @@ theme_override_font_sizes/font_size = 28
 text = "Yarn Basics Sample"
 horizontal_alignment = 1
 
-[node name="Subtitle" type="Label" parent="UILayer/UI" unique_id=1690746819]
+[node name="Subtitle" type="Label" parent="UILayer/UI" unique_id=646393998]
+visible = false
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -133,7 +136,8 @@ theme_override_font_sizes/font_size = 14
 text = "A tour of all Yarn language features"
 horizontal_alignment = 1
 
-[node name="StartButton" type="Button" parent="UILayer/UI" unique_id=1517611663]
+[node name="StartButton" type="Button" parent="UILayer/UI" unique_id=1006963450]
+visible = false
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -149,7 +153,7 @@ grow_vertical = 2
 theme_override_font_sizes/font_size = 18
 text = "Start Tour"
 
-[node name="RestartButton" type="Button" parent="UILayer/UI" unique_id=1438457410]
+[node name="RestartButton" type="Button" parent="UILayer/UI" unique_id=314669218]
 visible = false
 layout_mode = 1
 anchors_preset = 8
@@ -166,7 +170,8 @@ grow_vertical = 2
 theme_override_font_sizes/font_size = 18
 text = "Restart Tour"
 
-[node name="Instructions" type="Label" parent="UILayer/UI" unique_id=1054458388]
+[node name="Instructions" type="Label" parent="UILayer/UI" unique_id=1177949660]
+visible = false
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
@@ -183,3 +188,5 @@ theme_override_colors/font_color = Color(0.4, 0.4, 0.45, 1)
 theme_override_font_sizes/font_size = 12
 text = "Read the Basics.yarn file to see how each feature is written"
 horizontal_alignment = 1
+
+[connection signal="pressed" from="UILayer/UI/StartButton" to="YarnDialogueRunner" method="start_dialogue"]

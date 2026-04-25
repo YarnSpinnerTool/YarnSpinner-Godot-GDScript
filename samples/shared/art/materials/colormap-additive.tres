@@ -1,0 +1,11 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://4ilhyphlek4w"]
+
+[ext_resource type="Texture2D" uid="uid://duikd47pnfuj4" path="res://samples/shared/art/textures/colormap.png" id="1_pt7yv"]
+
+[resource]
+resource_name = "colormap"
+blend_mode = 1
+shading_mode = 0
+specular_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_pt7yv")

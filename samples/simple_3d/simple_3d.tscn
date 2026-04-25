@@ -1,29 +1,17 @@
 [gd_scene format=3 uid="uid://cebmhgwr1ratp"]
 
+[ext_resource type="Script" uid="uid://dqanr6mgbf8gn" path="res://samples/simple_3d/simple_3d.gd" id="1_5aq8e"]
 [ext_resource type="PackedScene" uid="uid://c53dt42idct4w" path="res://samples/shared/art/environment/prototype/floor-small-square.fbx" id="1_tchmn"]
 [ext_resource type="PackedScene" uid="uid://ddstl5c6os85k" path="res://samples/shared/art/environment/prototype/wall-low.fbx" id="2_cth4n"]
 [ext_resource type="PackedScene" uid="uid://bda2g3jgvqq7r" path="res://samples/shared/art/environment/prototype/wall-corner-low.fbx" id="3_3ede0"]
 [ext_resource type="Environment" uid="uid://bf6x5prjfs851" path="res://samples/shared/art/materials/samples-environment.tres" id="4_yv5up"]
-[ext_resource type="Script" uid="uid://flra500ihbix" path="res://addons/yarn_spinner/dialogue_runner.gd" id="5_vemq2"]
-[ext_resource type="Resource" uid="uid://bdm0vgwo2yfgf" path="res://samples/simple_3d/dialogue/Simple3D.yarnproject" id="6_ess7m"]
-[ext_resource type="Script" uid="uid://cged8u182768u" path="res://addons/yarn_spinner/ui/line_presenter.gd" id="7_nku58"]
-[ext_resource type="Script" uid="uid://cogqy630mjgv7" path="res://addons/yarn_spinner/ui/options_presenter.gd" id="8_in6mk"]
+[ext_resource type="PackedScene" uid="uid://cwyx0udsah02p" path="res://samples/shared/scenes/dialogue.tscn" id="9_8xcq0"]
 [ext_resource type="PackedScene" uid="uid://bckc4kcvgfsly" path="res://samples/shared/art/environment/fantasy-town/tree-small.fbx" id="9_o0shl"]
 [ext_resource type="PackedScene" uid="uid://dc25376ga8psc" path="res://samples/shared/art/environment/fantasy-town/tree-large.fbx" id="10_jw1y7"]
 [ext_resource type="PackedScene" uid="uid://le6c0y7pc8gt" path="res://samples/shared/scenes/explanation_character.tscn" id="11_mhnjb"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0f7vu"]
-content_margin_left = 40.0
-content_margin_top = 30.0
-content_margin_right = 40.0
-content_margin_bottom = 30.0
-bg_color = Color(0.1, 0.12, 0.18, 0.95)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-
 [node name="VoiceOver3d" type="Node3D" unique_id=46424985]
+script = ExtResource("1_5aq8e")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=24530079]
 transform = Transform3D(0.8660253, -0.38302222, 0.3213938, 0, 0.64278764, 0.7660444, -0.49999997, -0.66341394, 0.55667037, 0, 0, 0)
@@ -376,177 +364,6 @@ environment = ExtResource("4_yv5up")
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1729104788]
 transform = Transform3D(0.9723699, -0.02804539, 0.2317546, 0, 0.9927573, 0.12013684, -0.23344538, -0.11681745, 0.9653273, 0.31, 0.74, 1.4)
 
-[node name="YarnDialogueRunner" type="Node" parent="." unique_id=1583879027]
-script = ExtResource("5_vemq2")
-yarn_project = ExtResource("6_ess7m")
-auto_start = true
-verbose_logging = true
-
-[node name="UILayer" type="CanvasLayer" parent="." unique_id=1954229040]
-
-[node name="Background" type="ColorRect" parent="UILayer" unique_id=1903100555]
-visible = false
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.05, 0.07, 0.1, 1)
-
-[node name="LinePresenter" type="PanelContainer" parent="UILayer" unique_id=1391660594]
-visible = false
-anchors_preset = 12
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 60.0
-offset_top = -260.0
-offset_right = -60.0
-offset_bottom = -40.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_styles/panel = SubResource("StyleBoxFlat_0f7vu")
-script = ExtResource("7_nku58")
-
-[node name="VBox" type="VBoxContainer" parent="UILayer/LinePresenter" unique_id=1112520972]
-layout_mode = 2
-theme_override_constants/separation = 16
-
-[node name="CharacterLabel" type="Label" parent="UILayer/LinePresenter/VBox" unique_id=529660718]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.6, 0.8, 1, 1)
-theme_override_font_sizes/font_size = 24
-text = "Character"
-
-[node name="TextLabel" type="RichTextLabel" parent="UILayer/LinePresenter/VBox" unique_id=547978159]
-custom_minimum_size = Vector2(0, 80)
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_font_sizes/normal_font_size = 32
-bbcode_enabled = true
-text = "Dialogue text goes here..."
-fit_content = true
-
-[node name="ContinueIndicator" type="Label" parent="UILayer/LinePresenter/VBox" unique_id=748311217]
-layout_mode = 2
-size_flags_horizontal = 8
-theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
-theme_override_font_sizes/font_size = 16
-text = "Click or press Space to continue..."
-
-[node name="OptionsPresenter" type="PanelContainer" parent="UILayer" unique_id=1557484482]
-visible = false
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -450.0
-offset_top = -200.0
-offset_right = 450.0
-offset_bottom = 200.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_0f7vu")
-script = ExtResource("8_in6mk")
-
-[node name="OptionsContainer" type="VBoxContainer" parent="UILayer/OptionsPresenter" unique_id=678346108]
-layout_mode = 2
-theme_override_constants/separation = 12
-
-[node name="UI" type="Control" parent="UILayer" unique_id=322969042]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-mouse_filter = 2
-
-[node name="Title" type="Label" parent="UILayer/UI" unique_id=384935486]
-visible = false
-layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -200.0
-offset_top = 30.0
-offset_right = 200.0
-offset_bottom = 70.0
-grow_horizontal = 2
-theme_override_font_sizes/font_size = 28
-text = "Yarn Basics Sample"
-horizontal_alignment = 1
-
-[node name="Subtitle" type="Label" parent="UILayer/UI" unique_id=966549693]
-visible = false
-layout_mode = 1
-anchors_preset = 5
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -300.0
-offset_top = 75.0
-offset_right = 300.0
-offset_bottom = 100.0
-grow_horizontal = 2
-theme_override_colors/font_color = Color(0.6, 0.6, 0.65, 1)
-theme_override_font_sizes/font_size = 14
-text = "A tour of all Yarn language features"
-horizontal_alignment = 1
-
-[node name="StartButton" type="Button" parent="UILayer/UI" unique_id=1302385684]
-visible = false
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -100.0
-offset_top = -25.0
-offset_right = 100.0
-offset_bottom = 25.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_font_sizes/font_size = 18
-text = "Start Tour"
-
-[node name="RestartButton" type="Button" parent="UILayer/UI" unique_id=751632654]
-visible = false
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -100.0
-offset_top = -25.0
-offset_right = 100.0
-offset_bottom = 25.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_font_sizes/font_size = 18
-text = "Restart Tour"
-
-[node name="Instructions" type="Label" parent="UILayer/UI" unique_id=1764493964]
-visible = false
-layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -300.0
-offset_top = -30.0
-offset_right = 300.0
-offset_bottom = -10.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_colors/font_color = Color(0.4, 0.4, 0.45, 1)
-theme_override_font_sizes/font_size = 12
-text = "Read the Basics.yarn file to see how each feature is written"
-horizontal_alignment = 1
-
 [node name="tree-small" parent="." unique_id=1652844060 instance=ExtResource("9_o0shl")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.99869174, 1.4901161e-08, -0.422735)
 
@@ -556,4 +373,4 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0, -1.1)
 [node name="CharacterBody3D" parent="." unique_id=914088189 instance=ExtResource("11_mhnjb")]
 transform = Transform3D(0.98228073, 0, 0.1874156, 0, 1, 0, -0.1874156, 0, 0.98228073, -0.062, 0, 0.155)
 
-[connection signal="pressed" from="UILayer/UI/StartButton" to="YarnDialogueRunner" method="start_dialogue"]
+[node name="Dialogue" parent="." unique_id=1497124993 instance=ExtResource("9_8xcq0")]
