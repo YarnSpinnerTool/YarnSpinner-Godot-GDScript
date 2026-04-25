@@ -1,0 +1,74 @@
+[gd_scene format=3 uid="uid://bmnsbotu1oujm"]
+
+[ext_resource type="PackedScene" uid="uid://c3xpai64i8w0j" path="res://samples/welcome/Environment.fbx" id="1_s8f2s"]
+[ext_resource type="Environment" uid="uid://bf6x5prjfs851" path="res://samples/shared/art/materials/samples-environment.tres" id="2_eh2le"]
+[ext_resource type="PackedScene" uid="uid://dghanefcv2dl8" path="res://samples/shared/art/environment/fantasy-town/projector-screen.fbx" id="3_sse0m"]
+[ext_resource type="PackedScene" uid="uid://le6c0y7pc8gt" path="res://samples/shared/scenes/explanation_character.tscn" id="4_oik1v"]
+[ext_resource type="PackedScene" uid="uid://cwyx0udsah02p" path="res://samples/shared/scenes/dialogue.tscn" id="5_7g3mq"]
+[ext_resource type="Resource" uid="uid://cqiqscscbijsx" path="res://samples/welcome/dialogue/Intro.yarnproject" id="6_n60vi"]
+
+[sub_resource type="QuadMesh" id="QuadMesh_7g3mq"]
+
+[sub_resource type="ViewportTexture" id="ViewportTexture_7g3mq"]
+viewport_path = NodePath("SubViewport")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_n60vi"]
+resource_local_to_scene = true
+albedo_texture = SubResource("ViewportTexture_7g3mq")
+
+[node name="Welcome" type="Node3D" unique_id=942194094]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1765512604]
+transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
+shadow_enabled = true
+
+[node name="Environment" parent="." unique_id=2059723700 instance=ExtResource("1_s8f2s")]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=532024717]
+environment = ExtResource("2_eh2le")
+
+[node name="projector-screen" parent="." unique_id=23834354 instance=ExtResource("3_sse0m")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 0, 1.2)
+
+[node name="CharacterBody3D" parent="." unique_id=914088189 instance=ExtResource("4_oik1v")]
+transform = Transform3D(-0.9659258, 0, -0.25881913, 0, 1, 0, 0.25881913, 0, -0.9659258, 0.5, 0, 0.3)
+
+[node name="Camera3D" type="Camera3D" parent="." unique_id=207623824]
+transform = Transform3D(-1, -1.954051e-15, -8.742276e-08, 0, 1, -2.2351742e-08, 8.742276e-08, -2.2351742e-08, -1, 0.14, 0.70000005, -1.8000001)
+fov = 35.0
+
+[node name="Dialogue" parent="." unique_id=1497124993 instance=ExtResource("5_7g3mq")]
+
+[node name="YarnDialogueRunner" parent="Dialogue" index="0" unique_id=394517124]
+yarn_project = ExtResource("6_n60vi")
+
+[node name="SubViewport" type="SubViewport" parent="." unique_id=1845839773]
+disable_3d = true
+
+[node name="ColorRect" type="ColorRect" parent="SubViewport" unique_id=689713268]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(1, 0.6460767, 1, 1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="SubViewport" unique_id=479271702]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Label" type="Label" parent="SubViewport/VBoxContainer" unique_id=2112408890]
+layout_mode = 2
+text = "Woooooo label"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1167873192]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -0.7, 0.9, 1.1)
+mesh = SubResource("QuadMesh_7g3mq")
+surface_material_override/0 = SubResource("StandardMaterial3D_n60vi")
+
+[editable path="Dialogue"]

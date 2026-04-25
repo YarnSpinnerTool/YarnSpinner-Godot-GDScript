@@ -60,20 +60,20 @@ script = ExtResource("2_nfpeb")
 
 [node name="PillCharacter2" parent="." unique_id=2028345057 instance=ExtResource("2_jlihl")]
 
-[node name="Skeleton3D" parent="PillCharacter2/PillCharacter" index="0"]
+[node name="Skeleton3D" parent="PillCharacter2/PillCharacter" parent_id_path=PackedInt32Array(2028345057, 1457200766) index="0" unique_id=1152647687]
 bones/0/rotation = Quaternion(0, 0.7071068, 0.7071068, 0)
-bones/1/rotation = Quaternion(0.00023676435, 0.7071067, 0.7071067, -0.00023687122)
-bones/2/rotation = Quaternion(-4.9053872e-11, -1.1924799e-08, 0.0041135666, 0.99999154)
-bones/3/rotation = Quaternion(5.9216087e-17, 2.303104e-15, 0.007288015, 0.99997354)
-bones/4/rotation = Quaternion(4.2032207e-17, -4.8964555e-16, 0.008788812, 0.9999614)
-bones/5/rotation = Quaternion(-4.6117377e-17, -4.270326e-15, 0.006809013, 0.9999769)
+bones/1/rotation = Quaternion(-0.004011444, 0.7070954, 0.7070955, 0.0040113367)
+bones/2/rotation = Quaternion(2.5187697e-11, -1.19248735e-08, -0.0021121919, 0.9999978)
+bones/3/rotation = Quaternion(-1.5338092e-17, -2.2882516e-16, 0.0017531206, 0.9999985)
+bones/4/rotation = Quaternion(3.8214876e-18, -7.2718647e-16, 0.0069047315, 0.99997616)
+bones/5/rotation = Quaternion(2.2396248e-18, -3.7274916e-17, 0.008985396, 0.9999597)
 bones/7/rotation = Quaternion(0.7030023, -0.70300215, -0.07607793, 0.07607929)
 bones/8/rotation = Quaternion(0.7030024, 0.70300215, 0.076077305, 0.076078646)
 bones/10/position = Vector3(-0.054763872, 0.09883218, 0.19973081)
 bones/11/position = Vector3(0.05476434, 0.006787456, 0.1997307)
 bones/12/position = Vector3(-0.054763872, 0.0067874216, 0.19973081)
 
-[node name="PillCharacter_Mesh" parent="PillCharacter2/PillCharacter/Skeleton3D" index="0"]
+[node name="PillCharacter_Mesh" parent="PillCharacter2/PillCharacter/Skeleton3D" index="0" unique_id=1231077892]
 surface_material_override/1 = ExtResource("2_sry8v")
 surface_material_override/2 = ExtResource("4_axqwb")
 

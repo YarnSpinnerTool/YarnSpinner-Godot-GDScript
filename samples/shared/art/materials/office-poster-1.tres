@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://dknq56v1sejqr"]
+
+[ext_resource type="Texture2D" uid="uid://p0jc12lrom0t" path="res://samples/shared/art/textures/office-poster-1.png" id="1_02aaj"]
+
+[resource]
+resource_name = "colormap"
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_02aaj")
+emission_enabled = true
