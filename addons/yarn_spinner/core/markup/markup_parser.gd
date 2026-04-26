@@ -46,6 +46,15 @@ func _init() -> void:
 	_processors.append(_style_processor)
 	_processors.append(_palette_processor)
 
+	# Inline style shortcuts: [b]/[i]/[u]/[s]/[code] map directly to BBCode tags
+	# of the same name for RichTextLabel rendering.
+	for tag in ["b", "i", "u", "s", "code"]:
+		_processors.append(_InlineStyleProcessor.new(tag))
+
+	# [link="..."]text[/link] becomes [url=...]text[/url] — clickable when the
+	# RichTextLabel handles meta_clicked.
+	_processors.append(_LinkProcessor.new())
+
 
 func register_processor(processor: YarnMarkupAttributeProcessor) -> void:
 	_processors.append(processor)
@@ -228,3 +237,40 @@ func _find_processor(attr_name: String) -> YarnMarkupAttributeProcessor:
 		if processor.handles_attribute(attr_name):
 			return processor
 	return null
+
+
+# Built-in passthrough for [b]/[i]/[u]/[s]/[code] — yarn attribute name matches
+# the Godot BBCode tag exactly, so we just emit it directly.
+class _InlineStyleProcessor extends YarnMarkupAttributeProcessor:
+	func _init(name: String) -> void:
+		attribute_name = name
+
+	func process_open(_attribute_value: String, _properties: Dictionary) -> String:
+		return "[%s]" % attribute_name
+
+	func process_close() -> String:
+		return "[/%s]" % attribute_name
+
+
+# [link="value"]text[/link] -> [url=value]text[/url].
+# Tracks a per-instance stack so process_close emits the matching BBCode only
+# when the corresponding open actually emitted a [url=...] tag.
+class _LinkProcessor extends YarnMarkupAttributeProcessor:
+	var _emitted_url_stack: Array[bool] = []
+
+	func _init() -> void:
+		attribute_name = "link"
+
+	func process_open(attribute_value: String, _properties: Dictionary) -> String:
+		var has_url := not attribute_value.is_empty()
+		_emitted_url_stack.push_back(has_url)
+		if not has_url:
+			return ""
+		return "[url=%s]" % attribute_value
+
+	func process_close() -> String:
+		if _emitted_url_stack.is_empty():
+			return ""
+		if _emitted_url_stack.pop_back():
+			return "[/url]"
+		return ""

@@ -477,8 +477,15 @@ func _get_script_class_name(script: Script) -> String:
 func _is_async_result(result: Variant) -> bool:
 	if result is Signal:
 		return true
-	if result is Object and result != null and result.has_method("is_coroutine"):
-		return true
+	if result is Object and result != null:
+		# GDScript coroutines (functions containing `await`) return a
+		# GDScriptFunctionState when invoked via Callable.call/callv. The
+		# dispatcher's `await async_result` resolves it correctly, but we
+		# have to flag it as async so the await branch is taken.
+		if result.get_class() == "GDScriptFunctionState":
+			return true
+		if result.has_method("is_coroutine"):
+			return true
 	return false
 
 

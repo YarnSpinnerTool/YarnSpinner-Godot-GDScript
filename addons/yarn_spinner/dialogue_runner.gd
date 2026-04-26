@@ -121,6 +121,10 @@ var _current_line: YarnLine
 var _current_options: Array[YarnOption]
 var _waiting_for_content: bool = false
 var _current_cancellation_token: YarnCancellationToken
+# True while an async command is awaiting its returned Signal/coroutine.
+# _continue_dialogue_safe must not force the VM forward while this is set —
+# the await needs to resume on its own and call signal_content_complete.
+var _async_command_pending: bool = false
 
 
 func _ready() -> void:
@@ -702,6 +706,12 @@ func _continue_dialogue_safe() -> void:
 		return
 	if _vm.current_state == _vm.ExecutionState.STOPPED:
 		return
+	# If an async command is currently awaiting its returned signal/coroutine,
+	# don't force the VM forward — vm.continue_dialogue would unconditionally
+	# set state to RUNNING and steamroll over the pending await. The await
+	# will eventually resume and call signal_content_complete itself.
+	if _async_command_pending:
+		return
 	_continue_dialogue()
 
 
@@ -838,11 +848,19 @@ func _on_command(command_text: String) -> void:
 			return
 
 	if result.is_async:
+		_async_command_pending = true
 		var async_result: Variant = result.result
 		if async_result is Signal:
 			await async_result
 		elif async_result is Object and async_result != null:
-			await async_result
+			# Coroutine functions called via Callable.callv return a
+			# GDScriptFunctionState. The state has a `completed` signal that
+			# fires when the coroutine runs to its end.
+			if async_result.has_signal("completed"):
+				await async_result.completed
+			else:
+				await async_result
+		_async_command_pending = false
 
 	if not _is_running:
 		return
