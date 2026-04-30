@@ -121,10 +121,6 @@ var _current_line: YarnLine
 var _current_options: Array[YarnOption]
 var _waiting_for_content: bool = false
 var _current_cancellation_token: YarnCancellationToken
-# True while an async command is awaiting its returned Signal/coroutine.
-# _continue_dialogue_safe must not force the VM forward while this is set —
-# the await needs to resume on its own and call signal_content_complete.
-var _async_command_pending: bool = false
 
 
 func _ready() -> void:
@@ -574,14 +570,21 @@ func remove_presenter(presenter: YarnDialoguePresenter) -> void:
 
 
 func signal_content_complete() -> void:
-	if _waiting_for_content and not _content_complete_pending:
-		if _vm.current_state == _vm.ExecutionState.WAITING_FOR_INPUT or _vm.current_state == _vm.ExecutionState.STOPPED:
-			_waiting_for_content = false
-			return
-		_waiting_for_content = false
-		_content_complete_pending = true
-		_vm.signal_content_complete()
-		call_deferred("_continue_dialogue_safe")
+	if not _waiting_for_content:
+		return
+	# Always clear the flag even if a previous deferred continuation is still
+	# queued — `_continue_dialogue_safe` reads `_waiting_for_content` to decide
+	# whether new content has started, and a stale `true` here would make it
+	# bail forever once the previous defer fires.
+	_waiting_for_content = false
+	if _content_complete_pending:
+		# Previous defer is queued; it will resume the VM. Don't queue another.
+		return
+	if _vm.current_state == _vm.ExecutionState.WAITING_FOR_INPUT or _vm.current_state == _vm.ExecutionState.STOPPED:
+		return
+	_content_complete_pending = true
+	_vm.signal_content_complete()
+	call_deferred("_continue_dialogue_safe")
 
 
 func select_option(option_index: int) -> void:
@@ -706,11 +709,16 @@ func _continue_dialogue_safe() -> void:
 		return
 	if _vm.current_state == _vm.ExecutionState.STOPPED:
 		return
-	# If an async command is currently awaiting its returned signal/coroutine,
-	# don't force the VM forward — vm.continue_dialogue would unconditionally
-	# set state to RUNNING and steamroll over the pending await. The await
-	# will eventually resume and call signal_content_complete itself.
-	if _async_command_pending:
+	# If a line/command is currently awaiting its presenter's completion or
+	# its returned signal, don't force the VM forward — vm.continue_dialogue
+	# would unconditionally set state to RUNNING and steamroll over the
+	# pending await. The await will resume on its own and call
+	# signal_content_complete, which queues a fresh deferred continuation.
+	#
+	# This guards both async commands (where the await is on the returned
+	# Signal/coroutine) AND lines/sync commands where a new RUN_LINE has
+	# started while the previous completion's deferred call was queued.
+	if _waiting_for_content:
 		return
 	_continue_dialogue()
 
@@ -848,7 +856,6 @@ func _on_command(command_text: String) -> void:
 			return
 
 	if result.is_async:
-		_async_command_pending = true
 		var async_result: Variant = result.result
 		if async_result is Signal:
 			await async_result
@@ -860,7 +867,6 @@ func _on_command(command_text: String) -> void:
 				await async_result.completed
 			else:
 				await async_result
-		_async_command_pending = false
 
 	if not _is_running:
 		return
