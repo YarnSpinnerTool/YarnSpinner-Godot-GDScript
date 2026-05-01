@@ -136,13 +136,7 @@ func _ready() -> void:
 	_vm.set_library(_library)
 	_vm.verbose_logging = verbose_logging
 
-	_vm.line_handler.connect(_on_line)
-	_vm.options_handler.connect(_on_options)
-	_vm.command_handler.connect(_on_command)
-	_vm.node_start_handler.connect(_on_node_start)
-	_vm.node_complete_handler.connect(_on_node_complete)
-	_vm.dialogue_complete_handler.connect(_on_dialogue_complete)
-	_vm.prepare_for_lines_handler.connect(_on_prepare_for_lines)
+	_bind_vm_signals()
 
 	if variable_storage == null:
 		variable_storage = YarnInMemoryVariableStorage.new()
@@ -179,6 +173,19 @@ func _ready() -> void:
 		call_deferred("start_dialogue")
 
 
+func _enter_tree() -> void:
+	# Re-bind VM signal handlers after a re-parent. _exit_tree disconnects
+	# them defensively (Unity OnDestroy parity), but _ready only fires the
+	# first time a node enters the tree — without this hook, any subsequent
+	# add_child to a new parent would leave the runner alive but its VM
+	# silent (SHOW_OPTIONS, lines, commands all emitted into the void).
+	#
+	# On the very first entry _vm doesn't exist yet (it's constructed in
+	# _ready, which fires after _enter_tree), so we skip — _ready handles
+	# the initial bind in that case.
+	_bind_vm_signals()
+
+
 func _exit_tree() -> void:
 	# Clean up signal connections and cancel any in-progress dialogue.
 	# Matches Unity's OnDestroy pattern.
@@ -200,6 +207,27 @@ func _exit_tree() -> void:
 
 	if is_running():
 		stop_dialogue()
+
+
+## Bind every VM signal handler. Idempotent — safe to call from both _ready
+## (initial setup) and _enter_tree (re-bind after a re-parent).
+func _bind_vm_signals() -> void:
+	if _vm == null:
+		return
+	if not _vm.line_handler.is_connected(_on_line):
+		_vm.line_handler.connect(_on_line)
+	if not _vm.options_handler.is_connected(_on_options):
+		_vm.options_handler.connect(_on_options)
+	if not _vm.command_handler.is_connected(_on_command):
+		_vm.command_handler.connect(_on_command)
+	if not _vm.node_start_handler.is_connected(_on_node_start):
+		_vm.node_start_handler.connect(_on_node_start)
+	if not _vm.node_complete_handler.is_connected(_on_node_complete):
+		_vm.node_complete_handler.connect(_on_node_complete)
+	if not _vm.dialogue_complete_handler.is_connected(_on_dialogue_complete):
+		_vm.dialogue_complete_handler.connect(_on_dialogue_complete)
+	if not _vm.prepare_for_lines_handler.is_connected(_on_prepare_for_lines):
+		_vm.prepare_for_lines_handler.connect(_on_prepare_for_lines)
 
 
 func _configure_localisation() -> void:
