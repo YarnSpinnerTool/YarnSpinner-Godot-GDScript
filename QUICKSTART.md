@@ -29,7 +29,7 @@ If `ysc` (the Yarn Spinner compiler) is on your system PATH, compilation is auto
 Install the required version of `ysc` globally with:
 
 ```
-dotnet tool install YarnSpinner.Console --global --version 3.1.0-alpha1`
+dotnet tool install YarnSpinner.Console --global --version 3.2.2`
 ```
 
 ### Manual compilation
