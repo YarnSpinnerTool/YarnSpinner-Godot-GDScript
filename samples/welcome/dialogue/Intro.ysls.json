@@ -65,30 +65,6 @@
       "yarnName": "flash"
     },
     {
-      "async": false,
-      "definitionName": "set_fade_color",
-      "fileName": "fade_effect.gd",
-      "language": "gdscript",
-      "parameters": [],
-      "yarnName": "set_fade_color"
-    },
-    {
-      "async": false,
-      "definitionName": "fade_up",
-      "fileName": "fade_effect.gd",
-      "language": "gdscript",
-      "parameters": [],
-      "yarnName": "fade_up"
-    },
-    {
-      "async": false,
-      "definitionName": "fade_down",
-      "fileName": "fade_effect.gd",
-      "language": "gdscript",
-      "parameters": [],
-      "yarnName": "fade_down"
-    },
-    {
       "async": true,
       "definitionName": "_yarn_command_move",
       "fileName": "character.gd",
@@ -159,6 +135,30 @@
         }
       ],
       "yarnName": "face"
+    },
+    {
+      "async": false,
+      "definitionName": "set_fade_color",
+      "fileName": "fade_effect.gd",
+      "language": "gdscript",
+      "parameters": [],
+      "yarnName": "set_fade_color"
+    },
+    {
+      "async": false,
+      "definitionName": "fade_up",
+      "fileName": "fade_effect.gd",
+      "language": "gdscript",
+      "parameters": [],
+      "yarnName": "fade_up"
+    },
+    {
+      "async": false,
+      "definitionName": "fade_down",
+      "fileName": "fade_effect.gd",
+      "language": "gdscript",
+      "parameters": [],
+      "yarnName": "fade_down"
     }
   ],
   "functions": [],

@@ -37,6 +37,10 @@ func _get_save_extension() -> String:
 
 
 func _get_resource_type() -> String:
+	# Must stay "Resource". Returning a script class name (or any non-ClassDB
+	# type) puts the file's importer roundtrip check into a state Godot 4.6
+	# can't resolve, which makes "No loader found" errors fire on startup and
+	# disables the right-click "Reimport" menu item.
 	return "Resource"
 
 

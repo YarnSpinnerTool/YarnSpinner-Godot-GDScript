@@ -23,26 +23,28 @@ extends EditorPlugin
 
 const YarnProjectImporter := preload("res://addons/yarn_spinner/editor/yarn_project_importer.gd")
 const YarnFileImporter := preload("res://addons/yarn_spinner/editor/yarn_file_importer.gd")
-const YarnEditorScript := preload("res://addons/yarn_spinner/editor/yarn_editor.gd")
+const YarnMainScreen := preload("res://addons/yarn_spinner/editor/yarn_main_screen.gd")
 const YarnInspectorPlugin := preload("res://addons/yarn_spinner/editor/yarn_inspector_plugin.gd")
-const YarnCommandsPanelScript := preload("res://addons/yarn_spinner/editor/yarn_commands_panel.gd")
 const YarnVariableInspectorPlugin := preload("res://addons/yarn_spinner/editor/yarn_variable_inspector_plugin.gd")
 const YarnProjectInspectorPlugin := preload("res://addons/yarn_spinner/editor/yarn_project_inspector_plugin.gd")
+
+const MAIN_SCREEN_NAME := "Yarn Spinner"
+const PLUGIN_ICON_PATH := "res://addons/yarn_spinner/icons/yarn_script.svg"
 
 const SETTING_YSC_PATH := "yarn_spinner/compiler/ysc_path"
 const SETTING_AUTO_YSLS := "yarn_spinner/ysls/auto_regenerate"
 
 var _yarn_project_importer: EditorImportPlugin
 var _yarn_file_importer: EditorImportPlugin
-var _yarn_editor: Control
+var _main_screen: Control
 var _inspector_plugin: EditorInspectorPlugin
-var _commands_panel: Control
 var _variable_inspector_plugin: EditorInspectorPlugin
 var _project_inspector_plugin: EditorInspectorPlugin
 var _ysls_regenerate_timer: Timer
 var _ysls_needs_regenerate: bool = false
 var _reimport_timer: Timer
-var _reimport_needed: bool = false
+var _pending_reimport_projects: Dictionary = {}
+var _startup_check_done: bool = false
 
 
 func _enter_tree() -> void:
@@ -72,11 +74,9 @@ func _enter_tree() -> void:
 	_project_inspector_plugin = YarnProjectInspectorPlugin.new()
 	add_inspector_plugin(_project_inspector_plugin)
 
-	_yarn_editor = YarnEditorScript.new()
-	add_control_to_bottom_panel(_yarn_editor, "Yarn")
-
-	_commands_panel = YarnCommandsPanelScript.new()
-	add_control_to_bottom_panel(_commands_panel, "Yarn Commands")
+	_main_screen = YarnMainScreen.new()
+	EditorInterface.get_editor_main_screen().add_child(_main_screen)
+	_make_visible(false)
 
 	var fs := EditorInterface.get_resource_filesystem()
 	if fs:
@@ -143,15 +143,9 @@ func _exit_tree() -> void:
 		remove_inspector_plugin(_inspector_plugin)
 		_inspector_plugin = null
 
-	if _commands_panel:
-		remove_control_from_bottom_panel(_commands_panel)
-		_commands_panel.queue_free()
-		_commands_panel = null
-
-	if _yarn_editor:
-		remove_control_from_bottom_panel(_yarn_editor)
-		_yarn_editor.queue_free()
-		_yarn_editor = null
+	if _main_screen:
+		_main_screen.queue_free()
+		_main_screen = null
 
 	remove_import_plugin(_yarn_project_importer)
 	remove_import_plugin(_yarn_file_importer)
@@ -164,6 +158,37 @@ func _exit_tree() -> void:
 	remove_autoload_singleton("YarnSpinner")
 
 
+func _has_main_screen() -> bool:
+	return true
+
+
+func _get_plugin_name() -> String:
+	return MAIN_SCREEN_NAME
+
+
+func _get_plugin_icon() -> Texture2D:
+	# Godot does not rescale main-screen icons, so the source (256x256) must be
+	# downsized to the editor's standard tab icon size (16px, DPI-scaled).
+	if not ResourceLoader.exists(PLUGIN_ICON_PATH):
+		return null
+	var source: Texture2D = load(PLUGIN_ICON_PATH)
+	var image := source.get_image()
+	if image == null:
+		return source
+	if image.is_compressed():
+		image.decompress()
+	var icon_size := int(round(16.0 * EditorInterface.get_editor_scale()))
+	image.resize(icon_size, icon_size, Image.INTERPOLATE_LANCZOS)
+	return ImageTexture.create_from_image(image)
+
+
+func _make_visible(next_visible: bool) -> void:
+	if _main_screen:
+		_main_screen.visible = next_visible
+		if next_visible:
+			_main_screen.notify_shown()
+
+
 func _handles(object: Object) -> bool:
 	return object is YarnScriptResource
 
@@ -171,28 +196,32 @@ func _handles(object: Object) -> bool:
 func _edit(object: Object) -> void:
 	if object is YarnScriptResource:
 		var yarn_script := object as YarnScriptResource
-		if _yarn_editor and not yarn_script.source_path.is_empty():
-			_yarn_editor.edit_file(yarn_script.source_path)
-			make_bottom_panel_item_visible(_yarn_editor)
+		if _main_screen and not yarn_script.source_path.is_empty():
+			_main_screen.edit_file(yarn_script.source_path)
+			EditorInterface.set_main_screen_editor(MAIN_SCREEN_NAME)
 
 
 func _on_filesystem_changed() -> void:
 	_schedule_ysls_regenerate()
+	if not _startup_check_done:
+		_startup_check_done = true
+		_check_stale_yarnprojects_at_startup.call_deferred()
+		_reimport_files_with_stale_type.call_deferred()
 
 
 func _on_resources_reimported(resources: PackedStringArray) -> void:
-	var has_yarn_file := false
+	var changed_yarns := PackedStringArray()
 	var needs_ysls := false
 	for path in resources:
 		if path.ends_with(".yarn"):
-			has_yarn_file = true
+			changed_yarns.append(path)
 			needs_ysls = true
 		elif path.ends_with(".gd") or path.ends_with(".yarnproject"):
 			needs_ysls = true
 	if needs_ysls:
 		_schedule_ysls_regenerate()
-	if has_yarn_file:
-		_schedule_yarnproject_reimport()
+	if not changed_yarns.is_empty():
+		_schedule_yarnproject_reimport_for(changed_yarns)
 
 
 func _schedule_ysls_regenerate() -> void:
@@ -206,8 +235,19 @@ func _schedule_ysls_regenerate() -> void:
 		_ysls_regenerate_timer.start()
 
 
-func _schedule_yarnproject_reimport() -> void:
-	_reimport_needed = true
+## Queue every yarnproject whose globs match any of `changed_yarns` (res:// paths).
+func _schedule_yarnproject_reimport_for(changed_yarns: PackedStringArray) -> void:
+	var changed_abs := {}
+	for c in changed_yarns:
+		changed_abs[ProjectSettings.globalize_path(c)] = true
+
+	var all_projects := _find_yarn_projects("res://")
+	for project_path in all_projects:
+		if _project_matches_any(project_path, changed_abs):
+			_pending_reimport_projects[project_path] = true
+
+	if _pending_reimport_projects.is_empty():
+		return
 	if _reimport_timer and not _reimport_timer.is_stopped():
 		return  # already scheduled
 	if _reimport_timer:
@@ -215,15 +255,126 @@ func _schedule_yarnproject_reimport() -> void:
 
 
 func _do_yarnproject_reimport() -> void:
-	if not _reimport_needed:
+	if _pending_reimport_projects.is_empty():
 		return
-	_reimport_needed = false
+	var to_reimport := PackedStringArray(_pending_reimport_projects.keys())
+	_pending_reimport_projects.clear()
+	EditorInterface.get_resource_filesystem().reimport_files(to_reimport)
 
-	var yarn_projects := _find_yarn_projects("res://")
-	if yarn_projects.is_empty():
+
+## One-shot migration: when the addon is updated, existing .import sidecars
+## still report type="Resource" from older versions. Reimport any .yarn /
+## .yarnproject whose sidecar type no longer matches what the importers now
+## declare, so the FileSystem dock picks up the registered custom icons.
+func _reimport_files_with_stale_type() -> void:
+	var stale := PackedStringArray()
+	_collect_files_with_stale_type("res://", ".yarn", "Resource", stale)
+	_collect_files_with_stale_type("res://", ".yarnproject", "Resource", stale)
+	if stale.is_empty():
 		return
+	print("yarn spinner: refreshing import type for %d file(s) so FileSystem icons appear" % stale.size())
+	EditorInterface.get_resource_filesystem().reimport_files(stale)
 
-	EditorInterface.get_resource_filesystem().reimport_files(yarn_projects)
+
+func _collect_files_with_stale_type(dir_path: String, ext: String, expected_type: String, out: PackedStringArray) -> void:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var file_name := dir.get_next()
+	while not file_name.is_empty():
+		var full_path := dir_path.path_join(file_name)
+		if dir.current_is_dir():
+			if not file_name.begins_with(".") and file_name != "addons":
+				_collect_files_with_stale_type(full_path, ext, expected_type, out)
+		elif file_name.ends_with(ext):
+			if not _import_type_matches(full_path, expected_type):
+				out.append(full_path)
+		file_name = dir.get_next()
+	dir.list_dir_end()
+
+
+## Returns true if the file's .import sidecar already declares the expected
+## type (or is missing/unreadable — in which case Godot will create one on its
+## own and we don't need to force a reimport).
+func _import_type_matches(file_path: String, expected: String) -> bool:
+	var f := FileAccess.open(file_path + ".import", FileAccess.READ)
+	if f == null:
+		return true
+	while not f.eof_reached():
+		var line := f.get_line().strip_edges()
+		if line.begins_with("type="):
+			var raw := line.substr(5).strip_edges()
+			if raw.begins_with("\"") and raw.ends_with("\""):
+				raw = raw.substr(1, raw.length() - 2)
+			f.close()
+			return raw == expected
+	f.close()
+	return true
+
+
+## Scan every .yarnproject and reimport any whose compiled output is missing or stale.
+func _check_stale_yarnprojects_at_startup() -> void:
+	var projects := _find_yarn_projects("res://")
+	var stale := PackedStringArray()
+	for p in projects:
+		if _is_yarnproject_stale(p):
+			stale.append(p)
+	if stale.is_empty():
+		return
+	print("yarn spinner: recompiling %d stale yarnproject(s): %s" % [stale.size(), ", ".join(stale)])
+	EditorInterface.get_resource_filesystem().reimport_files(stale)
+
+
+func _is_yarnproject_stale(yarnproject_path: String) -> bool:
+	var imported := _get_imported_dest_path(yarnproject_path)
+	if imported.is_empty():
+		return true  # .import is missing, marked invalid, or has no dest path
+	var imported_abs := ProjectSettings.globalize_path(imported)
+	if not FileAccess.file_exists(imported_abs):
+		return true
+
+	if ResourceLoader.exists(yarnproject_path, "Resource"):
+		var res := ResourceLoader.load(yarnproject_path)
+		if res is YarnProjectResource and (res as YarnProjectResource).compiled_program.is_empty():
+			return true
+
+	var imported_mtime := FileAccess.get_modified_time(imported_abs)
+	var abs_yp := ProjectSettings.globalize_path(yarnproject_path)
+	var sources := YarnProjectImporter.parse_project_sources(abs_yp, abs_yp.get_base_dir())
+	for s in sources:
+		if FileAccess.get_modified_time(s) > imported_mtime:
+			return true
+	return false
+
+
+## Reads the .import sidecar; returns the dest_files path, or "" if invalid/missing.
+func _get_imported_dest_path(yarnproject_path: String) -> String:
+	var f := FileAccess.open(yarnproject_path + ".import", FileAccess.READ)
+	if f == null:
+		return ""
+	var path := ""
+	var valid := true
+	while not f.eof_reached():
+		var line := f.get_line().strip_edges()
+		if line == "valid=false":
+			valid = false
+		elif line.begins_with("path="):
+			var raw := line.substr(5)
+			if raw.begins_with('"') and raw.ends_with('"'):
+				raw = raw.substr(1, raw.length() - 2)
+			path = raw
+	f.close()
+	return "" if not valid else path
+
+
+func _project_matches_any(project_path: String, changed_abs_set: Dictionary) -> bool:
+	var abs_proj := ProjectSettings.globalize_path(project_path)
+	var sources := YarnProjectImporter.parse_project_sources(abs_proj, abs_proj.get_base_dir())
+	for s in sources:
+		if changed_abs_set.has(s):
+			return true
+	return false
 
 
 func _do_ysls_regenerate() -> void:

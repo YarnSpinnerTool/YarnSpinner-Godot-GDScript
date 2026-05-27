@@ -41,6 +41,10 @@ func _get_save_extension() -> String:
 
 
 func _get_resource_type() -> String:
+	# Must stay "Resource". Returning a script class name (or any non-ClassDB
+	# type) puts the file's importer roundtrip check into a state Godot 4.6
+	# can't resolve, which makes "No loader found" errors fire on startup and
+	# disables the right-click "Reimport" menu item.
 	return "Resource"
 
 
@@ -95,7 +99,7 @@ func _get_icon() -> Texture2D:
 func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> Error:
 	var abs_path := ProjectSettings.globalize_path(source_file)
 	var source_dir := abs_path.get_base_dir()
-	var source_files := _parse_project_sources(abs_path, source_dir)
+	var source_files := parse_project_sources(abs_path, source_dir)
 
 	# Try native compiler first (bundled, no .NET dependency)
 	if YarnNativeCompiler.is_available():
@@ -304,7 +308,9 @@ func _find_ysc_path(options: Dictionary) -> String:
 	return ""
 
 
-func _parse_project_sources(project_path: String, base_dir: String) -> PackedStringArray:
+## Parses a .yarnproject file and resolves its `sourceFiles` globs.
+## Returns absolute filesystem paths.
+static func parse_project_sources(project_path: String, base_dir: String) -> PackedStringArray:
 	var sources := PackedStringArray()
 
 	var file := FileAccess.open(project_path, FileAccess.READ)
@@ -322,13 +328,13 @@ func _parse_project_sources(project_path: String, base_dir: String) -> PackedStr
 	if data.has("sourceFiles"):
 		var patterns: Array = data["sourceFiles"]
 		for pattern in patterns:
-			var resolved := _resolve_glob(base_dir, pattern)
+			var resolved := resolve_glob(base_dir, pattern)
 			sources.append_array(resolved)
 
 	return sources
 
 
-func _resolve_glob(base_dir: String, pattern: String) -> PackedStringArray:
+static func resolve_glob(base_dir: String, pattern: String) -> PackedStringArray:
 	var results := PackedStringArray()
 
 	if pattern.contains("**"):
@@ -353,7 +359,7 @@ func _resolve_glob(base_dir: String, pattern: String) -> PackedStringArray:
 	return results
 
 
-func _find_files_recursive(dir_path: String, pattern: String, results: PackedStringArray) -> void:
+static func _find_files_recursive(dir_path: String, pattern: String, results: PackedStringArray) -> void:
 	var dir := DirAccess.open(dir_path)
 	if dir == null:
 		return

@@ -25,9 +25,10 @@ var _project_selector: OptionButton
 var _tree: Tree
 var _status_label: Label
 
-## Cached per-project YSLS data: { project_path: { commands: [], functions: [] } }
-var _project_data: Dictionary = {}
-## Ordered list of project paths matching the selector indices
+## Commands/functions from the most recent scan, for the current scope.
+var _current_commands: Array = []
+var _current_functions: Array = []
+## Ordered list of project paths matching the selector indices (after "All Projects").
 var _project_paths: Array[String] = []
 
 const ALL_PROJECTS := "(All Projects)"
@@ -85,22 +86,11 @@ func _init() -> void:
 
 
 func _refresh() -> void:
-	_project_data.clear()
+	# Rebuild the project selector ("All Projects" + each .yarnproject).
 	_project_paths.clear()
-
-	# Find all .yarnproject files
-	var yarn_projects := _find_yarn_projects("res://")
-
-	# Generate YSLS per project
-	for project_path in yarn_projects:
-		var generator := YarnYSLSGenerator.new()
-		var scan_root := YarnYSLSGenerator.find_scan_root(project_path)
-		generator.scan_directory(scan_root)
-		var ysls := generator.generate_ysls_dict()
-		_project_data[project_path] = ysls
+	for project_path in _find_yarn_projects("res://"):
 		_project_paths.append(project_path)
 
-	# Update the project selector
 	var prev_selected := _project_selector.selected
 	_project_selector.clear()
 	_project_selector.add_item(ALL_PROJECTS)
@@ -112,11 +102,30 @@ func _refresh() -> void:
 	else:
 		_project_selector.selected = 0
 
+	_rescan()
+
+
+## Scan the directory tree for the current scope and rebuild the list.
+## "All Projects" scans the whole project (res://); a specific project scans the
+## directory inferred for that .yarnproject.
+func _rescan() -> void:
+	var scan_root := "res://"
+	var selected_idx := _project_selector.selected
+	if selected_idx > 0:
+		var project_idx := selected_idx - 1  # offset for "All Projects" entry
+		if project_idx < _project_paths.size():
+			scan_root = YarnYSLSGenerator.find_scan_root(_project_paths[project_idx])
+
+	var generator := YarnYSLSGenerator.new()
+	generator.scan_directory(scan_root)
+	var ysls := generator.generate_ysls_dict()
+	_current_commands = ysls.get("commands", [])
+	_current_functions = ysls.get("functions", [])
 	_rebuild_tree()
 
 
 func _on_project_selected(_index: int) -> void:
-	_rebuild_tree()
+	_rescan()
 
 
 func _on_filter_changed(_new_text: String) -> void:
@@ -124,26 +133,7 @@ func _on_filter_changed(_new_text: String) -> void:
 
 
 func _rebuild_tree() -> void:
-	var selected_idx := _project_selector.selected
-	var filter := _filter_edit.text
-
-	# Collect commands and functions for the selected scope
-	var commands: Array = []
-	var functions: Array = []
-
-	if selected_idx <= 0:
-		# "All Projects" — merge all, grouped by project
-		_build_tree_grouped(filter)
-		return
-	else:
-		var project_idx := selected_idx - 1  # offset for "All Projects" entry
-		if project_idx < _project_paths.size():
-			var project_path := _project_paths[project_idx]
-			var ysls: Dictionary = _project_data.get(project_path, {})
-			commands = ysls.get("commands", [])
-			functions = ysls.get("functions", [])
-
-	_build_tree_flat(commands, functions, filter)
+	_build_tree_flat(_current_commands, _current_functions, _filter_edit.text)
 
 
 func _build_tree_flat(commands: Array, functions: Array, filter_text: String) -> void:
@@ -169,48 +159,7 @@ func _build_tree_flat(commands: Array, functions: Array, filter_text: String) ->
 		for fn in filtered_functions:
 			_add_item(func_header, fn, "function")
 
-	var total := filtered_commands.size() + filtered_functions.size()
 	_status_label.text = "%d commands, %d functions found." % [filtered_commands.size(), filtered_functions.size()]
-
-
-func _build_tree_grouped(filter_text: String) -> void:
-	_tree.clear()
-	var root := _tree.create_item()
-	var filter := filter_text.to_lower()
-	var total_commands := 0
-	var total_functions := 0
-
-	for project_path in _project_paths:
-		var ysls: Dictionary = _project_data.get(project_path, {})
-		var commands: Array = ysls.get("commands", [])
-		var functions: Array = ysls.get("functions", [])
-
-		var filtered_commands := _filter_items(commands, filter)
-		var filtered_functions := _filter_items(functions, filter)
-
-		if filtered_commands.is_empty() and filtered_functions.is_empty():
-			continue
-
-		# Project header
-		var project_name := project_path.get_file().get_basename()
-		var project_header := _tree.create_item(root)
-		project_header.set_text(0, "%s (%d commands, %d functions)" % [
-			project_name, filtered_commands.size(), filtered_functions.size()
-		])
-		_set_header_style(project_header)
-
-		for cmd in filtered_commands:
-			_add_item(project_header, cmd, "command")
-
-		for fn in filtered_functions:
-			_add_item(project_header, fn, "function")
-
-		total_commands += filtered_commands.size()
-		total_functions += filtered_functions.size()
-
-	_status_label.text = "%d projects, %d commands, %d functions found." % [
-		_project_paths.size(), total_commands, total_functions
-	]
 
 
 func _add_item(parent: TreeItem, data: Dictionary, type: String) -> void:

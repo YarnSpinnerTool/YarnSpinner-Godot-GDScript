@@ -41,7 +41,7 @@ _subresources={
 "materials": {
 "Material.002": {
 "use_external/enabled": true,
-"use_external/fallback_path": "res://samples/shared/art/environment/prototype/colormap.tres",
+"use_external/fallback_path": "res://samples/shared/art/materials/colormap.tres",
 "use_external/path": "uid://c8yg7ojn548xj"
 }
 }

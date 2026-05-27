@@ -194,6 +194,12 @@ func _scan_gdscript_file(path: String) -> void:
 	if not source.is_empty():
 		_scan_runtime_bindings(source, file_name)
 
+	# Loading the script (below) compiles it, which is expensive and noisy when
+	# scanning a whole project. It is only needed to discover annotated
+	# `_yarn_command_*` / `_yarn_function_*` methods, so skip it otherwise.
+	if not (source.contains("_yarn_command_") or source.contains("_yarn_function_")):
+		return
+
 	var script := ResourceLoader.load(path, "GDScript", ResourceLoader.CACHE_MODE_IGNORE) as GDScript
 	if script == null:
 		return
@@ -617,7 +623,10 @@ static func find_scan_root(yarn_project_path: String) -> String:
 			if has_gd:
 				return dir
 		dir = dir.get_base_dir()
-	return yarn_project_path.get_base_dir()
+	# No code directory found near the .yarnproject (e.g. scripts live elsewhere
+	# under res://). Fall back to scanning the whole project rather than just the
+	# project file's folder, so commands defined anywhere are still discovered.
+	return "res://"
 
 
 static func generate_from_runner(yarn_project_path: String, dialogue_runner) -> Error:
