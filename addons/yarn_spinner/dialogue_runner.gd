@@ -597,6 +597,17 @@ func remove_presenter(presenter: YarnDialoguePresenter) -> void:
 	_presenters.erase(presenter)
 
 
+## Called by a presenter (via [member YarnLine.source]) when it wants the
+## currently-running line to end. The default source is the runner itself, in
+## which case this is equivalent to [method signal_content_complete]. Wrapper
+## presenters (e.g. the Interruption add-on) may substitute themselves as the
+## source and intercept this call.
+##
+## Mirrors Unity Yarn Spinner's [code]IRequestLineCancellation.RequestLineCancellation[/code].
+func request_line_cancellation(_line: YarnLine) -> void:
+	signal_content_complete()
+
+
 func signal_content_complete() -> void:
 	if not _waiting_for_content:
 		return
@@ -645,6 +656,11 @@ func _run_option_as_line(option: YarnOption) -> void:
 
 	_waiting_for_content = true
 	_current_cancellation_token = YarnCancellationToken.new()
+
+	# Mark ourselves as the source the presenters should route end-of-line
+	# requests through. Wrapper presenters (e.g. the Interruption add-on) may
+	# substitute themselves as the source before dispatching to children.
+	line.source = self
 
 	var presenters_copy := _presenters.duplicate()
 
@@ -763,6 +779,12 @@ func _on_line(line: YarnLine) -> void:
 	_waiting_for_content = true
 
 	_current_cancellation_token = YarnCancellationToken.new()
+
+	# Mark ourselves as the source the presenters should route end-of-line
+	# requests through. Wrapper presenters (e.g. the Interruption add-on) may
+	# substitute themselves as the source before dispatching to children.
+	line.source = self
+
 	var presenters_copy := _presenters.duplicate()
 
 	var completion_signals: Array[Signal] = []

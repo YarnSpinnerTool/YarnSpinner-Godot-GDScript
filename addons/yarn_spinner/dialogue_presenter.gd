@@ -131,3 +131,18 @@ func request_hurry_up() -> void:
 func request_next() -> void:
 	if dialogue_runner != null:
 		dialogue_runner.signal_content_complete()
+
+
+## Helper for presenters that want to ask "the line should end now" (e.g. a
+## voice-over presenter when audio playback finishes).
+##
+## Routes through [member YarnLine.source] when available so that wrapper
+## presenters like the Interruption add-on can intercept; otherwise falls
+## back to calling [method YarnDialogueRunner.signal_content_complete]
+## directly. Mirrors Unity Yarn Spinner's
+## [code]IRequestLineCancellation.RequestLineCancellation[/code] dispatch.
+func _request_line_end(line: YarnLine) -> void:
+	if line != null and line.source != null and is_instance_valid(line.source) and line.source.has_method(&"request_line_cancellation"):
+		line.source.request_line_cancellation(line)
+	elif dialogue_runner != null:
+		dialogue_runner.signal_content_complete()

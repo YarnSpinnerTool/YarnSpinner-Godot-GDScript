@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dceegqr14qt25" path="res://samples/yarn_basics/scripts/yarn_basics_sample.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://flra500ihbix" path="res://addons/yarn_spinner/dialogue_runner.gd" id="2_runner"]
+[ext_resource type="Resource" uid="uid://b6egkjo14sykk" path="res://samples/yarn_basics/dialogue/Basics.yarnproject" id="3_cgxnv"]
 [ext_resource type="Script" uid="uid://cged8u182768u" path="res://addons/yarn_spinner/ui/line_presenter.gd" id="3_line"]
 [ext_resource type="Script" uid="uid://cogqy630mjgv7" path="res://addons/yarn_spinner/ui/options_presenter.gd" id="4_options"]
 
@@ -21,6 +22,7 @@ script = ExtResource("1_main")
 
 [node name="YarnDialogueRunner" type="Node" parent="." unique_id=113657643]
 script = ExtResource("2_runner")
+yarn_project = ExtResource("3_cgxnv")
 show_selected_option_as_line = true
 ysls_scan_path = "res://samples/yarn_basics"
 

@@ -47,6 +47,21 @@ var markup_attributes: Array[YarnMarkupAttribute] = []
 ## Full markup parse result — populated on first access to [member text].
 var markup_result: YarnMarkupParseResult = null
 
+## Optional source that handles requests to end this line early.
+##
+## The dialogue runner sets this to itself when it dispatches the line to its
+## presenters. Wrapper presenters (such as the Interruption add-on) may
+## substitute themselves as the source so that requests from child presenters
+## to end the line can be intercepted.
+##
+## A source object should implement [code]request_line_cancellation(line: YarnLine)[/code].
+## Presenters should route end-of-line requests through
+## [method YarnDialoguePresenter._request_line_end], which uses this field if
+## set and otherwise falls back to calling
+## [method YarnDialogueRunner.signal_content_complete] directly. This mirrors
+## the Unity Yarn Spinner [code]IRequestLineCancellation[/code] mechanism.
+var source: Object = null
+
 
 # ---------------------------------------------------------------------------
 # Lazy-computed properties

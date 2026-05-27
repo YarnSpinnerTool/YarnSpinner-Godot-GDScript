@@ -230,8 +230,10 @@ func _on_audio_finished() -> void:
 	voice_finished.emit(_current_line)
 	_voice_complete.emit()
 
-	if end_line_when_voice_complete and dialogue_runner != null:
-		dialogue_runner.signal_content_complete()
+	if end_line_when_voice_complete:
+		# Route through the line's source so wrapper presenters (e.g. the
+		# Interruption add-on) can intercept; falls back to the runner.
+		_request_line_end(_current_line)
 
 
 func clear_cache() -> void:
