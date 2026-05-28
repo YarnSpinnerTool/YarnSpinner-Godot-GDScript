@@ -616,6 +616,14 @@ func signal_content_complete() -> void:
 	# whether new content has started, and a stale `true` here would make it
 	# bail forever once the previous defer fires.
 	_waiting_for_content = false
+
+	# Wake up presenters that are passively waiting on the current line's
+	# cancellation token (e.g. SubtitlePresenter's
+	# `WaitUntilCanceled(token.NextContentToken)` pattern). Mirrors the Unity
+	# runner, which cancels NextContentToken when a line is signalled done.
+	if _current_cancellation_token != null:
+		_current_cancellation_token.request_next_content()
+
 	if _content_complete_pending:
 		# Previous defer is queued; it will resume the VM. Don't queue another.
 		return
