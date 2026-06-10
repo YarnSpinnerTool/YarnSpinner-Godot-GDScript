@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://cxgpbvfhb8x6o"]
+
+[ext_resource type="PackedScene" uid="uid://1xwqlbyoxmwo" path="res://samples/background-chatter/BackgroundChatter-Environment.fbx" id="1_cbsm0"]
+[ext_resource type="PackedScene" uid="uid://d1fluul8ky1qb" path="res://samples/shared/art/Materials/samples_environment.tscn" id="2_hyqe7"]
+
+[sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_cbsm0"]
+
+[node name="BackgroundChatter" type="Node3D" unique_id=1590418657]
+
+[node name="BackgroundChatter-Environment" parent="." unique_id=883681158 instance=ExtResource("1_cbsm0")]
+
+[node name="StaticBody3D" type="StaticBody3D" parent="BackgroundChatter-Environment" unique_id=2050502980]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="BackgroundChatter-Environment/StaticBody3D" unique_id=1628216668]
+shape = SubResource("ConcavePolygonShape3D_cbsm0")
+
+[node name="SamplesEnvironment" parent="." unique_id=789525707 instance=ExtResource("2_hyqe7")]
