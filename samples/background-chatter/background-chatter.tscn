@@ -2,6 +2,9 @@
 
 [ext_resource type="PackedScene" uid="uid://1xwqlbyoxmwo" path="res://samples/background-chatter/BackgroundChatter-Environment.fbx" id="1_cbsm0"]
 [ext_resource type="PackedScene" uid="uid://d1fluul8ky1qb" path="res://samples/shared/art/Materials/samples_environment.tscn" id="2_hyqe7"]
+[ext_resource type="PackedScene" uid="uid://don7obupokpwf" path="res://samples/shared/scenes/player_character.tscn" id="3_tdggp"]
+[ext_resource type="PackedScene" uid="uid://db6adsx7323jr" path="res://samples/shared/scenes/npc_character.tscn" id="4_kopbj"]
+[ext_resource type="PackedScene" uid="uid://le6c0y7pc8gt" path="res://samples/shared/scenes/explanation_character.tscn" id="5_bfau5"]
 
 [sub_resource type="ConcavePolygonShape3D" id="ConcavePolygonShape3D_cbsm0"]
 
@@ -15,3 +18,78 @@
 shape = SubResource("ConcavePolygonShape3D_cbsm0")
 
 [node name="SamplesEnvironment" parent="." unique_id=789525707 instance=ExtResource("2_hyqe7")]
+
+[node name="PlayerCharacter" parent="." unique_id=914088189 instance=ExtResource("3_tdggp")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 0, -25.9)
+
+[node name="NPCCharacter" parent="." unique_id=115849058 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.9, 0, -24.7)
+
+[node name="NPCCharacter2" parent="." unique_id=589593511 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, -24.6)
+
+[node name="CharacterBody3D2" parent="." unique_id=1520795368 instance=ExtResource("5_bfau5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.6, 0, -25.300001)
+
+[node name="Capsley" parent="." unique_id=820398884 instance=ExtResource("5_bfau5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.34141, 4.7683716e-07, -20.99632)
+
+[node name="NPCCharacter3" parent="." unique_id=977378923 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.036605, 0, -20.738665)
+
+[node name="NPCCharacter4" parent="." unique_id=578374523 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.967349, 0, -20.739944)
+
+[node name="Capsley2" parent="." unique_id=521498329 instance=ExtResource("5_bfau5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.4, 0, -16.7)
+
+[node name="NPCCharacter5" parent="." unique_id=904563525 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4, 0, -16.7)
+
+[node name="NPCCharacter6" parent="." unique_id=804883719 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.1000001, 0, -16.7)
+
+[node name="Capsley3" parent="." unique_id=189051171 instance=ExtResource("5_bfau5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.8000007, 0, -13)
+
+[node name="NPCCharacter7" parent="." unique_id=223068790 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 0, -12.900001)
+
+[node name="Capsley4" parent="." unique_id=1079906857 instance=ExtResource("5_bfau5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.2000003, 0, -9)
+
+[node name="NPCCharacter8" parent="." unique_id=212413935 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.4, 0, -8.900001)
+
+[node name="NPCCharacter9" parent="." unique_id=214636520 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.3, 0, -9)
+
+[node name="Capsley5" parent="." unique_id=1085165879 instance=ExtResource("5_bfau5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.1, 0, -3.9)
+
+[node name="NPCCharacter10" parent="." unique_id=1829752215 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.6325436, 0, -0.0026106834)
+
+[node name="NPCCharacter11" parent="." unique_id=1648140838 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.3610272, 0, -0.2752347)
+
+[node name="NPCCharacter12" parent="." unique_id=559811376 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.3, 0, 3.6000001)
+
+[node name="NPCCharacter13" parent="." unique_id=1056195103 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.3, 0, 5.1)
+
+[node name="NPCCharacter14" parent="." unique_id=748303811 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.4, 0, 5.2000003)
+
+[node name="NPCCharacter15" parent="." unique_id=147231561 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.9, 0.2, 8.5)
+
+[node name="NPCCharacter16" parent="." unique_id=1787785518 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.400001, 0, 9.3)
+
+[node name="NPCCharacter17" parent="." unique_id=109159388 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.4, 0, 9.6)
+
+[node name="NPCCharacter18" parent="." unique_id=551168336 instance=ExtResource("4_kopbj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0, 3.7)

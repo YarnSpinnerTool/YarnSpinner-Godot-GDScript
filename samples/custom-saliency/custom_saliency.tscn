@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://c5wpwn8c0ek6p"]
+
+[ext_resource type="PackedScene" uid="uid://ba6k8q62v3aeg" path="res://samples/shared/scenes/Basic Arena.tscn" id="1_1w626"]
+
+[node name="CustomSaliency" type="Node3D" unique_id=1631058740]
+
+[node name="BasicArena" parent="." unique_id=1653386484 instance=ExtResource("1_1w626")]

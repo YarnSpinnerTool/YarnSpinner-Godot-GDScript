@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://6n6wt607hi0q"]
+
+[ext_resource type="PackedScene" uid="uid://ba6k8q62v3aeg" path="res://samples/shared/scenes/Basic Arena.tscn" id="1_56f54"]
+
+[node name="OptionsThatTimeout" type="Node3D" unique_id=134441918]
+
+[node name="BasicArena" parent="." unique_id=1653386484 instance=ExtResource("1_56f54")]

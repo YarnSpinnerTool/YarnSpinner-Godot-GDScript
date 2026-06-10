@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://dyx87l5qvnsm7"]
+
+[ext_resource type="PackedScene" uid="uid://ba6k8q62v3aeg" path="res://samples/shared/scenes/Basic Arena.tscn" id="1_4ix28"]
+
+[node name="ThemedLinePresenter" type="Node3D" unique_id=2122200818]
+
+[node name="BasicArena" parent="." unique_id=1653386484 instance=ExtResource("1_4ix28")]
