@@ -40,7 +40,7 @@ nodes/Blink/position = Vector2(700, 150)
 "nodes/Animation 2/position" = Vector2(528.5395, 416.96646)
 node_connections = [&"output", 0, &"Blink", &"Blend2", 0, &"Idle", &"Blend2", 1, &"Animation", &"Blink", 0, &"Blend2", &"Blink", 1, &"Animation 2"]
 
-[node name="CharacterBody3D" type="CharacterBody3D" unique_id=914088189]
+[node name="PillCharacter" type="CharacterBody3D" unique_id=914088189]
 script = ExtResource("1_sry8v")
 speed = 5
 
@@ -60,20 +60,20 @@ script = ExtResource("2_nfpeb")
 
 [node name="PillCharacter2" parent="." unique_id=2028345057 instance=ExtResource("2_jlihl")]
 
-[node name="Skeleton3D" parent="PillCharacter2/PillCharacter" parent_id_path=PackedInt32Array(2028345057, 1457200766) index="0" unique_id=1152647687]
+[node name="Skeleton3D" parent="PillCharacter2/PillCharacter" parent_id_path=PackedInt32Array(2028345057, 828416499) index="0" unique_id=419014003]
 bones/0/rotation = Quaternion(0, 0.7071068, 0.7071068, 0)
-bones/1/rotation = Quaternion(-0.004011444, 0.7070954, 0.7070955, 0.0040113367)
-bones/2/rotation = Quaternion(2.5187697e-11, -1.19248735e-08, -0.0021121919, 0.9999978)
-bones/3/rotation = Quaternion(-1.5338092e-17, -2.2882516e-16, 0.0017531206, 0.9999985)
-bones/4/rotation = Quaternion(3.8214876e-18, -7.2718647e-16, 0.0069047315, 0.99997616)
-bones/5/rotation = Quaternion(2.2396248e-18, -3.7274916e-17, 0.008985396, 0.9999597)
+bones/1/rotation = Quaternion(0.0021003587, 0.7071036, 0.7071037, -0.0021004654)
+bones/2/rotation = Quaternion(-7.607396e-11, -1.1924658e-08, 0.0063794213, 0.99997973)
+bones/3/rotation = Quaternion(2.427231e-17, 6.0522235e-16, 0.007896156, 0.9999689)
+bones/4/rotation = Quaternion(8.991073e-17, 9.569033e-16, 0.00915835, 0.99995816)
+bones/5/rotation = Quaternion(-8.361643e-17, -4.0703626e-15, 0.004586091, 0.9999895)
 bones/7/rotation = Quaternion(0.7030023, -0.70300215, -0.07607793, 0.07607929)
 bones/8/rotation = Quaternion(0.7030024, 0.70300215, 0.076077305, 0.076078646)
 bones/10/position = Vector3(-0.054763872, 0.09883218, 0.19973081)
 bones/11/position = Vector3(0.05476434, 0.006787456, 0.1997307)
 bones/12/position = Vector3(-0.054763872, 0.0067874216, 0.19973081)
 
-[node name="PillCharacter_Mesh" parent="PillCharacter2/PillCharacter/Skeleton3D" index="0" unique_id=1231077892]
+[node name="PillCharacter_Mesh" parent="PillCharacter2/PillCharacter/Skeleton3D" index="0" unique_id=273724583]
 surface_material_override/1 = ExtResource("2_sry8v")
 surface_material_override/2 = ExtResource("4_axqwb")
 

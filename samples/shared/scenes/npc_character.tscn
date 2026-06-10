@@ -1,0 +1,32 @@
+[gd_scene format=3 uid="uid://db6adsx7323jr"]
+
+[ext_resource type="PackedScene" uid="uid://bbj41hxggtbc1" path="res://samples/shared/scenes/pill_character.tscn" id="1_h1y4k"]
+[ext_resource type="PackedScene" uid="uid://wejgijm7pbq1" path="res://samples/shared/art/Effects/Alert.fbx" id="2_4vgd5"]
+[ext_resource type="Shader" uid="uid://dneb8pffavgr" path="res://samples/shared/art/Character/configurable_gradient.tres" id="2_qjpwe"]
+[ext_resource type="Texture2D" uid="uid://dwhs02fqyek31" path="res://samples/shared/art/Textures/colormap.png" id="3_fnnib"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_hvlxi"]
+resource_name = "ConfigurableGradient"
+render_priority = 0
+shader = ExtResource("2_qjpwe")
+shader_parameter/Bottom_Colour = Color(1, 0.44705883, 0.26666668, 1)
+shader_parameter/Top_Colour = Color(1, 0.6156863, 0.26666668, 1)
+shader_parameter/Colour = ExtResource("3_fnnib")
+
+[node name="NPCCharacter" unique_id=914088189 instance=ExtResource("1_h1y4k")]
+
+[node name="Skeleton3D" parent="PillCharacter2/PillCharacter" parent_id_path=PackedInt32Array(2028345057, 828416499) index="0" unique_id=419014003]
+bones/1/rotation = Quaternion(0.006664397, 0.7070754, 0.7070754, -0.0066645034)
+bones/2/rotation = Quaternion(-1.0397552e-10, -1.19244445e-08, 0.008719214, 0.9999621)
+bones/3/rotation = Quaternion(-1.0698819e-16, -1.752695e-16, 0.007213608, 0.9999741)
+bones/4/rotation = Quaternion(-9.260326e-17, 8.066247e-18, 0.0021627888, 0.99999774)
+bones/5/rotation = Quaternion(-2.8411944e-16, -5.089326e-16, -0.0053359903, 0.99998575)
+
+[node name="PillCharacter_Mesh" parent="PillCharacter2/PillCharacter/Skeleton3D" index="0" unique_id=273724583]
+surface_material_override/1 = SubResource("ShaderMaterial_hvlxi")
+
+[node name="Alert" parent="." index="3" unique_id=1947954221 instance=ExtResource("2_4vgd5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.90000004, 0)
+
+[editable path="PillCharacter2"]
+[editable path="Alert"]

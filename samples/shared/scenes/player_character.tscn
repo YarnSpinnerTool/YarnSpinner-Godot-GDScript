@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://don7obupokpwf"]
+
+[ext_resource type="PackedScene" uid="uid://bbj41hxggtbc1" path="res://samples/shared/scenes/pill_character.tscn" id="1_eoqwp"]
+[ext_resource type="Shader" uid="uid://dneb8pffavgr" path="res://samples/shared/art/Character/configurable_gradient.tres" id="2_scy11"]
+[ext_resource type="Texture2D" uid="uid://dwhs02fqyek31" path="res://samples/shared/art/Textures/colormap.png" id="3_2dwnp"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_02qkf"]
+resource_name = "ConfigurableGradient"
+render_priority = 0
+shader = ExtResource("2_scy11")
+shader_parameter/Bottom_Colour = Color(0.105882354, 0.5176471, 0.4117647, 1)
+shader_parameter/Top_Colour = Color(0.36862746, 0.78431374, 0.5372549, 1)
+shader_parameter/Colour = ExtResource("3_2dwnp")
+
+[node name="PlayerCharacter" unique_id=914088189 instance=ExtResource("1_eoqwp")]
+
+[node name="Skeleton3D" parent="PillCharacter2/PillCharacter" parent_id_path=PackedInt32Array(2028345057, 828416499) index="0" unique_id=419014003]
+bones/1/rotation = Quaternion(0.0068298657, 0.7070738, 0.7070738, -0.006829972)
+bones/2/rotation = Quaternion(-1.0484959e-10, -1.1924436e-08, 0.008792514, 0.99996144)
+bones/3/rotation = Quaternion(-7.3201454e-17, -1.0952409e-15, 0.0066468026, 0.99997795)
+bones/4/rotation = Quaternion(2.2830809e-17, 1.2033286e-16, 0.0013842994, 0.99999905)
+bones/5/rotation = Quaternion(-1.0674382e-16, -1.3829721e-15, -0.0060015786, 0.999982)
+
+[node name="PillCharacter_Mesh" parent="PillCharacter2/PillCharacter/Skeleton3D" index="0" unique_id=273724583]
+surface_material_override/1 = SubResource("ShaderMaterial_02qkf")
+
+[editable path="PillCharacter2"]
