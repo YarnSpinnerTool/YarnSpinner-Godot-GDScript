@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://b2xkrvjt0vpo7"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_gh3p0"]
+
+[node name="Placeholder Character" type="Node3D" unique_id=1550736814]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1329263680]
+transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, 0.4, 0)
+mesh = SubResource("CapsuleMesh_gh3p0")
+skeleton = NodePath("../..")
+
+[node name="Label3D" type="Label3D" parent="." unique_id=1323017005]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+text = "Character"
