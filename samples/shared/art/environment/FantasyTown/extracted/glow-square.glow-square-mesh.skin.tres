@@ -1,0 +1,11 @@
+[gd_resource type="Skin" format=3 uid="uid://sxgi53tlrq70"]
+
+[resource]
+resource_name = "Skin"
+bind_count = 2
+bind/0/name = &"Root"
+bind/0/bone = -1
+bind/0/pose = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+bind/1/name = &"Position"
+bind/1/bone = -1
+bind/1/pose = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -1, 0)

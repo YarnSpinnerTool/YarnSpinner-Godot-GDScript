@@ -1,10 +1,10 @@
 [gd_scene format=3 uid="uid://bbj41hxggtbc1"]
 
 [ext_resource type="Script" uid="uid://d03rwih7ojyup" path="res://samples/shared/scripts/simple_character.gd" id="1_sry8v"]
-[ext_resource type="PackedScene" uid="uid://q6k1rl2jh25p" path="res://samples/shared/art/characters/PillCharacter.glb" id="2_jlihl"]
+[ext_resource type="PackedScene" uid="uid://q6k1rl2jh25p" path="res://samples/shared/art/Character/PillCharacter.glb" id="2_jlihl"]
 [ext_resource type="Script" uid="uid://b537231y64fgi" path="res://samples/shared/scripts/simple_character_animation.gd" id="2_nfpeb"]
-[ext_resource type="Material" uid="uid://6mvqfqm8cysm" path="res://samples/shared/art/characters/ConfigurableGradient.tres" id="2_sry8v"]
-[ext_resource type="Material" uid="uid://c5ig2wa0gs47" path="res://samples/shared/art/characters/mouth/mouth.tres" id="4_axqwb"]
+[ext_resource type="Material" uid="uid://6mvqfqm8cysm" path="res://samples/shared/art/Character/ConfigurableGradient.tres" id="2_sry8v"]
+[ext_resource type="Material" uid="uid://c5ig2wa0gs47" path="res://samples/shared/art/Character/mouth/mouth.tres" id="4_axqwb"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_jwmc5"]
 radius = 0.22998047

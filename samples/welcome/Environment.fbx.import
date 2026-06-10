@@ -41,18 +41,18 @@ _subresources={
 "materials": {
 "colormap_base": {
 "use_external/enabled": true,
-"use_external/fallback_path": "res://samples/shared/art/materials/colormap.tres",
-"use_external/path": "uid://c8yg7ojn548xj"
+"use_external/fallback_path": "res://samples/shared/art2/Materials/colormap-base.mat.tres",
+"use_external/path": "uid://dhud8jr6jnudr"
 },
 "colormap_base_additive": {
 "use_external/enabled": true,
-"use_external/fallback_path": "res://samples/shared/art/materials/colormap-additive.tres",
-"use_external/path": "uid://4ilhyphlek4w"
+"use_external/fallback_path": "res://samples/shared/art2/Materials/colormap-base-additive.mat.tres",
+"use_external/path": "uid://decbbm120qfwu"
 },
 "office_poster_1": {
 "use_external/enabled": true,
-"use_external/fallback_path": "res://samples/shared/art/materials/office-poster-1.tres",
-"use_external/path": "uid://dknq56v1sejqr"
+"use_external/fallback_path": "res://samples/shared/art2/Materials/office-poster-1.mat.tres",
+"use_external/path": "uid://b2mnstg106eqd"
 }
 }
 }

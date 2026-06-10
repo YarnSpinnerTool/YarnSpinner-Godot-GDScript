@@ -1,0 +1,158 @@
+[remap]
+
+importer="scene"
+importer_version=1
+type="PackedScene"
+uid="uid://5c7qq4j168e4"
+path="res://.godot/imported/siege-catapult.fbx-b66f9e317aae557f75d0d533c53febb7.scn"
+
+[deps]
+
+source_file="res://samples/shared/art/Environment/FantasyTown/siege-catapult.fbx"
+dest_files=["res://.godot/imported/siege-catapult.fbx-b66f9e317aae557f75d0d533c53febb7.scn"]
+
+[params]
+
+nodes/root_type=""
+nodes/root_name=""
+nodes/root_script=null
+nodes/apply_root_scale=true
+nodes/root_scale=1.0
+nodes/import_as_skeleton_bones=false
+nodes/use_name_suffixes=true
+nodes/use_node_type_suffixes=true
+meshes/ensure_tangents=1
+meshes/generate_lods=true
+meshes/create_shadow_meshes=false
+meshes/light_baking=2
+meshes/lightmap_texel_size=0.2
+meshes/force_disable_compression=false
+skins/use_named_skins=true
+animation/import=true
+animation/fps=24.0
+animation/trimming=true
+animation/remove_immutable_tracks=false
+animation/import_rest_as_RESET=true
+import_script/path=""
+materials/extract=0
+materials/extract_format=0
+materials/extract_path=""
+_subresources={
+"animations": {},
+"materials": {
+"colormap": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://samples/shared/art/Materials/colormap-base.mat.tres",
+"use_external/path": "uid://dhud8jr6jnudr"
+}
+},
+"meshes": {
+"Root Scene_catapult": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-catapult.catapult.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://cisbwfbem512p"
+},
+"Root Scene_siege-catapult": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-catapult.siege-catapult.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://js24koiasd6e"
+},
+"Root Scene_wheel_007": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-catapult.wheel_007.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://bu1bsgkw6pa50"
+},
+"Root Scene_wheel_008": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-catapult.wheel_008.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://bxg2vvtvtql4y"
+},
+"Root Scene_wheel_009": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-catapult.wheel_009.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://lrbx41363u2m"
+},
+"Root Scene_wheel_010": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-catapult.wheel_010.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://0uy2xwbydqbr"
+},
+"catapult": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-catapult.catapult.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://cisbwfbem512p"
+},
+"siege-catapult": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-catapult.siege-catapult.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://js24koiasd6e"
+},
+"wheel_007": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-catapult.wheel_007.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://bu1bsgkw6pa50"
+},
+"wheel_008": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-catapult.wheel_008.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://bxg2vvtvtql4y"
+},
+"wheel_009": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-catapult.wheel_009.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://lrbx41363u2m"
+},
+"wheel_010": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-catapult.wheel_010.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://0uy2xwbydqbr"
+}
+},
+"nodes": {
+"PATH:AnimationPlayer": {
+"optimizer/enabled": true,
+"optimizer/max_angular_error": 0.00277777777777777,
+"optimizer/max_linear_error": 0.5
+}
+}
+}
+fbx/importer=0
+fbx/allow_geometry_helper_nodes=false
+fbx/embedded_image_handling=1
+fbx/naming_version=2

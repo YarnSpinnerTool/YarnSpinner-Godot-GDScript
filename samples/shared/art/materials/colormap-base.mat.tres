@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://dhud8jr6jnudr"]
+
+[ext_resource type="Texture2D" uid="uid://dwhs02fqyek31" path="res://samples/shared/art/Textures/colormap.png" id="1_kslmu"]
+
+[resource]
+resource_name = "colormap-base"
+depth_draw_mode = 1
+albedo_texture = ExtResource("1_kslmu")
+uv1_scale = Vector3(1, 1, 0)

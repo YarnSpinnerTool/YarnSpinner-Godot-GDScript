@@ -1,0 +1,126 @@
+[remap]
+
+importer="scene"
+importer_version=1
+type="PackedScene"
+uid="uid://csve1da4wr2c6"
+path="res://.godot/imported/bookshelf.fbx-090de8989faa1ec761f883e8fbec09c5.scn"
+
+[deps]
+
+source_file="res://samples/shared/art/Environment/FantasyTown/bookshelf.fbx"
+dest_files=["res://.godot/imported/bookshelf.fbx-090de8989faa1ec761f883e8fbec09c5.scn"]
+
+[params]
+
+nodes/root_type=""
+nodes/root_name=""
+nodes/root_script=null
+nodes/apply_root_scale=true
+nodes/root_scale=1.0
+nodes/import_as_skeleton_bones=false
+nodes/use_name_suffixes=true
+nodes/use_node_type_suffixes=true
+meshes/ensure_tangents=1
+meshes/generate_lods=true
+meshes/create_shadow_meshes=false
+meshes/light_baking=2
+meshes/lightmap_texel_size=0.2
+meshes/force_disable_compression=false
+skins/use_named_skins=true
+animation/import=true
+animation/fps=24.0
+animation/trimming=true
+animation/remove_immutable_tracks=false
+animation/import_rest_as_RESET=true
+import_script/path=""
+materials/extract=0
+materials/extract_format=0
+materials/extract_path=""
+_subresources={
+"animations": {},
+"materials": {
+"colormap": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/bookshelf.colormap.material",
+"use_external/path": "uid://cn6bebis2e5i0"
+}
+},
+"meshes": {
+"Root Scene_bookshelf": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/bookshelf.bookshelf.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://df6t2tjx7df52"
+},
+"Root Scene_bookshelf-books-1": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/bookshelf.bookshelf-books-1.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://cop2k73gga7fs"
+},
+"Root Scene_bookshelf-books-2": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/bookshelf.bookshelf-books-2.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://cnqngnai0b1ep"
+},
+"Root Scene_bookshelf-books-3": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/bookshelf.bookshelf-books-3.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://bs3j4gsec148r"
+},
+"bookshelf": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/bookshelf.bookshelf.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://df6t2tjx7df52"
+},
+"bookshelf-books-1": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/bookshelf.bookshelf-books-1.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://cop2k73gga7fs"
+},
+"bookshelf-books-2": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/bookshelf.bookshelf-books-2.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://cnqngnai0b1ep"
+},
+"bookshelf-books-3": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/bookshelf.bookshelf-books-3.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://bs3j4gsec148r"
+}
+},
+"nodes": {
+"PATH:AnimationPlayer": {
+"optimizer/enabled": true,
+"optimizer/max_angular_error": 0.00277777777777777,
+"optimizer/max_linear_error": 0.5
+}
+}
+}
+fbx/importer=0
+fbx/allow_geometry_helper_nodes=false
+fbx/embedded_image_handling=1
+fbx/naming_version=2

@@ -1,0 +1,27 @@
+[gd_resource type="Animation" format=3 uid="uid://3foqyqqi5ujs"]
+
+[resource]
+resource_name = "animation"
+length = 2.0
+step = 0.016666668
+tracks/0/type = "position_3d"
+tracks/0/imported = true
+tracks/0/enabled = true
+tracks/0/path = NodePath("indicator-round-f/rotate-y")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = PackedFloat32Array(0, 1, 0, 0, 0)
+tracks/1/type = "rotation_3d"
+tracks/1/imported = true
+tracks/1/enabled = true
+tracks/1/path = NodePath("indicator-round-f/rotate-y")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = PackedFloat32Array(0, 1, 0, 0, 0, 1, 1, 1, 0, -1, 0, -2.7637439e-08, 1.9833333, 1, 0, -0.026167924, 0, -0.9996576, 2, 1, 0, -1.2246469e-16, 0, -1)
+tracks/2/type = "scale_3d"
+tracks/2/imported = true
+tracks/2/enabled = true
+tracks/2/path = NodePath("indicator-round-f/rotate-y")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = PackedFloat32Array(0, 1, 1, 1, 1)

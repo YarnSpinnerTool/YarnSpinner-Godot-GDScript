@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://baftehyg67jsa"]
+
+[ext_resource type="Texture2D" uid="uid://b6yu6ubmbdm04" path="res://YarnSpinner-Unity-Samples/Shared Assets/Art/Environment/FoliageSprites/grass-2.png" id="1_p3i0a"]
+
+[resource]
+resource_name = "Foliage-Grass-Green-2"
+depth_draw_mode = 1
+albedo_texture = ExtResource("1_p3i0a")
+uv1_scale = Vector3(1, 1, 0)

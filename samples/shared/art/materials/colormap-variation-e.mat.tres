@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://n3rijrwknvu0"]
+
+[ext_resource type="Texture2D" uid="uid://84kk21rumd83" path="res://samples/shared/art/Textures/variation-e.png" id="1_qdxar"]
+
+[resource]
+resource_name = "colormap-variation-e"
+depth_draw_mode = 1
+albedo_texture = ExtResource("1_qdxar")
+roughness = 0.964
+uv1_scale = Vector3(1, 1, 0)

@@ -1,10 +1,10 @@
 [gd_scene format=3 uid="uid://bmnsbotu1oujm"]
 
 [ext_resource type="PackedScene" uid="uid://c3xpai64i8w0j" path="res://samples/welcome/Environment.fbx" id="1_s8f2s"]
-[ext_resource type="Environment" uid="uid://bf6x5prjfs851" path="res://samples/shared/art/materials/samples-environment.tres" id="2_eh2le"]
-[ext_resource type="PackedScene" uid="uid://dghanefcv2dl8" path="res://samples/shared/art/environment/fantasy-town/projector-screen.fbx" id="3_sse0m"]
+[ext_resource type="PackedScene" uid="uid://mfh5uufornuu" path="res://samples/shared/art/Environment/FantasyTown/projector-screen.fbx" id="2_7g3mq"]
 [ext_resource type="PackedScene" uid="uid://le6c0y7pc8gt" path="res://samples/shared/scenes/explanation_character.tscn" id="4_oik1v"]
 [ext_resource type="PackedScene" uid="uid://cwyx0udsah02p" path="res://samples/shared/scenes/dialogue.tscn" id="5_7g3mq"]
+[ext_resource type="PackedScene" uid="uid://d1fluul8ky1qb" path="res://samples/shared/art/Materials/samples_environment.tscn" id="6_7g3mq"]
 [ext_resource type="Resource" uid="uid://cqiqscscbijsx" path="res://samples/welcome/dialogue/Intro.yarnproject" id="6_n60vi"]
 
 [sub_resource type="QuadMesh" id="QuadMesh_7g3mq"]
@@ -24,10 +24,7 @@ shadow_enabled = true
 
 [node name="Environment" parent="." unique_id=2059723700 instance=ExtResource("1_s8f2s")]
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=532024717]
-environment = ExtResource("2_eh2le")
-
-[node name="projector-screen" parent="." unique_id=23834354 instance=ExtResource("3_sse0m")]
+[node name="projector-screen" parent="." unique_id=1647432055 instance=ExtResource("2_7g3mq")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 0, 1.2)
 
 [node name="CharacterBody3D" parent="." unique_id=914088189 instance=ExtResource("4_oik1v")]
@@ -70,5 +67,7 @@ text = "Woooooo label"
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -0.7, 0.9, 1.1)
 mesh = SubResource("QuadMesh_7g3mq")
 surface_material_override/0 = SubResource("StandardMaterial3D_n60vi")
+
+[node name="SamplesEnvironment" parent="." unique_id=789525707 instance=ExtResource("6_7g3mq")]
 
 [editable path="Dialogue"]

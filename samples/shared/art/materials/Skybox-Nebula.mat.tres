@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://d1d0knb3utxpr"]
+
+[ext_resource type="Texture2D" uid="uid://oicf43tnpyyx" path="res://samples/shared/art/Textures/Skybox_EST_2.jpg" id="1_b0o5c"]
+
+[resource]
+resource_name = "Skybox-Nebula"
+depth_draw_mode = 1
+albedo_texture = ExtResource("1_b0o5c")
+uv1_scale = Vector3(1, 1, 0)

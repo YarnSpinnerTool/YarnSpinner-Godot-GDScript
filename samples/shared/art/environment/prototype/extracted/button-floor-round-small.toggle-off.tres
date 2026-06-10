@@ -1,0 +1,27 @@
+[gd_resource type="Animation" format=3 uid="uid://xjditvj4rjc5"]
+
+[resource]
+resource_name = "toggle-off"
+length = 0.2
+step = 0.016666668
+tracks/0/type = "position_3d"
+tracks/0/imported = true
+tracks/0/enabled = true
+tracks/0/path = NodePath("button-floor-round-small/button")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = PackedFloat32Array(0, 1, 0, -0.05, 0, 0.04, 1, 0, -0.04936, 0, 0.053333335, 1, 0, -0.047977284, 0, 0.06666667, 1, 0, -0.04506173, 0, 0.08, 1, 0, -0.03976, 0, 0.093333334, 1, 0, -0.031029133, 0, 0.10666668, 1, 0, -0.01897086, 0, 0.12, 1, 0, -0.010239998, 0, 0.13333334, 1, 0, -0.004938272, 0, 0.14666668, 1, 0, -0.0020227164, 0, 0.16000001, 1, 0, -0.00063999894, 0, 0.2, 1, 0, 0, 0)
+tracks/1/type = "rotation_3d"
+tracks/1/imported = true
+tracks/1/enabled = true
+tracks/1/path = NodePath("button-floor-round-small/button")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = PackedFloat32Array(0, 1, 0, 0, 0, 1)
+tracks/2/type = "scale_3d"
+tracks/2/imported = true
+tracks/2/enabled = true
+tracks/2/path = NodePath("button-floor-round-small/button")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = PackedFloat32Array(0, 1, 1, 1, 1)

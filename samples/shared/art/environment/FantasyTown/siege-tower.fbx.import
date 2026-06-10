@@ -1,0 +1,142 @@
+[remap]
+
+importer="scene"
+importer_version=1
+type="PackedScene"
+uid="uid://bbgfnsj636rvm"
+path="res://.godot/imported/siege-tower.fbx-e30bc68a3b03537aee9de1ddb71a6804.scn"
+
+[deps]
+
+source_file="res://samples/shared/art/Environment/FantasyTown/siege-tower.fbx"
+dest_files=["res://.godot/imported/siege-tower.fbx-e30bc68a3b03537aee9de1ddb71a6804.scn"]
+
+[params]
+
+nodes/root_type=""
+nodes/root_name=""
+nodes/root_script=null
+nodes/apply_root_scale=true
+nodes/root_scale=1.0
+nodes/import_as_skeleton_bones=false
+nodes/use_name_suffixes=true
+nodes/use_node_type_suffixes=true
+meshes/ensure_tangents=1
+meshes/generate_lods=true
+meshes/create_shadow_meshes=false
+meshes/light_baking=2
+meshes/lightmap_texel_size=0.2
+meshes/force_disable_compression=false
+skins/use_named_skins=true
+animation/import=true
+animation/fps=24.0
+animation/trimming=true
+animation/remove_immutable_tracks=false
+animation/import_rest_as_RESET=true
+import_script/path=""
+materials/extract=0
+materials/extract_format=0
+materials/extract_path=""
+_subresources={
+"animations": {},
+"materials": {
+"colormap": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://samples/shared/art/Materials/colormap-base.mat.tres",
+"use_external/path": "uid://dhud8jr6jnudr"
+}
+},
+"meshes": {
+"Root Scene_siege-tower": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-tower.siege-tower.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://rp6exc0u73hr"
+},
+"Root Scene_wheel_017": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-tower.wheel_017.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://bx5t6nicyrbw0"
+},
+"Root Scene_wheel_018": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-tower.wheel_018.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://5rhs36gy5y6s"
+},
+"Root Scene_wheel_019": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-tower.wheel_019.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://daq2y7iokfjte"
+},
+"Root Scene_wheel_020": {
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-tower.wheel_020.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://cng4y8jfj220c"
+},
+"siege-tower": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-tower.siege-tower.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://rp6exc0u73hr"
+},
+"wheel_017": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-tower.wheel_017.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://bx5t6nicyrbw0"
+},
+"wheel_018": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-tower.wheel_018.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://5rhs36gy5y6s"
+},
+"wheel_019": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-tower.wheel_019.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://daq2y7iokfjte"
+},
+"wheel_020": {
+"generate/lightmap_uv": 0,
+"generate/lods": 0,
+"generate/shadow_meshes": 0,
+"lods/normal_merge_angle": 20.0,
+"save_to_file/enabled": true,
+"save_to_file/fallback_path": "res://samples/shared/art/Environment/FantasyTown/extracted/siege-tower.wheel_020.mesh",
+"save_to_file/make_streamable": "",
+"save_to_file/path": "uid://cng4y8jfj220c"
+}
+},
+"nodes": {
+"PATH:AnimationPlayer": {
+"optimizer/enabled": true,
+"optimizer/max_angular_error": 0.00277777777777777,
+"optimizer/max_linear_error": 0.5
+}
+}
+}
+fbx/importer=0
+fbx/allow_geometry_helper_nodes=false
+fbx/embedded_image_handling=1
+fbx/naming_version=2
