@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://wejgijm7pbq1" path="res://samples/shared/art/Effects/Alert.fbx" id="2_4vgd5"]
 [ext_resource type="Shader" uid="uid://dneb8pffavgr" path="res://samples/shared/art/Character/configurable_gradient.tres" id="2_qjpwe"]
 [ext_resource type="Texture2D" uid="uid://dwhs02fqyek31" path="res://samples/shared/art/Textures/colormap.png" id="3_fnnib"]
+[ext_resource type="AnimationLibrary" uid="uid://ogbtclctr0iq" path="res://samples/shared/art/Effects/speaking_indicator.tres" id="5_fnnib"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_hvlxi"]
 resource_name = "ConfigurableGradient"
@@ -13,20 +14,42 @@ shader_parameter/Bottom_Colour = Color(1, 0.44705883, 0.26666668, 1)
 shader_parameter/Top_Colour = Color(1, 0.6156863, 0.26666668, 1)
 shader_parameter/Colour = ExtResource("3_fnnib")
 
+[sub_resource type="Animation" id="Animation_fnnib"]
+length = 0.001
+tracks/0/type = "scale_3d"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = PackedFloat32Array(0, 1, 1, 1, 1)
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_hvlxi"]
+_data = {
+&"RESET": SubResource("Animation_fnnib")
+}
+
 [node name="NPCCharacter" unique_id=914088189 instance=ExtResource("1_h1y4k")]
 
 [node name="Skeleton3D" parent="PillCharacter2/PillCharacter" parent_id_path=PackedInt32Array(2028345057, 828416499) index="0" unique_id=419014003]
-bones/1/rotation = Quaternion(0.006664397, 0.7070754, 0.7070754, -0.0066645034)
-bones/2/rotation = Quaternion(-1.0397552e-10, -1.19244445e-08, 0.008719214, 0.9999621)
-bones/3/rotation = Quaternion(-1.0698819e-16, -1.752695e-16, 0.007213608, 0.9999741)
-bones/4/rotation = Quaternion(-9.260326e-17, 8.066247e-18, 0.0021627888, 0.99999774)
-bones/5/rotation = Quaternion(-2.8411944e-16, -5.089326e-16, -0.0053359903, 0.99998575)
+bones/1/rotation = Quaternion(-0.0012723441, 0.70710564, 0.70710564, 0.0012722374)
+bones/2/rotation = Quaternion(6.4546944e-11, -1.1924724e-08, -0.005412787, 0.99998534)
+bones/3/rotation = Quaternion(-3.0062847e-17, 3.8536763e-15, -0.0081885075, 0.99996656)
+bones/4/rotation = Quaternion(4.955253e-17, 5.39316e-17, -0.009116946, 0.99995846)
+bones/5/rotation = Quaternion(9.122126e-17, -5.3138866e-15, -0.005643818, 0.99998415)
 
 [node name="PillCharacter_Mesh" parent="PillCharacter2/PillCharacter/Skeleton3D" index="0" unique_id=273724583]
 surface_material_override/1 = SubResource("ShaderMaterial_hvlxi")
 
-[node name="Alert" parent="." index="3" unique_id=1947954221 instance=ExtResource("2_4vgd5")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.90000004, 0)
+[node name="SpeakingIndicator" type="Node3D" parent="." index="3" unique_id=1168795485]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+
+[node name="Alert" parent="SpeakingIndicator" index="0" unique_id=1947954221 instance=ExtResource("2_4vgd5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.9604645e-08, 0)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="SpeakingIndicator" index="1" unique_id=1961829490]
+libraries/ = SubResource("AnimationLibrary_hvlxi")
+libraries/speaking_indicator = ExtResource("5_fnnib")
 
 [editable path="PillCharacter2"]
-[editable path="Alert"]
+[editable path="SpeakingIndicator/Alert"]

@@ -1,0 +1,44 @@
+[gd_resource type="AnimationLibrary" format=3 uid="uid://ogbtclctr0iq"]
+
+[sub_resource type="Animation" id="Animation_nyncy"]
+resource_name = "appear"
+length = 0.50000167
+step = 0.016666668
+tracks/0/type = "scale_3d"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".")
+tracks/0/interp = 2
+tracks/0/loop_wrap = false
+tracks/0/keys = PackedFloat32Array(0, 1, 0, 0, 0, 0.0001, 1, 0, 0, 0, 0.40000004, 1, 1.1, 1.1, 1.1, 0.50000006, 1, 1, 1, 1)
+
+[sub_resource type="Animation" id="Animation_8rx0d"]
+resource_name = "disappear"
+length = 0.5
+step = 0.016666668
+tracks/0/type = "scale_3d"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".")
+tracks/0/interp = 1
+tracks/0/loop_wrap = false
+tracks/0/keys = PackedFloat32Array(0, 1, 1, 1, 1, 0.25, 1, 1.1, 1.1, 1.1, 0.5, 1, 0, 0, 0)
+
+[sub_resource type="Animation" id="Animation_8ejwp"]
+resource_name = "hidden"
+length = 0.033335
+step = 0.016666668
+tracks/0/type = "scale_3d"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".")
+tracks/0/interp = 1
+tracks/0/loop_wrap = false
+tracks/0/keys = PackedFloat32Array(0, 1, 0, 0, 0, 0.033333335, 1, 0, 0, 0)
+
+[resource]
+_data = {
+&"appear": SubResource("Animation_nyncy"),
+&"disappear": SubResource("Animation_8rx0d"),
+&"hidden": SubResource("Animation_8ejwp")
+}
