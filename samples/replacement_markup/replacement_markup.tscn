@@ -1,7 +1,23 @@
 [gd_scene format=3 uid="uid://dd73r0hsv6g8n"]
 
 [ext_resource type="PackedScene" uid="uid://ba6k8q62v3aeg" path="res://samples/shared/scenes/Basic Arena.tscn" id="1_p6870"]
+[ext_resource type="PackedScene" uid="uid://don7obupokpwf" path="res://samples/shared/scenes/player_character.tscn" id="2_xkejl"]
+[ext_resource type="PackedScene" uid="uid://db6adsx7323jr" path="res://samples/shared/scenes/npc_character.tscn" id="3_6ore7"]
 
 [node name="ReplacementMarkup" type="Node3D" unique_id=1997084305]
 
 [node name="BasicArena" parent="." unique_id=1653386484 instance=ExtResource("1_p6870")]
+
+[node name="PlayerCharacter" parent="." unique_id=914088189 instance=ExtResource("2_xkejl")]
+
+[node name="NPCCharacter" parent="." unique_id=1856572499 instance=ExtResource("3_6ore7")]
+transform = Transform3D(-0.27228022, 0, -0.9622181, 0, 1, 0, 0.9622181, 0, -0.27228022, 2.6000001, 0, 0.1)
+
+[node name="NPCCharacter2" parent="." unique_id=1404052781 instance=ExtResource("3_6ore7")]
+transform = Transform3D(-0.7169106, 0, -0.69716525, 0, 1, 0, 0.69716525, 0, -0.7169106, 1.2, 0, 1.3000001)
+
+[node name="NPCCharacter3" parent="." unique_id=1594634360 instance=ExtResource("3_6ore7")]
+transform = Transform3D(-0.6971652, 0, 0.71691066, 0, 1, 0, -0.71691066, 0, -0.6971652, -1.4000001, 0, 1.3000001)
+
+[node name="NPCCharacter4" parent="." unique_id=1170345962 instance=ExtResource("3_6ore7")]
+transform = Transform3D(-0.24530737, 0, 0.96944547, 0, 1, 0, -0.96944547, 0, -0.24530737, -2.3, 0, 0)

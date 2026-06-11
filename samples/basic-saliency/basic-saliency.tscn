@@ -22,16 +22,16 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.90000004, -3.7)
 text = "It is $DAY $TIME"
 
 [node name="CharacterBody3D" parent="." unique_id=914088189 instance=ExtResource("4_5pn3x")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.8, 0, -2.2)
+transform = Transform3D(0.8660254, 0, 0.5, 0, 1, 0, -0.5, 0, 0.8660254, -2.7, 0, -1.8000001)
 
 [node name="CharacterBody3D2" parent="." unique_id=1118758715 instance=ExtResource("4_5pn3x")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.3000001, 0, -2)
 
 [node name="CharacterBody3D3" parent="." unique_id=301660961 instance=ExtResource("4_5pn3x")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.4, 0, -2)
+transform = Transform3D(0.9659258, 0, -0.25881904, 0, 1, 0, 0.25881904, 0, 0.9659258, 1.4, 0, -2)
 
 [node name="CharacterBody3D4" parent="." unique_id=124740546 instance=ExtResource("4_5pn3x")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.6, 0, -2)
+transform = Transform3D(0.70710677, 0, -0.70710677, 0, 1, 0, 0.70710677, 0, 0.70710677, 2.6999998, 0, -1.8)
 
 [node name="PlayerCharacter" parent="." unique_id=425830781 instance=ExtResource("5_ob6wq")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.1, 0, -0.2)

@@ -3,7 +3,9 @@
 [ext_resource type="PackedScene" uid="uid://dwbba478b63mt" path="res://samples/feature_tour/feature_toor_room.tscn" id="1_y25vy"]
 [ext_resource type="Material" uid="uid://odgigp7jeiom" path="res://samples/shared/art/Materials/skybox.tres" id="2_gh3p0"]
 [ext_resource type="PackedScene" uid="uid://bbxu2hyown07m" path="res://samples/shared/art/Environment/Prototype/wall-low.fbx" id="3_gh3p0"]
-[ext_resource type="PackedScene" uid="uid://b2xkrvjt0vpo7" path="res://samples/feature_tour/placeholder_character.tscn" id="4_6l1mg"]
+[ext_resource type="PackedScene" uid="uid://don7obupokpwf" path="res://samples/shared/scenes/player_character.tscn" id="4_6l1mg"]
+[ext_resource type="PackedScene" uid="uid://le6c0y7pc8gt" path="res://samples/shared/scenes/explanation_character.tscn" id="5_ygllq"]
+[ext_resource type="PackedScene" uid="uid://db6adsx7323jr" path="res://samples/shared/scenes/npc_character.tscn" id="6_aayqt"]
 
 [sub_resource type="Sky" id="Sky_6l1mg"]
 sky_material = ExtResource("2_gh3p0")
@@ -11,8 +13,6 @@ sky_material = ExtResource("2_gh3p0")
 [sub_resource type="Environment" id="Environment_ygllq"]
 background_mode = 2
 sky = SubResource("Sky_6l1mg")
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_gh3p0"]
 
 [node name="FeatureTour" type="Node3D" unique_id=1249590773]
 
@@ -45,215 +45,32 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 0, 0
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=578889554]
 environment = SubResource("Environment_ygllq")
 
-[node name="Placeholder Character" parent="." unique_id=1550736814 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.5, 0, 0.86525756)
+[node name="PlayerCharacter" parent="." unique_id=914088189 instance=ExtResource("4_6l1mg")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.031093359, 0, -3.0097387)
 
-[node name="Label3D" parent="Placeholder Character" index="1" unique_id=1323017005]
-text = "Capsley_Welcome"
+[node name="Capsley" parent="." unique_id=1322549715 instance=ExtResource("5_ygllq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 0, 0)
 
-[node name="Placeholder Character22" parent="." unique_id=1838502752 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, 0, -3.6347425)
+[node name="Capsley2" parent="." unique_id=565575895 instance=ExtResource("5_ygllq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 0, 6.1)
 
-[node name="MeshInstance3D" parent="Placeholder Character22" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
+[node name="NPCCharacter" parent="." unique_id=1547393779 instance=ExtResource("6_aayqt")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.6, 0, 8.3)
 
-[node name="Label3D" parent="Placeholder Character22" index="1" unique_id=1323017005]
-text = "Player"
+[node name="NPCCharacter2" parent="." unique_id=625950801 instance=ExtResource("6_aayqt")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.6, 0, 8.5)
 
-[node name="Placeholder Character2" parent="." unique_id=1451225050 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -0.9, 0, 5.765258)
+[node name="Capsley3" parent="." unique_id=257155044 instance=ExtResource("5_ygllq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.7, 0, 13.1)
 
-[node name="Label3D" parent="Placeholder Character2" index="1" unique_id=1323017005]
-text = "Capsley_Room2"
+[node name="NPCCharacter3" parent="." unique_id=827977381 instance=ExtResource("6_aayqt")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.1, 0, 14.5)
 
-[node name="Placeholder Character3" parent="." unique_id=1108588191 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 1.5000001, 0, 8.265258)
+[node name="Capsley4" parent="." unique_id=507856039 instance=ExtResource("5_ygllq")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.8, 0, 20.5)
 
-[node name="MeshInstance3D" parent="Placeholder Character3" index="0" unique_id=1329263680]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, 0, 0.4, -0.39999962)
+[node name="NPCCharacter4" parent="." unique_id=995516339 instance=ExtResource("6_aayqt")]
+transform = Transform3D(-0.25881904, 0, -0.9659258, 0, 1, 0, 0.9659258, 0, -0.25881904, 0.8, 0, 22.5)
 
-[node name="Label3D" parent="Placeholder Character3" index="1" unique_id=1323017005]
-text = "Room2_Nodes_and_Lines"
-
-[node name="Placeholder Character4" parent="." unique_id=418758638 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.4999999, 0, 8.665257)
-
-[node name="Label3D" parent="Placeholder Character4" index="1" unique_id=1323017005]
-text = "Room2_Options_and_Jumps_1"
-
-[node name="Placeholder Character5" parent="." unique_id=99415875 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.4999999, 0, 15.465258)
-
-[node name="MeshInstance3D" parent="Placeholder Character5" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character5" index="1" unique_id=1323017005]
-text = "Room3_Detours_1"
-
-[node name="Placeholder Character6" parent="." unique_id=1848051322 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.70000017, 0, 13.765258)
-
-[node name="MeshInstance3D" parent="Placeholder Character6" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character6" index="1" unique_id=1323017005]
-text = "Capsley_Room3"
-
-[node name="Placeholder Character7" parent="." unique_id=197599176 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.60000014, 0, 20.365257)
-
-[node name="MeshInstance3D" parent="Placeholder Character7" index="0" unique_id=1329263680]
-transform = Transform3D(0.4, 0, 0, 0, 0.4, 0, 0, 0, 0.4, -5.9604645e-08, 0.4, 0.70000076)
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character7" index="1" unique_id=1323017005]
-text = "Capsley_Room4"
-
-[node name="Placeholder Character10" parent="." unique_id=1991427239 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.5000001, 0, 26.165258)
-
-[node name="MeshInstance3D" parent="Placeholder Character10" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character10" index="1" unique_id=1323017005]
-text = "Capsley_Room5"
-
-[node name="Placeholder Character15" parent="." unique_id=1709989945 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -0.49999985, 0, 34.065258)
-
-[node name="MeshInstance3D" parent="Placeholder Character15" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character15" index="1" unique_id=1323017005]
-text = "Capsley_Room6"
-
-[node name="Placeholder Character16" parent="." unique_id=1919455722 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.6000002, 0, 36.66526)
-
-[node name="MeshInstance3D" parent="Placeholder Character16" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character16" index="1" unique_id=1323017005]
-text = "Room6_Functions_1"
-
-[node name="Placeholder Character17" parent="." unique_id=1272764628 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 1.4000002, 0, 35.76526)
-
-[node name="MeshInstance3D" parent="Placeholder Character17" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character17" index="1" unique_id=1323017005]
-text = "Room6_SmartVariables_1"
-
-[node name="Placeholder Character18" parent="." unique_id=1430058954 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.0999999, 0, 36.46526)
-
-[node name="MeshInstance3D" parent="Placeholder Character18" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character18" index="1" unique_id=1323017005]
-text = "Room6_Commands_1"
-
-[node name="Placeholder Character11" parent="." unique_id=808454405 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 1.5000002, 0, 27.365257)
-
-[node name="MeshInstance3D" parent="Placeholder Character11" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character11" index="1" unique_id=1323017005]
-text = "Room5_IfStatements_1"
-
-[node name="Placeholder Character12" parent="." unique_id=1801698594 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.4, 0, 27.265259)
-
-[node name="MeshInstance3D" parent="Placeholder Character12" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character12" index="1" unique_id=1323017005]
-text = "Room5_ConditionalOptions_1"
-
-[node name="Placeholder Character13" parent="." unique_id=993272083 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.4, 0, 29.965258)
-
-[node name="MeshInstance3D" parent="Placeholder Character13" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character13" index="1" unique_id=1323017005]
-text = "Room5_Once_1"
-
-[node name="Placeholder Character14" parent="." unique_id=683215924 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 1.2000002, 0, 29.36526)
-
-[node name="MeshInstance3D" parent="Placeholder Character14" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character14" index="1" unique_id=1323017005]
-text = "Room5_Enums_1"
-
-[node name="Placeholder Character19" parent="." unique_id=1922367804 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.36450106, 0, 41.19229)
-
-[node name="MeshInstance3D" parent="Placeholder Character19" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character19" index="1" unique_id=1323017005]
-text = "Capsley_Room7"
-
-[node name="Placeholder Character20" parent="." unique_id=1623422667 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 1.1645011, 0, 42.49229)
-
-[node name="MeshInstance3D" parent="Placeholder Character20" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character20" index="1" unique_id=1323017005]
-text = "Room7_LineGroups_1"
-
-[node name="Placeholder Character21" parent="." unique_id=1379021720 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.1354989, 0, 42.79229)
-
-[node name="MeshInstance3D" parent="Placeholder Character21" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character21" index="1" unique_id=1323017005]
-text = "Room7_NodeGroups_1"
-
-[node name="Placeholder Character8" parent="." unique_id=1180723575 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -0.9999999, 0, 21.465258)
-
-[node name="MeshInstance3D" parent="Placeholder Character8" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character8" index="1" unique_id=1323017005]
-text = "Room4_Variables_1"
-
-[node name="Placeholder Character9" parent="." unique_id=1638939472 instance=ExtResource("4_6l1mg")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.80000013, 0, 21.465258)
-
-[node name="MeshInstance3D" parent="Placeholder Character9" index="0" unique_id=1329263680]
-mesh = SubResource("CapsuleMesh_gh3p0")
-
-[node name="Label3D" parent="Placeholder Character9" index="1" unique_id=1323017005]
-text = "Room4_Variables_2"
-
-[editable path="Placeholder Character"]
-[editable path="Placeholder Character22"]
-[editable path="Placeholder Character2"]
-[editable path="Placeholder Character3"]
-[editable path="Placeholder Character4"]
-[editable path="Placeholder Character5"]
-[editable path="Placeholder Character6"]
-[editable path="Placeholder Character7"]
-[editable path="Placeholder Character10"]
-[editable path="Placeholder Character15"]
-[editable path="Placeholder Character16"]
-[editable path="Placeholder Character17"]
-[editable path="Placeholder Character18"]
-[editable path="Placeholder Character11"]
-[editable path="Placeholder Character12"]
-[editable path="Placeholder Character13"]
-[editable path="Placeholder Character14"]
-[editable path="Placeholder Character19"]
-[editable path="Placeholder Character20"]
-[editable path="Placeholder Character21"]
-[editable path="Placeholder Character8"]
-[editable path="Placeholder Character9"]
+[node name="NPCCharacter5" parent="." unique_id=1060473254 instance=ExtResource("6_aayqt")]
+transform = Transform3D(0.49999997, 0, 0.8660254, 0, 1, 0, -0.8660254, 0, 0.49999997, -0.7, 0, 21.9)

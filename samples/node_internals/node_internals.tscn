@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://csowwdr4p4sxf"]
+
+[ext_resource type="PackedScene" uid="uid://ba6k8q62v3aeg" path="res://samples/shared/scenes/Basic Arena.tscn" id="1_g6ctb"]
+[ext_resource type="PackedScene" uid="uid://don7obupokpwf" path="res://samples/shared/scenes/player_character.tscn" id="2_emymf"]
+[ext_resource type="PackedScene" uid="uid://le6c0y7pc8gt" path="res://samples/shared/scenes/explanation_character.tscn" id="3_g6ctb"]
+
+[node name="NodeInternals" type="Node3D" unique_id=2078170690]
+
+[node name="BasicArena" parent="." unique_id=1653386484 instance=ExtResource("1_g6ctb")]
+
+[node name="PlayerCharacter" parent="." unique_id=914088189 instance=ExtResource("2_emymf")]
+transform = Transform3D(1, 0, -1.7682974e-07, 0, 1, 0, 1.7682974e-07, 0, 1, 0, 0, -1.8000001)
+
+[node name="Capsley" parent="." unique_id=1106896242 instance=ExtResource("3_g6ctb")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -0.19942239, 0.02388975, 1.1773677)

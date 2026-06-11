@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://bjuu3nwvdg5v3"]
+
+[ext_resource type="PackedScene" uid="uid://dd4yv7jus8gow" path="res://samples/shared/art/Materials/samples_environment_nebula.tscn" id="1_ijte8"]
+[ext_resource type="PackedScene" uid="uid://db6adsx7323jr" path="res://samples/shared/scenes/npc_character.tscn" id="2_2lf2e"]
+[ext_resource type="PackedScene" uid="uid://bdovhq5o7dcjv" path="res://samples/shared/art/Character/Attach_Hat_Spacehelmet.fbx" id="3_2lf2e"]
+
+[node name="VoiceOver3d" type="Node3D" unique_id=304579994]
+
+[node name="SamplesEnvironmentNebula" parent="." unique_id=789525707 instance=ExtResource("1_ijte8")]
+
+[node name="NPCCharacter" parent="." unique_id=914088189 instance=ExtResource("2_2lf2e")]
+
+[node name="Skeleton3D" parent="NPCCharacter/PillCharacter2/PillCharacter" parent_id_path=PackedInt32Array(914088189, 2028345057, 828416499) index="0" unique_id=419014003]
+bones/1/rotation = Quaternion(0.0028210662, 0.70710117, 0.70710117, -0.0028211728)
+bones/2/rotation = Quaternion(-8.566009e-11, -1.1924594e-08, 0.007183296, 0.99997425)
+bones/3/rotation = Quaternion(1.2843377e-17, -2.3551463e-16, 0.008086822, 0.9999674)
+bones/4/rotation = Quaternion(6.436256e-17, 5.423855e-16, 0.009055951, 0.999959)
+bones/5/rotation = Quaternion(-5.0402278e-18, -2.026411e-15, 0.0036008784, 0.99999356)
+
+[node name="BoneAttachment3D" type="BoneAttachment3D" parent="NPCCharacter/PillCharacter2/PillCharacter/Skeleton3D" index="1" unique_id=807486273]
+transform = Transform3D(0.99925816, -0.03851036, 1.2702522e-07, 0.03851036, 0.9992582, 5.941434e-08, -1.2514516e-07, 6.345565e-08, 0.99999994, -0.004852538, 0.319955, 1.9364482e-08)
+bone_name = "Spine_2"
+bone_idx = 3
+
+[node name="Attach_Hat_Spacehelmet" parent="NPCCharacter/PillCharacter2/PillCharacter/Skeleton3D/BoneAttachment3D" unique_id=1376263347 instance=ExtResource("3_2lf2e")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.32, 0)
+
+[editable path="NPCCharacter"]
+[editable path="NPCCharacter/PillCharacter2"]
+[editable path="NPCCharacter/Alert"]
