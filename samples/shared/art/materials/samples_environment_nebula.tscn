@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://dd4yv7jus8gow"]
+
+[ext_resource type="Material" uid="uid://dj45onlcs1yya" path="res://samples/shared/art/materials/skybox-nebula.tres" id="1_0mruu"]
+
+[sub_resource type="Sky" id="Sky_xxrig"]
+sky_material = ExtResource("1_0mruu")
+
+[sub_resource type="Environment" id="Environment_flryd"]
+background_mode = 2
+sky = SubResource("Sky_xxrig")
+ambient_light_source = 2
+ambient_light_color = Color(0.39614066, 0.05693455, 0.3871002, 1)
+
+[node name="SamplesEnvironmentNebula" type="WorldEnvironment" unique_id=789525707]
+environment = SubResource("Environment_flryd")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1090274539]
+transform = Transform3D(0.8660254, -0.35355338, 0.35355338, 0, 0.7071068, 0.7071068, -0.50000006, -0.6123725, 0.6123725, 0, 0, 0)

@@ -1,0 +1,6 @@
+[gd_resource type="PanoramaSkyMaterial" format=3 uid="uid://dj45onlcs1yya"]
+
+[ext_resource type="Texture2D" uid="uid://c28viccvho83j" path="res://samples/shared/art/textures/skybox-nebula.png" id="1_djpva"]
+
+[resource]
+panorama = ExtResource("1_djpva")
