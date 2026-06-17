@@ -59,11 +59,10 @@ signal continue_requested()
 @export var use_markup: bool = true
 
 ## display-time event handlers, invoked as each character is revealed.
-## these are nodes implementing the [YarnActionMarkupHandler] interface
-## (on_prepare_for_line, on_line_display_begin, on_character_will_appear,
-## on_line_display_complete, on_line_will_dismiss). a pause handler for
-## [pause] markup is always added automatically, ahead of this list.
-@export var event_handlers: Array[Node] = []
+## attach [YarnActionMarkupHandlerNode]s in your scene and list them here
+## (the scene-attached counterpart to Unity's "Event Handlers" list). a pause
+## handler for [pause] markup is always added automatically, ahead of this list.
+@export var event_handlers: Array[YarnActionMarkupHandlerNode] = []
 
 var _is_displaying: bool = false
 var _is_fully_revealed: bool = false
