@@ -20,7 +20,9 @@
 class_name YarnLinePresenter
 extends YarnDialoguePresenter
 ## built-in presenter for displaying dialogue lines.
-## provides typewriter effect and continue button functionality.
+## provides a typewriter effect, a continue indicator, and a list of
+## [YarnActionMarkupHandler] event handlers that are invoked as each character
+## is revealed (mirroring Yarn Spinner for Unity's LinePresenter).
 
 ## typewriter animation modes
 enum TypewriterMode {
@@ -56,12 +58,22 @@ signal continue_requested()
 @export var hurry_action: String = "ui_accept"
 @export var use_markup: bool = true
 
+## display-time event handlers, invoked as each character is revealed.
+## these are nodes implementing the [YarnActionMarkupHandler] interface
+## (on_prepare_for_line, on_line_display_begin, on_character_will_appear,
+## on_line_display_complete, on_line_will_dismiss). a pause handler for
+## [pause] markup is always added automatically, ahead of this list.
+@export var event_handlers: Array[Node] = []
+
 var _is_displaying: bool = false
 var _is_fully_revealed: bool = false
+var _hurrying: bool = false
 var _current_line: YarnLine
-var _typewriter_tween: Tween
+var _current_token: YarnCancellationToken
 var _markup_parser: YarnMarkupParser
-var _word_positions: PackedInt32Array
+var _pause_processor: YarnPauseEventProcessor
+## the handler list in effect for the current line (pause handler first).
+var _active_handlers: Array = []
 signal _line_complete
 
 
@@ -82,6 +94,10 @@ func _ready() -> void:
 
 	if continue_indicator != null:
 		continue_indicator.visible = false
+
+	# A pause handler is always present so that [pause] markup works, matching
+	# Unity's LinePresenter which prepends a PauseEventProcessor.
+	_pause_processor = YarnPauseEventProcessor.new()
 
 
 func _find_child_of_type(type_name: String) -> Node:
@@ -142,27 +158,23 @@ func on_dialogue_started() -> void:
 	_set_presenter_visible(false)
 	_is_displaying = false
 	_is_fully_revealed = false
+	_hurrying = false
 	_current_line = null
+	_current_token = null
 
 
 func on_dialogue_completed() -> void:
 	_set_presenter_visible(false)
 	_is_displaying = false
 	_is_fully_revealed = false
-	_kill_typewriter_tween()
 
 
-func _kill_typewriter_tween() -> void:
-	if _typewriter_tween != null:
-		if _typewriter_tween.is_valid() and _typewriter_tween.is_running():
-			_typewriter_tween.kill()
-		_typewriter_tween = null
-
-
-func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
+func run_line(line: YarnLine, token: YarnCancellationToken = null) -> Variant:
 	_current_line = line
+	_current_token = token
 	_is_displaying = true
 	_is_fully_revealed = false
+	_hurrying = false
 
 	_set_presenter_visible(true)
 
@@ -181,76 +193,136 @@ func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
 
 	if text_label != null:
 		text_label.text = display_text
-		text_label.visible_ratio = 0.0
+		text_label.visible_characters = 0
 
 	if continue_indicator != null:
 		continue_indicator.visible = false
 
+	# Build the handler list for this line and let each one prepare. This is
+	# the GDScript equivalent of the typewriter's PrepareForContent step.
+	_active_handlers = _build_handlers()
+	for handler in _active_handlers:
+		if handler.has_method("on_prepare_for_line"):
+			handler.on_prepare_for_line(line, text_label)
+
 	line_started.emit(line)
 
-	_kill_typewriter_tween()
-
-	match typewriter_mode:
-		TypewriterMode.INSTANT:
-			if text_label != null:
-				text_label.visible_ratio = 1.0
-			_on_typewriter_complete()
-
-		TypewriterMode.LETTER:
-			if text_label != null and characters_per_second > 0 and display_text.length() > 0:
-				var plain_text := line.get_plain_text()
-				var duration := plain_text.length() / characters_per_second
-				_typewriter_tween = create_tween()
-				_typewriter_tween.tween_property(text_label, "visible_ratio", 1.0, duration)
-				_typewriter_tween.finished.connect(_on_typewriter_complete, CONNECT_ONE_SHOT)
-			else:
-				if text_label != null:
-					text_label.visible_ratio = 1.0
-				_on_typewriter_complete()
-
-		TypewriterMode.WORD:
-			var plain_text := line.get_plain_text()
-			_word_positions = _calculate_word_positions(plain_text)
-			if text_label != null and words_per_second > 0 and _word_positions.size() > 0:
-				var duration := _word_positions.size() / words_per_second
-				_typewriter_tween = create_tween()
-				_typewriter_tween.tween_method(_reveal_words, 0.0, 1.0, duration)
-				_typewriter_tween.finished.connect(_on_typewriter_complete, CONNECT_ONE_SHOT)
-			else:
-				if text_label != null:
-					text_label.visible_ratio = 1.0
-				_on_typewriter_complete()
+	# Run the typewriter as a detached coroutine; it emits _line_complete once
+	# the line has been fully read and dismissed. run_line itself returns the
+	# completion signal synchronously, which is what the runner awaits.
+	_run_typewriter()
 
 	return _line_complete
 
 
-func _calculate_word_positions(text: String) -> PackedInt32Array:
-	var positions := PackedInt32Array()
+func _build_handlers() -> Array:
+	var handlers: Array = []
+	if _pause_processor != null:
+		handlers.append(_pause_processor)
+	for handler in event_handlers:
+		if handler != null:
+			handlers.append(handler)
+	return handlers
+
+
+## reveals the line one unit at a time, invoking each event handler as every
+## character appears. mirrors Unity's Letter/Word/Instant typewriters.
+func _run_typewriter() -> void:
+	var label := text_label
+	var handlers := _active_handlers
+	var line := _current_line
+
+	for handler in handlers:
+		if handler.has_method("on_line_display_begin"):
+			handler.on_line_display_begin(line, label)
+
+	var visible_count := 0
+	if label != null:
+		visible_count = label.get_total_character_count()
+
+	var seconds_per_unit := 0.0
+	var word_boundaries := PackedInt32Array()
+	match typewriter_mode:
+		TypewriterMode.LETTER:
+			if characters_per_second > 0:
+				seconds_per_unit = 1.0 / characters_per_second
+		TypewriterMode.WORD:
+			if words_per_second > 0:
+				seconds_per_unit = 1.0 / words_per_second
+			word_boundaries = _calculate_word_boundaries(line.get_plain_text())
+
+	# Start with a full time budget so the first unit appears immediately.
+	var accumulated := seconds_per_unit
+	var next_boundary := 0
+
+	for i in visible_count:
+		if not _is_displaying:
+			return  # dismissed or dialogue stopped mid-reveal
+
+		# Is this character a timing gate? Letter mode gates on every
+		# character; word mode only on word boundaries.
+		var gate := false
+		if typewriter_mode == TypewriterMode.LETTER:
+			gate = true
+		elif typewriter_mode == TypewriterMode.WORD:
+			if next_boundary < word_boundaries.size() and i == word_boundaries[next_boundary]:
+				gate = true
+				next_boundary += 1
+
+		if gate and seconds_per_unit > 0.0:
+			while not _is_cancelled() and accumulated < seconds_per_unit:
+				var before := Time.get_ticks_usec()
+				await get_tree().process_frame
+				if not _is_displaying:
+					return
+				accumulated += float(Time.get_ticks_usec() - before) / 1_000_000.0
+			accumulated -= seconds_per_unit
+
+		# Let each handler react to this character, awaiting any signal it
+		# returns (e.g. a pause, an emotion change, a walk). When hurrying we
+		# still fire the handler for its side effect but skip the wait.
+		for handler in handlers:
+			if handler.has_method("on_character_will_appear"):
+				var result: Variant = handler.on_character_will_appear(i, line, _current_token)
+				if result is Signal and not (result as Signal).is_null() and not _is_cancelled():
+					await result
+					if not _is_displaying:
+						return
+
+		if label != null:
+			label.visible_characters = i + 1
+
+	if label != null:
+		label.visible_characters = -1
+
+	for handler in handlers:
+		if handler.has_method("on_line_display_complete"):
+			handler.on_line_display_complete()
+
+	_on_typewriter_complete()
+
+
+## returns the character index just past the end of each word, used as the
+## word-mode timing gates (matches Unity's word.lastCharacterIndex + 1).
+func _calculate_word_boundaries(text: String) -> PackedInt32Array:
+	var boundaries := PackedInt32Array()
 	var in_word := false
-	for i in range(text.length()):
+	for i in text.length():
 		var c := text[i]
-		if c == " " or c == "\t" or c == "\n":
+		var is_space := c == " " or c == "\t" or c == "\n"
+		if is_space and in_word:
+			boundaries.append(i)
 			in_word = false
-		elif not in_word:
+		elif not is_space:
 			in_word = true
-			positions.append(i)
-	# add end position
-	positions.append(text.length())
-	return positions
-
-
-func _reveal_words(progress: float) -> void:
-	if text_label == null or _word_positions.is_empty():
-		return
-	var word_index := int(progress * (_word_positions.size() - 1))
-	word_index = clampi(word_index, 0, _word_positions.size() - 1)
-	var char_pos := _word_positions[word_index]
-	var plain_length := _word_positions[_word_positions.size() - 1]
-	if plain_length > 0:
-		text_label.visible_ratio = float(char_pos) / float(plain_length)
+	if in_word:
+		boundaries.append(text.length())
+	return boundaries
 
 
 func _on_typewriter_complete() -> void:
+	if not _is_displaying:
+		return
 	_is_fully_revealed = true
 	line_finished.emit(_current_line)
 
@@ -264,9 +336,17 @@ func _on_typewriter_complete() -> void:
 
 
 func _complete_line() -> void:
+	if not _is_displaying:
+		return
 	_is_displaying = false
 	_is_fully_revealed = false
+
+	for handler in _active_handlers:
+		if handler.has_method("on_line_will_dismiss"):
+			handler.on_line_will_dismiss()
+
 	_current_line = null
+	_current_token = null
 
 	if continue_indicator != null:
 		continue_indicator.visible = false
@@ -275,12 +355,18 @@ func _complete_line() -> void:
 	_line_complete.emit()
 
 
+func _is_cancelled() -> bool:
+	if _hurrying:
+		return true
+	if _current_token != null and _current_token.is_cancelled:
+		return true
+	return false
+
+
 func request_hurry_up() -> void:
-	if _typewriter_tween != null and _typewriter_tween.is_valid() and _typewriter_tween.is_running():
-		_kill_typewriter_tween()
-		if text_label != null:
-			text_label.visible_ratio = 1.0
-		_on_typewriter_complete()
+	_hurrying = true
+	if _current_token != null:
+		_current_token.request_hurry_up()
 
 
 func request_next() -> void:
