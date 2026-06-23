@@ -60,7 +60,7 @@ func try_get_property(prop_name: String) -> YarnMarkupValue:
 			var val: Variant = properties[key]
 			if val is YarnMarkupValue:
 				return val
-				return YarnMarkupValue.from_string(str(val))
+			return YarnMarkupValue.from_string(str(val))
 	return null
 
 

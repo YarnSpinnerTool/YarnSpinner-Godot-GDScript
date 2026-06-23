@@ -224,6 +224,17 @@ func _build_handlers() -> Array:
 	return handlers
 
 
+## Registers a custom replacement-marker processor so that markup like
+## [code][marker_name]...[/marker_name][/code] is transformed when this presenter
+## renders a line. The presenter parses with its own markup parser, so register
+## here (not just on the line provider) for the change to be visible. The Godot
+## equivalent of registering a ReplacementMarkupHandler in Unity.
+func register_marker_processor(marker_name: String, processor: YarnAttributeMarkerProcessor) -> void:
+	if _markup_parser == null:
+		_markup_parser = YarnMarkupParser.new()
+	_markup_parser.register_marker_processor(marker_name, processor)
+
+
 ## reveals the line one unit at a time, invoking each event handler as every
 ## character appears. mirrors Unity's Letter/Word/Instant typewriters.
 func _run_typewriter() -> void:

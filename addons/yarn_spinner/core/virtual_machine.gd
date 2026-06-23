@@ -304,11 +304,13 @@ func has_salient_content(node_group_name: String) -> bool:
 		return false
 	if saliency_strategy == null:
 		return true
+	var typed_options: Array[Dictionary] = []
+	typed_options.assign(options)
 	var context := {
 		"vm": self,
 		"variable_storage": variable_storage
 	}
-	var selected_index := saliency_strategy.select_candidate(options, context)
+	var selected_index := saliency_strategy.select_candidate(typed_options, context)
 	return selected_index >= 0
 
 

@@ -105,53 +105,58 @@ static func get_saliency_options_for_node_group(
 	if not node.headers.has("$Yarn.Internal.NodeGroupHub"):
 		return []
 
+	# Mirrors Unity's SmartVariableEvaluationVirtualMachine: every node tagged
+	# with this group's NodeGroup header is a candidate. The hub node itself
+	# carries no candidate instructions, so we enumerate the program's nodes
+	# rather than scanning the hub. Each candidate's saliency-condition
+	# variables are evaluated to count passing/failing conditions; the saliency
+	# strategy is responsible for discarding the failing ones.
 	var candidates: Array[Dictionary] = []
+	for member_name in program.nodes:
+		var member: YarnNode = program.nodes[member_name]
+		if member.headers.get("$Yarn.Internal.NodeGroup", "") != group_name:
+			continue
+		candidates.append(_build_member_candidate(member_name, member, variable_storage, library, program))
 
-	for instruction in node.instructions:
-		if instruction.opcode == YarnInstruction.OpCode.ADD_SALIENCY_CANDIDATE:
-			var candidate := _build_candidate(instruction, node, variable_storage, library, program)
-			if candidate != null:
-				candidates.append(candidate)
-
-	var valid_candidates: Array[Dictionary] = []
-	for candidate in candidates:
-		if candidate.get("conditions_failed", 0) == 0:
-			valid_candidates.append(candidate)
-
-	return valid_candidates
+	return candidates
 
 
-static func _build_candidate(
-	instruction: YarnInstruction,
-	parent_node: YarnNode,
+static func _build_member_candidate(
+	member_name: String,
+	member: YarnNode,
 	variable_storage: YarnVariableStorage,
 	library: YarnLibrary,
 	program: YarnProgram
 ) -> Dictionary:
-	var content_id_str: String = str(instruction.destination)
-	var candidate := {
-		"content_id": content_id_str,
-		"complexity": instruction.float_value if instruction.float_value != 0.0 else -1,
-		"conditions_passed": 0,
-		"conditions_failed": 0,
-		"destination": instruction.destination,
-		"content_type": YarnSaliencyStrategy.ContentType.NODE,
-	}
+	var passing := 0
+	var failing := 0
 
-	var saliency_vars_header: String = parent_node.headers.get("$Yarn.Internal.ContentSaliencyVariables", "")
+	var saliency_vars_header: String = member.headers.get("$Yarn.Internal.ContentSaliencyVariables", "")
 	if not saliency_vars_header.is_empty():
-		var var_names := saliency_vars_header.split(";", false)
-		for var_name in var_names:
+		for var_name in saliency_vars_header.split(";", false):
 			var_name = var_name.strip_edges()
 			if var_name.is_empty():
 				continue
 			var value: Variant = _evaluate_smart_or_stored(var_name, variable_storage, library, program)
 			if value != null and _is_truthy(value):
-				candidate.conditions_passed += 1
+				passing += 1
 			else:
-				candidate.conditions_failed += 1
+				failing += 1
 
-	return candidate
+	# Complexity score defaults to -1 when the header is absent, as in Unity.
+	var complexity := -1
+	var complexity_header: String = member.headers.get("$Yarn.Internal.ContentSaliencyComplexity", "")
+	if complexity_header.is_valid_int():
+		complexity = complexity_header.to_int()
+
+	return {
+		"content_id": member_name,
+		"complexity": complexity,
+		"conditions_passed": passing,
+		"conditions_failed": failing,
+		"destination": 0,
+		"content_type": YarnSaliencyStrategy.ContentType.NODE,
+	}
 
 
 ## Tries smart variable nodes first, then falls back to storage.

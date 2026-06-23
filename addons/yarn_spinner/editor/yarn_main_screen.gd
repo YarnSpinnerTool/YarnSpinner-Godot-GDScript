@@ -42,7 +42,12 @@ var _welcome_button: Button
 var _save_button: Button
 var _reload_button: Button
 var _commands_toggle: Button
+var _samples_button: Button
 var _path_label: Label
+
+# --- samples view ---
+var _samples_panel: Control
+var _samples_list: VBoxContainer
 
 # --- file list / node outline ---
 var _file_filter: LineEdit
@@ -90,6 +95,11 @@ func _ready() -> void:
 	_commands_panel.custom_minimum_size = Vector2(0, 180)
 	_commands_panel.visible = false
 	_body_split.add_child(_commands_panel)
+
+	# samples browser: a full-body list shown in place of the editor
+	_samples_panel = _build_samples_panel()
+	_samples_panel.visible = false
+	root.add_child(_samples_panel)
 
 	_build_dialogs()
 
@@ -148,6 +158,14 @@ func _build_toolbar() -> Control:
 	_commands_toggle.tooltip_text = "Show the Commands & Functions palette"
 	_commands_toggle.toggled.connect(_on_commands_toggled)
 	toolbar.add_child(_commands_toggle)
+
+	_samples_button = Button.new()
+	_samples_button.text = "Samples"
+	_samples_button.icon = _editor_icon("PlayScene")
+	_samples_button.toggle_mode = true
+	_samples_button.tooltip_text = "Browse and run the Yarn Spinner samples"
+	_samples_button.toggled.connect(_on_samples_toggled)
+	toolbar.add_child(_samples_button)
 
 	var docs_button := Button.new()
 	docs_button.text = "Docs"
@@ -337,6 +355,9 @@ func _build_dialogs() -> void:
 func edit_file(path: String) -> void:
 	if _code_edit == null or path.is_empty():
 		return
+	# Leave the samples browser if it's open, so the file is actually visible.
+	if _samples_button and _samples_button.button_pressed:
+		_samples_button.button_pressed = false
 	_current_path = path
 	_reload_file()
 	if not _path_is_known(path):
@@ -669,6 +690,194 @@ func _on_commands_toggled(pressed: bool) -> void:
 func _position_commands_split() -> void:
 	if _body_split.size.y > 320:
 		_body_split.split_offset = int(_body_split.size.y) - 240
+
+
+# -------------------------------------------------------------------------- #
+#  Samples browser
+# -------------------------------------------------------------------------- #
+
+func _build_samples_panel() -> Control:
+	var scale := EditorInterface.get_editor_scale()
+
+	var panel := MarginContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	for side in ["left", "right", "top", "bottom"]:
+		panel.add_theme_constant_override("margin_" + side, int(12 * scale))
+
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", int(8 * scale))
+	panel.add_child(box)
+
+	var header := Label.new()
+	header.text = "Samples"
+	header.theme_type_variation = "HeaderMedium"
+	box.add_child(header)
+
+	var hint := Label.new()
+	hint.text = "Run a sample to see Yarn Spinner in action, or open its scene to see how it's built."
+	hint.modulate = Color(1, 1, 1, 0.7)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(hint)
+
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	box.add_child(scroll)
+
+	_samples_list = VBoxContainer.new()
+	_samples_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_samples_list.add_theme_constant_override("separation", int(6 * scale))
+	scroll.add_child(_samples_list)
+
+	return panel
+
+
+func _on_samples_toggled(pressed: bool) -> void:
+	if _samples_panel == null:
+		return
+	_samples_panel.visible = pressed
+	_body_split.visible = not pressed
+	if pressed:
+		_refresh_samples()
+
+
+func _refresh_samples() -> void:
+	if _samples_list == null:
+		return
+	for child in _samples_list.get_children():
+		child.queue_free()
+
+	var samples := _find_samples()
+	if samples.is_empty():
+		var empty := Label.new()
+		empty.text = "No samples found under res://samples/."
+		empty.modulate = Color(1, 1, 1, 0.6)
+		_samples_list.add_child(empty)
+		return
+
+	for sample in samples:
+		_samples_list.add_child(_build_sample_row(sample))
+
+
+func _build_sample_row(sample: Dictionary) -> Control:
+	var row := PanelContainer.new()
+
+	var margin := MarginContainer.new()
+	for side in ["left", "right", "top", "bottom"]:
+		margin.add_theme_constant_override("margin_" + side, 8)
+	row.add_child(margin)
+
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 8)
+	margin.add_child(hbox)
+
+	var name_label := Label.new()
+	name_label.text = sample.name
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(name_label)
+
+	var path_label := Label.new()
+	path_label.text = sample.scene.trim_prefix("res://samples/")
+	path_label.modulate = Color(1, 1, 1, 0.45)
+	path_label.tooltip_text = sample.scene
+	hbox.add_child(path_label)
+
+	var open_button := Button.new()
+	open_button.text = "Open"
+	open_button.icon = _editor_icon("Load")
+	open_button.tooltip_text = "Open this sample's scene in the editor"
+	open_button.pressed.connect(_open_sample.bind(sample.scene))
+	hbox.add_child(open_button)
+
+	var play_button := Button.new()
+	play_button.text = "Play"
+	play_button.icon = _editor_icon("Play")
+	play_button.tooltip_text = "Run this sample"
+	play_button.pressed.connect(_play_sample.bind(sample.scene))
+	hbox.add_child(play_button)
+
+	return row
+
+
+func _play_sample(scene_path: String) -> void:
+	if not ResourceLoader.exists(scene_path):
+		push_error("YarnEditor: sample scene not found: %s" % scene_path)
+		return
+	EditorInterface.play_custom_scene(scene_path)
+
+
+func _open_sample(scene_path: String) -> void:
+	if not ResourceLoader.exists(scene_path):
+		return
+	EditorInterface.open_scene_from_path(scene_path)
+	# Opening leaves us on the Yarn Spinner tab; switch to the scene editor so
+	# the opened scene is actually visible.
+	_show_opened_scene.call_deferred()
+
+
+func _show_opened_scene() -> void:
+	var root := EditorInterface.get_edited_scene_root()
+	if root is CanvasItem:
+		EditorInterface.set_main_screen_editor("2D")
+	else:
+		EditorInterface.set_main_screen_editor("3D")
+
+
+## Finds each sample folder under res://samples/ (excluding shared) and its
+## entry scene, returning [{ name, scene }] sorted by name.
+func _find_samples() -> Array:
+	var samples: Array = []
+	var base := "res://samples"
+	var dir := DirAccess.open(base)
+	if dir == null:
+		return samples
+	dir.list_dir_begin()
+	var entry := dir.get_next()
+	while not entry.is_empty():
+		if dir.current_is_dir() and not entry.begins_with(".") and entry != "shared":
+			var scene := _find_sample_scene(base.path_join(entry), entry)
+			if not scene.is_empty():
+				samples.append({"name": entry.replace("-", "_").capitalize(), "scene": scene})
+		entry = dir.get_next()
+	dir.list_dir_end()
+	samples.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.name < b.name)
+	return samples
+
+
+## Picks the entry scene for a sample: a scene named after the folder (with an
+## optional "_sample" suffix, in the folder or a scenes/ subfolder), else the
+## first .tscn found in the folder or its scenes/ subfolder.
+func _find_sample_scene(dir_path: String, folder: String) -> String:
+	var candidates := [
+		dir_path.path_join(folder + ".tscn"),
+		dir_path.path_join("scenes").path_join(folder + ".tscn"),
+		dir_path.path_join(folder + "_sample.tscn"),
+		dir_path.path_join("scenes").path_join(folder + "_sample.tscn"),
+	]
+	for candidate in candidates:
+		if ResourceLoader.exists(candidate):
+			return candidate
+	var found := _first_tscn(dir_path)
+	if not found.is_empty():
+		return found
+	return _first_tscn(dir_path.path_join("scenes"))
+
+
+func _first_tscn(dir_path: String) -> String:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return ""
+	var found: Array[String] = []
+	dir.list_dir_begin()
+	var entry := dir.get_next()
+	while not entry.is_empty():
+		if not dir.current_is_dir() and entry.ends_with(".tscn"):
+			found.append(dir_path.path_join(entry))
+		entry = dir.get_next()
+	dir.list_dir_end()
+	found.sort()
+	return found[0] if not found.is_empty() else ""
 
 
 # -------------------------------------------------------------------------- #

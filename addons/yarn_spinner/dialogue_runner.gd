@@ -259,6 +259,18 @@ func _apply_saliency_strategy() -> void:
 		print("dialogue runner: applied saliency strategy: %s" % SaliencyStrategyType.keys()[saliency_strategy])
 
 
+## Installs a custom [YarnSaliencyStrategy], overriding the built-in chosen by
+## the [member saliency_strategy] export. Keeps the VM and the library's
+## has-salient-content context in step. The Godot equivalent of Unity's
+## DialogueRunner.Dialogue.ContentSaliencyStrategy.
+func set_content_saliency_strategy(strategy: YarnSaliencyStrategy) -> void:
+	if strategy == null:
+		return
+	_vm.set_saliency_strategy(strategy)
+	if _library != null:
+		_library.set_vm_context(strategy, variable_storage)
+
+
 func _discover_presenters() -> void:
 	for presenter in presenters:
 		if presenter != null and presenter not in _presenters:
