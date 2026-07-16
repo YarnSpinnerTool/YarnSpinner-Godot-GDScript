@@ -36,6 +36,12 @@ signal dialogue_started()
 
 signal dialogue_completed()
 
+## Emitted when dialogue ends without reaching a natural finish: an explicit
+## [method stop_dialogue], a restart via [method start_dialogue], or a VM
+## runtime error. Fires immediately before [signal dialogue_completed].
+## Teardown (this runner leaving the tree mid-dialogue) emits neither signal.
+signal dialogue_cancelled()
+
 signal node_started(node_name: String)
 
 signal node_completed(node_name: String)
@@ -92,18 +98,28 @@ signal command_received(command_name: String, command_args: Array)
 
 @export_group("Auto-Discovery")
 
-## Scan scene for _yarn_command_* methods at startup.
+## RUNTIME setting. Scan the running scene for _yarn_command_* and
+## _yarn_function_* methods at startup and register them so Yarn can call
+## them. This is what determines whether a command/function actually works
+## at play time. (Contrast with YSLS Scan Path below, which only affects the
+## editor's .ysls.json and has no effect on what runs.)
 @export var auto_discover_commands: bool = true
 
-## Root node for command scanning (empty = scene root).
+## RUNTIME setting. Root node whose subtree is scanned for _yarn_command_* /
+## _yarn_function_* methods (empty = the current scene root). A method only
+## registers if a node carrying its script sits under this root when the scan
+## runs. If a command/function errors at runtime, this is the setting to check
+## (or register it explicitly with add_command()/add_function()).
 @export var discovery_root: NodePath = ^""
 
 @export_group("YSLS Generation")
 
-## directory to scan for _yarn_command_* and _yarn_function_* methods
-## Directory to scan for Yarn command/function definitions when generating
-## the .ysls.json file. Defaults to the Yarn project's directory. Set to
-## "res://" to scan the entire project (all commands visible to all projects).
+## EDITOR-ONLY setting. Directory of .gd files to scan when generating the
+## .ysls.json used by the VS Code extension (autocomplete and squiggles).
+## This does NOT register anything at runtime - a green .ysls.json does not
+## mean a command/function is callable. To make it callable, use the
+## Discovery Root above or add_command()/add_function(). Defaults to the Yarn
+## project's directory; set to "res://" to scan the whole project.
 @export_dir var ysls_scan_path: String = ""
 
 @export_tool_button("Regenerate YSLS", "Reload") var _regenerate_ysls_button = _regenerate_ysls_pressed
@@ -117,6 +133,11 @@ var _asset_provider: YarnAssetProvider
 var _smart_variable_evaluator: YarnSmartVariableEvaluator
 var _is_running: bool = false
 var _is_starting: bool = false
+## Bumped when a run starts or is cleared. Coroutines handling lines, options
+## and commands capture it before awaiting; a mismatch afterwards means their
+## run was cancelled (and possibly replaced), so they must not touch the
+## current run's state.
+var _run_id := 0
 var _current_line: YarnLine
 var _current_options: Array[YarnOption]
 var _waiting_for_content: bool = false
@@ -206,7 +227,13 @@ func _exit_tree() -> void:
 			_vm.prepare_for_lines_handler.disconnect(_on_prepare_for_lines)
 
 	if is_running():
-		stop_dialogue()
+		# Stop silently. Emitting dialogue_completed here would tell
+		# listeners a run finished when the node is just being torn down
+		# (scene change, quit) — issue #138. Presenters aren't notified
+		# either; they're being freed along with this runner.
+		if _vm != null:
+			_vm.stop()
+		_clear_run_state()
 
 
 ## Bind every VM signal handler. Idempotent — safe to call from both _ready
@@ -285,21 +312,67 @@ func _discover_presenters() -> void:
 
 
 func _auto_discover_commands() -> void:
-	var root: Node = self
+	var root: Node = null
 	if not discovery_root.is_empty():
 		root = get_node_or_null(discovery_root)
 	if root == null:
 		root = get_tree().current_scene
-
 	if root == null:
-		return
+		# No current scene (runner used standalone): scan what we can reach.
+		root = owner if owner != null else self
 
 	var registered_scripts: Dictionary = {}
+
+	# Autoload singletons are the idiomatic Godot home for global commands (the
+	# counterpart of Unity's static [YarnCommand] methods). Scan them first so a
+	# singleton method wins the name, and register each as a global command bound
+	# to the singleton - a singleton is unambiguous, so no target is needed and
+	# <<command args>> works directly. Runs before/regardless of the scene walk,
+	# so these register even when nothing in the scene provides them.
+	_scan_singletons_for_commands(registered_scripts)
 
 	_scan_node_for_commands(root, registered_scripts)
 
 	if verbose_logging and not registered_scripts.is_empty():
 		print("dialogue runner: auto-discovered commands from %d scripts" % registered_scripts.size())
+
+
+## Registers _yarn_command_*/_yarn_function_* methods found on autoload
+## singletons as GLOBAL definitions bound to the singleton instance. Because a
+## singleton is unique, both static and non-static methods bind directly (no
+## target resolution), matching how Unity treats static commands as global.
+func _scan_singletons_for_commands(registered_scripts: Dictionary) -> void:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return
+
+	for setting in ProjectSettings.get_property_list():
+		var setting_name: String = setting.get("name", "")
+		if not setting_name.begins_with("autoload/"):
+			continue
+		var autoload_name := setting_name.substr("autoload/".length())
+		var singleton := tree.root.get_node_or_null(NodePath(autoload_name))
+		if singleton == null:
+			continue
+
+		var script := singleton.get_script() as Script
+		if script == null or registered_scripts.has(script):
+			continue
+		registered_scripts[script] = true
+
+		for method in script.get_script_method_list():
+			var method_name: String = method["name"]
+			if method_name.begins_with("_yarn_command_"):
+				var yarn_name := method_name.substr(14)
+				if not _library.has_command(yarn_name) and not _library.has_instance_command(yarn_name):
+					_library.register_command(yarn_name, Callable(singleton, method_name))
+					if verbose_logging:
+						print("dialogue runner: registered global command '%s' on autoload '%s'" % [yarn_name, autoload_name])
+			elif method_name.begins_with("_yarn_function_"):
+				var yarn_name := method_name.substr(15)
+				if not _library.has_function(yarn_name):
+					var param_count: int = method.get("args", []).size()
+					_library.register_function(yarn_name, Callable(singleton, method_name), param_count)
 
 
 func _scan_node_for_commands(node: Node, registered_scripts: Dictionary) -> void:
@@ -397,6 +470,7 @@ func start_dialogue(node_name: String = "") -> void:
 
 	_is_running = true
 	_is_starting = false
+	_run_id += 1
 	_content_complete_pending = false
 	dialogue_started.emit()
 
@@ -416,19 +490,34 @@ func stop_dialogue() -> void:
 		return
 
 	_vm.stop()
+	_clear_run_state()
+	await _finish_dialogue(true)
+
+
+## Reset per-run state without emitting any signals.
+func _clear_run_state() -> void:
 	_is_running = false
+	_run_id += 1
 	_content_complete_pending = false
 	_waiting_for_content = false
+	_current_options.clear()
 
 	if _current_cancellation_token != null:
 		_current_cancellation_token.request_next_content()
 		_current_cancellation_token = null
 
+
+## Shared tail for every non-teardown end of dialogue: presenters are
+## notified, then signals fire. Cancelled ends (explicit stop, restart,
+## VM error) emit dialogue_cancelled before dialogue_completed.
+func _finish_dialogue(was_cancelled: bool) -> void:
 	var presenters_copy := _presenters.duplicate()
 	for presenter in presenters_copy:
 		if is_instance_valid(presenter):
 			await _safe_notify_presenter(presenter, "on_dialogue_completed")
 
+	if was_cancelled:
+		dialogue_cancelled.emit()
 	dialogue_completed.emit()
 
 
@@ -657,7 +746,10 @@ func select_option(option_index: int) -> void:
 	_current_options.clear()
 
 	if show_selected_option_as_line and selected_option != null:
+		var run := _run_id
 		await _run_option_as_line(selected_option)
+		if run != _run_id:
+			return
 
 	call_deferred("_continue_dialogue")
 
@@ -674,6 +766,7 @@ func _run_option_as_line(option: YarnOption) -> void:
 	if verbose_logging:
 		print("dialogue runner: running selected option as line: %s" % line.get_plain_text())
 
+	var run := _run_id
 	_waiting_for_content = true
 	_current_cancellation_token = YarnCancellationToken.new()
 
@@ -686,16 +779,18 @@ func _run_option_as_line(option: YarnOption) -> void:
 
 	var completion_signals: Array[Signal] = []
 	for presenter in presenters_copy:
-		if not _is_running:
+		if run != _run_id:
 			return
 		var result: Variant = presenter.run_line(line, _current_cancellation_token)
 		if result is Signal:
 			completion_signals.append(result)
 
 	for sig: Signal in completion_signals:
-		if not _is_running:
+		if run != _run_id:
 			return
 		await sig
+		if run != _run_id:
+			return
 
 
 func get_locale() -> String:
@@ -791,6 +886,7 @@ func _on_line(line: YarnLine) -> void:
 	if not _is_running:
 		return
 
+	var run := _run_id
 	_current_line = line
 
 	if _line_provider != null:
@@ -809,16 +905,18 @@ func _on_line(line: YarnLine) -> void:
 
 	var completion_signals: Array[Signal] = []
 	for presenter in presenters_copy:
-		if not _is_running:
+		if run != _run_id:
 			return
 		var result: Variant = presenter.run_line(line, _current_cancellation_token)
 		if result is Signal:
 			completion_signals.append(result)
 
 	for sig: Signal in completion_signals:
-		if not _is_running:
+		if run != _run_id:
 			return
 		await sig
+		if run != _run_id:
+			return
 
 	if _is_running:
 		signal_content_complete()
@@ -828,6 +926,7 @@ func _on_options(options: Array[YarnOption]) -> void:
 	if not _is_running:
 		return
 
+	var run := _run_id
 	_current_options = options
 
 	if _line_provider != null:
@@ -850,9 +949,11 @@ func _on_options(options: Array[YarnOption]) -> void:
 	var pending_signals: Array[Signal] = []
 
 	for presenter in presenters_copy:
-		if not _is_running or timeout_triggered:
+		if run != _run_id or timeout_triggered:
 			break
 		var result: Variant = await presenter.run_options(options, _current_cancellation_token)
+		if run != _run_id:
+			return
 		if result is Signal:
 			pending_signals.append(result)
 		elif result is int and result >= 0 and selected_option_index < 0:
@@ -861,14 +962,16 @@ func _on_options(options: Array[YarnOption]) -> void:
 	# If no presenter returned synchronously, await their signals
 	if selected_option_index < 0:
 		for sig: Signal in pending_signals:
-			if not _is_running or timeout_triggered:
+			if run != _run_id or timeout_triggered:
 				break
 			var result: Variant = await sig
+			if run != _run_id:
+				return
 			if result is int and result >= 0 and selected_option_index < 0:
 				selected_option_index = int(result)
 				break
 
-	if not _is_running:
+	if run != _run_id or not _is_running:
 		return
 
 	if selected_option_index >= 0:
@@ -893,12 +996,14 @@ func _on_options(options: Array[YarnOption]) -> void:
 func _start_option_timeout(timeout: float, on_timeout: Callable) -> void:
 	if not is_inside_tree():
 		return
+	var run := _run_id
 	await get_tree().create_timer(timeout).timeout
-	if _is_running and not _current_options.is_empty():
+	if run == _run_id and _is_running and not _current_options.is_empty():
 		on_timeout.call()
 
 
 func _on_command(command_text: String) -> void:
+	var run := _run_id
 	_waiting_for_content = true
 
 	var _parsed := YarnCommandParser.parse(command_text)
@@ -909,7 +1014,8 @@ func _on_command(command_text: String) -> void:
 
 	if not result.handled:
 		if await _handle_builtin_command(command_text):
-			signal_content_complete()
+			if run == _run_id:
+				signal_content_complete()
 			return
 
 		# Emit the unhandled command signal. Matching Unity behaviour:
@@ -921,7 +1027,20 @@ func _on_command(command_text: String) -> void:
 			command_unhandled.emit(command_text)
 			return
 		else:
-			push_error("yarn spinner: no handler for command '%s'. Did you forget to register it? Dialogue will continue." % command_text)
+			if not result.error.is_empty():
+				# A command name matched but dispatch failed (e.g. an instance
+				# command whose target node wasn't found). Surface why, plus the
+				# fix, instead of a generic "no handler".
+				push_error(("yarn spinner: command '%s' could not run: %s. If this is a " +
+					"_yarn_command_ on a Node it is an instance command, so its first argument " +
+					"must be a target node name (<<cmd TargetNode args>>). For a global command, " +
+					"make the method static or register it with runner.add_command(). " +
+					"Dialogue will continue.") % [command_text, result.error])
+			else:
+				push_error(("yarn spinner: no handler for command '%s'. It is not registered at " +
+					"runtime - attach its script to a node under the DialogueRunner's discovery " +
+					"root, make it static, or register it with runner.add_command(). A valid " +
+					".ysls.json does not register it. Dialogue will continue.") % command_text)
 			signal_content_complete()
 			return
 
@@ -938,7 +1057,7 @@ func _on_command(command_text: String) -> void:
 			else:
 				await async_result
 
-	if not _is_running:
+	if run != _run_id or not _is_running:
 		return
 
 	signal_content_complete()
@@ -977,12 +1096,10 @@ func _on_node_complete(node_name: String) -> void:
 
 func _on_dialogue_complete() -> void:
 	_is_running = false
-
-	var presenters_copy := _presenters.duplicate()
-	for presenter in presenters_copy:
-		await _safe_notify_presenter(presenter, "on_dialogue_completed")
-
-	dialogue_completed.emit()
+	# A VM error ends the run to avoid a soft-lock (GDScript has no
+	# exceptions to surface it), but it isn't a natural finish — flag it
+	# as cancelled so listeners can tell the difference.
+	await _finish_dialogue(_vm != null and _vm.has_error())
 
 
 func _on_prepare_for_lines(line_ids: PackedStringArray) -> void:

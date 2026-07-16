@@ -47,7 +47,7 @@ var _path_label: Label
 
 # --- samples view ---
 var _samples_panel: Control
-var _samples_list: VBoxContainer
+var _samples_grid: GridContainer
 
 # --- file list / node outline ---
 var _file_filter: LineEdit
@@ -696,6 +696,39 @@ func _position_commands_split() -> void:
 #  Samples browser
 # -------------------------------------------------------------------------- #
 
+const SAMPLES_DOCS_URL := "https://yarnspinner.dev/docs/godot/samples"
+
+const SAMPLE_CARD_WIDTH := 268.0
+const SAMPLE_THUMB_HEIGHT := 150.0
+const SAMPLE_THUMB_OVERRIDES := ["thumbnail.png", "thumbnail.jpg", "screenshot.png", "screenshot.jpg"]
+
+## One-line blurbs shown on each sample card, keyed by folder name.
+const SAMPLE_DESCRIPTIONS := {
+	"background-chatter": "Ambient NPC conversations play out around you, each line floating above its speaker.",
+	"basic-saliency": "Characters change what they say with the day and time, using node and line groups.",
+	"commands_and_functions": "Drive your game from Yarn with custom commands, and read game state back with functions.",
+	"custom-saliency": "Write your own saliency strategy to decide which content gets chosen.",
+	"feature_tour": "A guided, room-by-room walk through every major Yarn Spinner feature.",
+	"inline_events": "Fire game events like movement and emotions from right inside a line of dialogue.",
+	"instance_commands": "Commands that target a specific object instance in the scene.",
+	"node_internals": "Peek at node titles, headers and metadata from the running dialogue.",
+	"options_that_timeout": "Options that expire if the player takes too long to choose.",
+	"replacement_markup": "Custom markup that swaps text for icons and richly styled spans.",
+	"simple_3d": "The smallest possible 3D scene that runs a single Yarn line.",
+	"themed_line_presenter": "Restyle the built-in line presenter to match the look of your game.",
+	"voice_over_3d": "Recorded voice-over synced to lines in a 3D scene.",
+	"voice_over": "Play recorded voice-over alongside each spoken line.",
+	"welcome": "A friendly starting point that introduces the basics of Yarn Spinner.",
+	"yarn_basics": "The fundamentals: nodes, lines, options and jumps.",
+}
+
+# A small rotating palette so placeholder thumbnails feel intentional, not blank.
+const SAMPLE_ACCENTS := [
+	Color("e36588"), Color("6794d9"), Color("8bc34a"), Color("ffb74d"),
+	Color("ba68c8"), Color("4dd0e1"), Color("f06292"), Color("9ccc65"),
+]
+
+
 func _build_samples_panel() -> Control:
 	var scale := EditorInterface.get_editor_scale()
 
@@ -703,34 +736,67 @@ func _build_samples_panel() -> Control:
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	for side in ["left", "right", "top", "bottom"]:
-		panel.add_theme_constant_override("margin_" + side, int(12 * scale))
+		panel.add_theme_constant_override("margin_" + side, int(16 * scale))
 
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", int(8 * scale))
+	box.add_theme_constant_override("separation", int(4 * scale))
 	panel.add_child(box)
+
+	var header_row := HBoxContainer.new()
+	header_row.add_theme_constant_override("separation", int(12 * scale))
+	box.add_child(header_row)
 
 	var header := Label.new()
 	header.text = "Samples"
-	header.theme_type_variation = "HeaderMedium"
-	box.add_child(header)
+	header.theme_type_variation = "HeaderLarge"
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header_row.add_child(header)
+
+	var docs_link := LinkButton.new()
+	docs_link.text = "Samples documentation"
+	docs_link.uri = SAMPLES_DOCS_URL
+	docs_link.underline = LinkButton.UNDERLINE_MODE_ON_HOVER
+	docs_link.tooltip_text = SAMPLES_DOCS_URL
+	docs_link.size_flags_vertical = Control.SIZE_SHRINK_END
+	header_row.add_child(docs_link)
 
 	var hint := Label.new()
 	hint.text = "Run a sample to see Yarn Spinner in action, or open its scene to see how it's built."
-	hint.modulate = Color(1, 1, 1, 0.7)
+	hint.modulate = Color(1, 1, 1, 0.6)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(hint)
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, int(8 * scale))
+	box.add_child(spacer)
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	box.add_child(scroll)
 
-	_samples_list = VBoxContainer.new()
-	_samples_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_samples_list.add_theme_constant_override("separation", int(6 * scale))
-	scroll.add_child(_samples_list)
+	_samples_grid = GridContainer.new()
+	_samples_grid.columns = 4
+	_samples_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_samples_grid.add_theme_constant_override("h_separation", int(14 * scale))
+	_samples_grid.add_theme_constant_override("v_separation", int(14 * scale))
+	_samples_grid.resized.connect(_update_samples_columns)
+	scroll.add_child(_samples_grid)
 
 	return panel
+
+
+## Keeps cards filling each row: 4 columns when four fit at their minimum width,
+## otherwise 3. Cards stretch to share the row, so there's never a ragged edge.
+func _update_samples_columns() -> void:
+	if _samples_grid == null:
+		return
+	var scale := EditorInterface.get_editor_scale()
+	var min_card := 190.0 * scale
+	var sep := 14.0 * scale
+	var cols := 4 if _samples_grid.size.x >= 4.0 * min_card + 3.0 * sep else 3
+	if _samples_grid.columns != cols:
+		_samples_grid.columns = cols
 
 
 func _on_samples_toggled(pressed: bool) -> void:
@@ -743,9 +809,9 @@ func _on_samples_toggled(pressed: bool) -> void:
 
 
 func _refresh_samples() -> void:
-	if _samples_list == null:
+	if _samples_grid == null:
 		return
-	for child in _samples_list.get_children():
+	for child in _samples_grid.get_children():
 		child.queue_free()
 
 	var samples := _find_samples()
@@ -753,51 +819,146 @@ func _refresh_samples() -> void:
 		var empty := Label.new()
 		empty.text = "No samples found under res://samples/."
 		empty.modulate = Color(1, 1, 1, 0.6)
-		_samples_list.add_child(empty)
+		_samples_grid.add_child(empty)
 		return
 
-	for sample in samples:
-		_samples_list.add_child(_build_sample_row(sample))
+	for i in samples.size():
+		_samples_grid.add_child(_build_sample_card(samples[i], i))
+	_update_samples_columns.call_deferred()
 
 
-func _build_sample_row(sample: Dictionary) -> Control:
-	var row := PanelContainer.new()
+func _build_sample_card(sample: Dictionary, index: int) -> Control:
+	var scale := EditorInterface.get_editor_scale()
+	var accent: Color = SAMPLE_ACCENTS[index % SAMPLE_ACCENTS.size()]
 
-	var margin := MarginContainer.new()
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 8)
-	row.add_child(margin)
+	var card := PanelContainer.new()
+	card.custom_minimum_size = Vector2(int(190 * scale), 0)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card.add_theme_stylebox_override("panel", _sample_card_style(false))
+	card.mouse_filter = Control.MOUSE_FILTER_PASS
+	card.mouse_entered.connect(func() -> void:
+		card.add_theme_stylebox_override("panel", _sample_card_style(true)))
+	card.mouse_exited.connect(func() -> void:
+		card.add_theme_stylebox_override("panel", _sample_card_style(false)))
 
-	var hbox := HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 8)
-	margin.add_child(hbox)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override("separation", 0)
+	card.add_child(body)
+
+	# Thumbnail: a real scene preview when we can get one, an accent placeholder until then.
+	var thumb := TextureRect.new()
+	thumb.custom_minimum_size = Vector2(0, int(SAMPLE_THUMB_HEIGHT * scale))
+	thumb.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	thumb.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	thumb.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	thumb.clip_contents = true
+	thumb.texture = _sample_placeholder(sample.name, accent)
+	# Grow the thumbnail's height with its width so it keeps a 16:9 feel.
+	thumb.resized.connect(func() -> void:
+		var h := int(thumb.size.x * SAMPLE_THUMB_HEIGHT / SAMPLE_CARD_WIDTH)
+		if absi(int(thumb.custom_minimum_size.y) - h) > 1:
+			thumb.custom_minimum_size.y = h)
+	body.add_child(thumb)
+	_request_sample_thumbnail(sample, thumb)
+
+	var text_margin := MarginContainer.new()
+	for side in ["left", "right"]:
+		text_margin.add_theme_constant_override("margin_" + side, int(12 * scale))
+	text_margin.add_theme_constant_override("margin_top", int(10 * scale))
+	text_margin.add_theme_constant_override("margin_bottom", int(12 * scale))
+	# Fill the card so the description absorbs spare height and the buttons sit
+	# on the bottom edge, keeping every row's buttons aligned.
+	text_margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_child(text_margin)
+
+	var text := VBoxContainer.new()
+	text.add_theme_constant_override("separation", int(4 * scale))
+	text_margin.add_child(text)
 
 	var name_label := Label.new()
 	name_label.text = sample.name
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.add_child(name_label)
+	name_label.theme_type_variation = "HeaderSmall"
+	text.add_child(name_label)
 
-	var path_label := Label.new()
-	path_label.text = sample.scene.trim_prefix("res://samples/")
-	path_label.modulate = Color(1, 1, 1, 0.45)
-	path_label.tooltip_text = sample.scene
-	hbox.add_child(path_label)
+	var desc_label := Label.new()
+	desc_label.text = SAMPLE_DESCRIPTIONS.get(sample.folder, sample.scene.trim_prefix("res://samples/"))
+	desc_label.modulate = Color(1, 1, 1, 0.6)
+	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc_label.custom_minimum_size = Vector2(0, int(52 * scale))
+	desc_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	desc_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	text.add_child(desc_label)
+
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", int(6 * scale))
+	text.add_child(buttons)
+
+	var card_docs := LinkButton.new()
+	card_docs.text = "Docs"
+	card_docs.uri = SAMPLES_DOCS_URL + "/" + sample.folder.replace("_", "-")
+	card_docs.underline = LinkButton.UNDERLINE_MODE_ON_HOVER
+	card_docs.tooltip_text = card_docs.uri
+	card_docs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card_docs.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	buttons.add_child(card_docs)
 
 	var open_button := Button.new()
 	open_button.text = "Open"
 	open_button.icon = _editor_icon("Load")
 	open_button.tooltip_text = "Open this sample's scene in the editor"
 	open_button.pressed.connect(_open_sample.bind(sample.scene))
-	hbox.add_child(open_button)
+	buttons.add_child(open_button)
 
 	var play_button := Button.new()
 	play_button.text = "Play"
 	play_button.icon = _editor_icon("Play")
 	play_button.tooltip_text = "Run this sample"
 	play_button.pressed.connect(_play_sample.bind(sample.scene))
-	hbox.add_child(play_button)
+	buttons.add_child(play_button)
 
-	return row
+	return card
+
+
+func _sample_card_style(hovered: bool) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	var base := Color(0.16, 0.17, 0.21)
+	var theme := EditorInterface.get_editor_theme()
+	if theme and theme.has_color("base_color", "Editor"):
+		base = theme.get_color("base_color", "Editor")
+	sb.bg_color = base.lightened(0.07) if hovered else base.lightened(0.02)
+	sb.set_corner_radius_all(8)
+	sb.set_content_margin_all(0)
+	sb.border_color = Color(1, 1, 1, 0.12) if hovered else Color(1, 1, 1, 0.05)
+	sb.set_border_width_all(1)
+	return sb
+
+
+## Builds a tidy accent gradient with the sample's initial, used until (or unless)
+## a real scene preview is available.
+func _sample_placeholder(display_name: String, accent: Color) -> Texture2D:
+	var w := 268
+	var h := 150
+	var img := Image.create(w, h, false, Image.FORMAT_RGB8)
+	var top := accent.darkened(0.35)
+	var bottom := accent.darkened(0.6)
+	for y in h:
+		var row := top.lerp(bottom, float(y) / float(h - 1))
+		for x in w:
+			img.set_pixel(x, y, row)
+	return ImageTexture.create_from_image(img)
+
+
+## Uses the sample's bundled screenshot (thumbnail.png / screenshot.png). Falls
+## back to the accent placeholder set by the caller when none is present.
+func _request_sample_thumbnail(sample: Dictionary, target: TextureRect) -> void:
+	var folder_path := "res://samples".path_join(sample.folder)
+	for name in SAMPLE_THUMB_OVERRIDES:
+		var candidate := folder_path.path_join(name)
+		if ResourceLoader.exists(candidate):
+			var tex := load(candidate)
+			if tex is Texture2D:
+				target.texture = tex
+				return
 
 
 func _play_sample(scene_path: String) -> void:
@@ -838,7 +999,7 @@ func _find_samples() -> Array:
 		if dir.current_is_dir() and not entry.begins_with(".") and entry != "shared":
 			var scene := _find_sample_scene(base.path_join(entry), entry)
 			if not scene.is_empty():
-				samples.append({"name": entry.replace("-", "_").capitalize(), "scene": scene})
+				samples.append({"name": entry.replace("-", "_").capitalize(), "scene": scene, "folder": entry})
 		entry = dir.get_next()
 	dir.list_dir_end()
 	samples.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.name < b.name)

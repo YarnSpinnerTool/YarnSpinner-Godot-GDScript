@@ -39,6 +39,10 @@ extends Node
 ## Set automatically when the presenter is added to a runner.
 var dialogue_runner: YarnDialogueRunner
 
+## Serial of the most recent fade; an older fade bails out once a newer one
+## starts, so two fades never fight over the same modulate alpha.
+var _fade_serial := 0
+
 
 ## Safely set visibility for this presenter's UI.
 ## Handles three common layouts:
@@ -55,6 +59,48 @@ func _set_presenter_visible(v: bool) -> void:
 			child.visible = v
 		elif child is CanvasLayer:
 			child.visible = v
+
+
+## The CanvasItem this presenter fades: itself when it is one, otherwise its
+## first CanvasItem child. Null for non-visual presenters.
+func _get_presenter_canvas_item() -> CanvasItem:
+	# The declared base is Node, but scenes often attach this script to a
+	# Control; go via Variant so the analyser allows the cast.
+	var target: Variant = self
+	if target is CanvasItem:
+		return target as CanvasItem
+	for child in get_children():
+		if child is CanvasItem:
+			return child
+	return null
+
+
+## Fade the presenter's UI between two modulate alphas over [param duration]
+## seconds (the Godot counterpart of Unity's canvas group fade). Awaitable.
+## Finishes early when [param cancel] returns true. No-op for non-visual
+## presenters.
+func _fade_presenter_alpha(from_alpha: float, to_alpha: float, duration: float, cancel: Callable = Callable()) -> void:
+	var item := _get_presenter_canvas_item()
+	if item == null:
+		return
+	_fade_serial += 1
+	var serial := _fade_serial
+	if duration <= 0.0 or not is_inside_tree():
+		item.modulate.a = to_alpha
+		return
+	item.modulate.a = from_alpha
+	var elapsed := 0.0
+	while elapsed < duration:
+		await get_tree().process_frame
+		if serial != _fade_serial:
+			return
+		if not is_inside_tree() or not is_instance_valid(item):
+			return
+		if cancel.is_valid() and cancel.call():
+			break
+		elapsed += get_process_delta_time()
+		item.modulate.a = lerpf(from_alpha, to_alpha, clampf(elapsed / duration, 0.0, 1.0))
+	item.modulate.a = to_alpha
 
 
 ## Called when dialogue begins. Override to set up your presenter UI.
@@ -98,8 +144,14 @@ func prepare_for_lines(_line_ids: PackedStringArray) -> void:
 ##   The runner will await it before advancing.
 ## - Return [code]null[/code] if the line was handled synchronously. The
 ##   runner advances immediately.
-func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
-	dialogue_runner.signal_content_complete()
+##
+## The base implementation just returns [code]null[/code] ("not handled").
+## It must not call [method YarnDialogueRunner.signal_content_complete]:
+## with several presenters attached, a passive one doing so completes every
+## line the instant it appears, cutting off the presenters that actually
+## display it. The runner already advances by itself when no presenter
+## returns a completion signal.
+func run_line(_line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
 	return null
 
 
@@ -128,9 +180,16 @@ func request_hurry_up() -> void:
 
 ## Called when the runner requests the presenter to advance to the
 ## next piece of content (dismiss the current line).
+##
+## No-op in the base class: a presenter with no active content has nothing
+## to dismiss. Presenters that display content override this and complete
+## their own line (see [YarnLinePresenter], [YarnVoiceOverPresenter]).
+## Calling [method YarnDialogueRunner.signal_content_complete] from here
+## would complete whatever the runner is waiting on — including async
+## commands such as [code]<<wait>>[/code] — whenever the player presses
+## "advance", skipping them.
 func request_next() -> void:
-	if dialogue_runner != null:
-		dialogue_runner.signal_content_complete()
+	pass
 
 
 ## Helper for presenters that want to ask "the line should end now" (e.g. a

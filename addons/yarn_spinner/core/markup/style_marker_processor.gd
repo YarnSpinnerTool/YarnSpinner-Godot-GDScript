@@ -22,6 +22,12 @@ extends YarnAttributeMarkerProcessor
 ## supports bold, italic, underline, strikethrough, code, and custom names.
 
 
+## optional stylesheet consulted before the built-in styles: maps a lowercased
+## style name to a Dictionary with "start" and "end" bbcode strings. the Godot
+## counterpart of a TextMeshPro style sheet.
+var styles: Dictionary = {}
+
+
 func process_replacement_marker(
 	marker: YarnMarkupAttribute,
 	child_builder: Array,
@@ -37,6 +43,13 @@ func process_replacement_marker(
 	var original_length: int = child_builder[0].length()
 	var open_tag := ""
 	var close_tag := ""
+
+	if styles.has(style_name):
+		var style: Dictionary = styles[style_name]
+		open_tag = style.get("start", "")
+		close_tag = style.get("end", "")
+		child_builder[0] = open_tag + child_builder[0] + close_tag
+		return ReplacementMarkerResult.new([], child_builder[0].length() - original_length)
 
 	match style_name:
 		"bold", "b":

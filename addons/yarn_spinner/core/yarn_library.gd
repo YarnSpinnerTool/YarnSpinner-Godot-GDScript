@@ -153,7 +153,10 @@ func get_function_param_count(func_name: String) -> int:
 
 func call_function(func_name: String, stack: Array, vm: YarnVirtualMachine) -> Variant:
 	if not _functions.has(func_name):
-		push_error("yarn library: unknown function '%s'" % func_name)
+		push_error(("yarn library: unknown function '%s'. It is not registered at runtime. " +
+			"If you defined it with _yarn_function_%s, make sure that script is on a node under " +
+			"the DialogueRunner's discovery root (a valid .ysls.json does not register it); " +
+			"otherwise register it with runner.add_function(\"%s\", callable).") % [func_name, func_name, func_name])
 		return null
 
 	var callable: Callable = _functions[func_name]

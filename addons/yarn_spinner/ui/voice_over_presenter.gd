@@ -44,6 +44,9 @@ signal voice_finished(line: YarnLine)
 var _is_playing: bool = false
 var _fade_tween: Tween
 var _current_line: YarnLine
+## bumped whenever the current line changes or dialogue ends, so a superseded
+## line's wait timers can tell they are stale after an await.
+var _line_generation := 0
 signal _voice_complete
 ## line_id -> AudioStream
 var _audio_cache: Dictionary[String, AudioStream] = {}
@@ -60,6 +63,8 @@ func _ready() -> void:
 
 
 func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
+	_line_generation += 1
+	var generation := _line_generation
 	_current_line = line
 	_is_playing = false
 
@@ -74,7 +79,7 @@ func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
 
 	if wait_time_before_start > 0.0 and is_inside_tree():
 		await get_tree().create_timer(wait_time_before_start).timeout
-		if not _is_playing:
+		if generation != _line_generation or not _is_playing:
 			return null
 
 	_play_audio(audio)
@@ -87,6 +92,7 @@ func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
 
 
 func on_dialogue_completed() -> void:
+	_line_generation += 1
 	_stop_audio_immediate()
 	_is_playing = false
 
@@ -223,9 +229,12 @@ func _on_audio_finished() -> void:
 		return
 
 	_is_playing = false
+	var generation := _line_generation
 
 	if wait_time_after_complete > 0.0 and is_inside_tree():
 		await get_tree().create_timer(wait_time_after_complete).timeout
+		if generation != _line_generation:
+			return
 
 	voice_finished.emit(_current_line)
 	_voice_complete.emit()

@@ -48,12 +48,21 @@ signal continue_requested()
 @export var continue_indicator: Control
 
 @export var typewriter_mode: TypewriterMode = TypewriterMode.LETTER
-## characters per second for LETTER mode (0 = instant)
-@export var characters_per_second: float = 30.0
+## Justify (fill-align) the body text, matching themes that set the line text to
+## justified. Off by default so ordinary left-aligned presenters are unchanged.
+@export var justify_text: bool = false
+
+## characters per second for LETTER mode (0 = instant).
+## matches Unity's LinePresenter default typewriter speed.
+@export var characters_per_second: float = 60.0
 @export var words_per_second: float = 10.0
 @export var auto_advance: bool = false
-## seconds to wait before auto-advancing
-@export var auto_advance_delay: float = 2.0
+## seconds to wait before auto-advancing (matches Unity's autoAdvanceDelay).
+@export var auto_advance_delay: float = 1.0
+## fade the panel in and out around each line (mirrors Unity's LinePresenter).
+@export var use_fade_effect: bool = true
+@export var fade_up_duration: float = 0.25
+@export var fade_down_duration: float = 0.1
 @export var continue_action: String = "ui_accept"
 @export var hurry_action: String = "ui_accept"
 @export var use_markup: bool = true
@@ -73,6 +82,9 @@ var _markup_parser: YarnMarkupParser
 var _pause_processor: YarnPauseEventProcessor
 ## the handler list in effect for the current line (pause handler first).
 var _active_handlers: Array = []
+## bumped whenever the current line changes or dialogue starts/ends, so a
+## superseded line's coroutines can tell they are stale after an await.
+var _line_generation := 0
 signal _line_complete
 
 
@@ -154,6 +166,7 @@ func _input(event: InputEvent) -> void:
 
 
 func on_dialogue_started() -> void:
+	_line_generation += 1
 	_set_presenter_visible(false)
 	_is_displaying = false
 	_is_fully_revealed = false
@@ -163,12 +176,14 @@ func on_dialogue_started() -> void:
 
 
 func on_dialogue_completed() -> void:
+	_line_generation += 1
 	_set_presenter_visible(false)
 	_is_displaying = false
 	_is_fully_revealed = false
 
 
 func run_line(line: YarnLine, token: YarnCancellationToken = null) -> Variant:
+	_line_generation += 1
 	_current_line = line
 	_current_token = token
 	_is_displaying = true
@@ -191,11 +206,15 @@ func run_line(line: YarnLine, token: YarnCancellationToken = null) -> Variant:
 		display_text = line.get_plain_text()
 
 	if text_label != null:
+		if justify_text:
+			display_text = "[fill]%s[/fill]" % display_text
 		text_label.text = display_text
 		text_label.visible_characters = 0
 
+	# Unity's continue arrow is visible for the whole line, not just once the
+	# text has fully revealed, so match that here.
 	if continue_indicator != null:
-		continue_indicator.visible = false
+		continue_indicator.visible = true
 
 	# Build the handler list for this line and let each one prepare. This is
 	# the GDScript equivalent of the typewriter's PrepareForContent step.
@@ -241,6 +260,12 @@ func _run_typewriter() -> void:
 	var label := text_label
 	var handlers := _active_handlers
 	var line := _current_line
+	var generation := _line_generation
+
+	if use_fade_effect:
+		await _fade_presenter_alpha(0.0, 1.0, fade_up_duration, _is_cancelled)
+		if generation != _line_generation or not _is_displaying:
+			return
 
 	for handler in handlers:
 		if handler.has_method("on_line_display_begin"):
@@ -266,8 +291,8 @@ func _run_typewriter() -> void:
 	var next_boundary := 0
 
 	for i in visible_count:
-		if not _is_displaying:
-			return  # dismissed or dialogue stopped mid-reveal
+		if generation != _line_generation or not _is_displaying:
+			return  # replaced, dismissed, or dialogue stopped mid-reveal
 
 		# Is this character a timing gate? Letter mode gates on every
 		# character; word mode only on word boundaries.
@@ -283,7 +308,7 @@ func _run_typewriter() -> void:
 			while not _is_cancelled() and accumulated < seconds_per_unit:
 				var before := Time.get_ticks_usec()
 				await get_tree().process_frame
-				if not _is_displaying:
+				if generation != _line_generation or not _is_displaying:
 					return
 				accumulated += float(Time.get_ticks_usec() - before) / 1_000_000.0
 			accumulated -= seconds_per_unit
@@ -296,7 +321,7 @@ func _run_typewriter() -> void:
 				var result: Variant = handler.on_character_will_appear(i, line, _current_token)
 				if result is Signal and not (result as Signal).is_null() and not _is_cancelled():
 					await result
-					if not _is_displaying:
+					if generation != _line_generation or not _is_displaying:
 						return
 
 		if label != null:
@@ -309,7 +334,7 @@ func _run_typewriter() -> void:
 		if handler.has_method("on_line_display_complete"):
 			handler.on_line_display_complete()
 
-	_on_typewriter_complete()
+	_on_typewriter_complete(generation)
 
 
 ## returns the character index just past the end of each word, used as the
@@ -330,17 +355,16 @@ func _calculate_word_boundaries(text: String) -> PackedInt32Array:
 	return boundaries
 
 
-func _on_typewriter_complete() -> void:
-	if not _is_displaying:
+func _on_typewriter_complete(generation: int) -> void:
+	if generation != _line_generation or not _is_displaying:
 		return
 	_is_fully_revealed = true
 	line_finished.emit(_current_line)
 
-	if continue_indicator != null:
-		continue_indicator.visible = true
-
 	if auto_advance and is_inside_tree():
 		await get_tree().create_timer(auto_advance_delay).timeout
+		if generation != _line_generation:
+			return
 		if is_inside_tree() and _is_displaying and _is_fully_revealed:
 			_complete_line()
 
@@ -350,6 +374,7 @@ func _complete_line() -> void:
 		return
 	_is_displaying = false
 	_is_fully_revealed = false
+	var generation := _line_generation
 
 	for handler in _active_handlers:
 		if handler.has_method("on_line_will_dismiss"):
@@ -358,10 +383,18 @@ func _complete_line() -> void:
 	_current_line = null
 	_current_token = null
 
+	if use_fade_effect:
+		await _fade_presenter_alpha(1.0, 0.0, fade_down_duration)
+		if generation != _line_generation:
+			return
+
 	if continue_indicator != null:
 		continue_indicator.visible = false
 
 	_set_presenter_visible(false)
+	var item := _get_presenter_canvas_item()
+	if item != null:
+		item.modulate.a = 1.0
 	_line_complete.emit()
 
 

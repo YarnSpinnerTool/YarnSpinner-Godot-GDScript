@@ -138,7 +138,7 @@ func _setup_presenters() -> void:
 	line_presenter.character_label = _character_label
 	line_presenter.character_container = _character_container
 	line_presenter.continue_indicator = _continue_indicator
-	line_presenter.characters_per_second = 40.0
+	line_presenter.characters_per_second = 60.0
 	add_child(line_presenter)
 
 	options_presenter = YarnOptionsPresenter.new()

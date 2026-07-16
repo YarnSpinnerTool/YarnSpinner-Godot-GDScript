@@ -37,10 +37,19 @@ signal option_selected(index: int, option: YarnOption)
 @export var option_button_scene: PackedScene
 
 ## Hide options whose is_available is false (instead of showing them greyed out).
-@export var hide_unavailable: bool = false
+## Defaults to true to match Unity's OptionsPresenter, whose showUnavailableOptions
+## defaults to false (i.e. unavailable options are hidden).
+@export var hide_unavailable: bool = true
 
 ## Input action prefix for keyboard shortcuts (e.g. "option_" → "option_1", "option_2").
 @export var option_action_prefix: String = ""
+
+@export_group("Fade")
+
+## fade the panel in and out around the options (mirrors Unity's OptionsPresenter).
+@export var use_fade_effect: bool = true
+@export var fade_up_duration: float = 0.25
+@export var fade_down_duration: float = 0.1
 
 @export_group("Last Line")
 
@@ -140,6 +149,9 @@ func run_options(options: Array[YarnOption], _token: YarnCancellationToken = nul
 		if not _option_buttons[i].disabled:
 			_option_buttons[i].grab_focus()
 			break
+
+	if use_fade_effect:
+		await _fade_presenter_alpha(0.0, 1.0, fade_up_duration)
 
 	return await _wait_for_selection()
 
@@ -318,7 +330,14 @@ func _select_option(index: int) -> void:
 
 	_selected_index = index
 	_is_showing_options = false
+
+	if use_fade_effect:
+		await _fade_presenter_alpha(1.0, 0.0, fade_down_duration)
+
 	_set_presenter_visible(false)
+	var item := _get_presenter_canvas_item()
+	if item != null:
+		item.modulate.a = 1.0
 	_hide_last_line()
 
 	option_selected.emit(index, option)
