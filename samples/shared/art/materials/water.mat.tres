@@ -1,7 +1,0 @@
-[gd_resource type="StandardMaterial3D" format=3 uid="uid://blnx3isy0uwqa"]
-
-[resource]
-resource_name = "water"
-depth_draw_mode = 1
-roughness = 0.029
-uv1_scale = Vector3(1, 1, 0)

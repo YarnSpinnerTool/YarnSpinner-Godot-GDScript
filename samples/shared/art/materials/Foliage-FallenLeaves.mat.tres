@@ -1,9 +1,0 @@
-[gd_resource type="StandardMaterial3D" format=3 uid="uid://bh68nq4noc0s"]
-
-[ext_resource type="Texture2D" uid="uid://dwrxj165cwmpt" path="res://YarnSpinner-Unity-Samples/Shared Assets/Art/Environment/FoliageSprites/leaves-1.png" id="1_j7pmr"]
-
-[resource]
-resource_name = "Foliage-FallenLeaves"
-depth_draw_mode = 1
-albedo_texture = ExtResource("1_j7pmr")
-uv1_scale = Vector3(1, 1, 0)

@@ -1,9 +1,0 @@
-[gd_resource type="StandardMaterial3D" format=3 uid="uid://d04y3qte3ader"]
-
-[ext_resource type="Texture2D" uid="uid://boy4ntjwur6k3" path="res://samples/shared/art/Textures/variation-c.png" id="1_y7h8q"]
-
-[resource]
-resource_name = "colormap-variation-c"
-depth_draw_mode = 1
-albedo_texture = ExtResource("1_y7h8q")
-uv1_scale = Vector3(1, 1, 0)

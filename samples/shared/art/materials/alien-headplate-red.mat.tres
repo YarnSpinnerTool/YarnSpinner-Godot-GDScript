@@ -1,8 +1,0 @@
-[gd_resource type="StandardMaterial3D" format=3 uid="uid://hf6m7lispxok"]
-
-[resource]
-resource_name = "alien-headplate-red"
-depth_draw_mode = 1
-albedo_color = Color(0.8117647, 0.18028784, 0.15991762, 1)
-metallic = 0.393
-uv1_scale = Vector3(1, 1, 0)
