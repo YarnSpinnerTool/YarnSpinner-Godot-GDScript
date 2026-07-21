@@ -214,7 +214,11 @@ func _compile_native(source_file: String, abs_path: String, source_files: Packed
 		var file := FileAccess.open(src_path, FileAccess.READ)
 		if file != null:
 			files.append({
-				"fileName": src_path.get_file(),
+				# Full path, not get_file() — the compiler keys files by this
+				# name, and basenames collide (workshop/hotspots.yarn vs
+				# vespuccis_restaurant/hotspots.yarn) which throws a duplicate-
+				# key ArgumentException inside the native compiler.
+				"fileName": src_path,
 				"source": file.get_as_text(),
 			})
 			file.close()
