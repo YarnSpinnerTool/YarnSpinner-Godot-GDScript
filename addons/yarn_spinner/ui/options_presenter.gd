@@ -34,7 +34,11 @@ signal option_selected(index: int, option: YarnOption)
 
 @export var options_container: Container
 
-@export var option_button_scene: PackedScene
+## Scene instantiated per option, like the Option Item prefab in Yarn
+## Spinner for Unity. The root may be a [YarnOptionItem] (preferred) or any
+## [BaseButton]. Edit the default scene or point this at your own to
+## restyle options.
+@export var option_button_scene: PackedScene = preload("res://addons/yarn_spinner/ui/option_item.tscn")
 
 ## Hide options whose is_available is false (instead of showing them greyed out).
 ## Defaults to true to match Unity's OptionsPresenter, whose showUnavailableOptions
@@ -78,8 +82,8 @@ const LASTLINE_MARKUP := "lastline"
 
 var _is_showing_options: bool = false
 var _current_options: Array[YarnOption] = []
-var _option_buttons: Array[BaseButton] = []
-var _button_pool: Array[BaseButton] = []
+var _option_buttons: Array[Control] = []
+var _button_pool: Array[Control] = []
 var _max_pool_size: int = 10
 var _selected_index: int = -1
 var _last_seen_line: YarnLine = null
@@ -136,6 +140,16 @@ func run_options(options: Array[YarnOption], token: YarnCancellationToken = null
 	if token != null and token.is_next_content_requested:
 		return -1
 
+	# If every option is unavailable there is nothing to present; decline
+	# and let the runner's fallthrough handling decide what happens.
+	var any_available := false
+	for option in options:
+		if option.is_available:
+			any_available = true
+			break
+	if not any_available:
+		return -1
+
 	_current_options = options
 	_is_showing_options = true
 	_selected_index = -1
@@ -147,9 +161,14 @@ func run_options(options: Array[YarnOption], token: YarnCancellationToken = null
 	_set_presenter_visible(true)
 	options_shown.emit(options)
 
-	for i in range(_option_buttons.size()):
-		if not _option_buttons[i].disabled:
-			_option_buttons[i].grab_focus()
+	for item in _option_buttons:
+		if item is YarnOptionItem:
+			var opt_item := item as YarnOptionItem
+			if opt_item.is_available:
+				opt_item.grab_focus_if_available()
+				break
+		elif item is BaseButton and not (item as BaseButton).disabled:
+			(item as BaseButton).grab_focus()
 			break
 
 	# Honour the wind-down contract: when the token fires (option timeout,
@@ -249,41 +268,50 @@ func _clear_options() -> void:
 	_option_buttons.clear()
 
 
-func _return_to_pool(button: BaseButton) -> void:
-	if not is_instance_valid(button):
+func _return_to_pool(item: Control) -> void:
+	if not is_instance_valid(item):
 		return
 
-	if _button_callbacks.has(button):
-		var callback: Callable = _button_callbacks[button]
-		if button.pressed.is_connected(callback):
-			button.pressed.disconnect(callback)
-		_button_callbacks.erase(button)
+	if _button_callbacks.has(item):
+		var callback: Callable = _button_callbacks[item]
+		if item is YarnOptionItem:
+			var opt_item := item as YarnOptionItem
+			if opt_item.option_selected.is_connected(callback):
+				opt_item.option_selected.disconnect(callback)
+		elif item is BaseButton:
+			var button := item as BaseButton
+			if button.pressed.is_connected(callback):
+				button.pressed.disconnect(callback)
+		_button_callbacks.erase(item)
 
-	button.visible = false
-	if button.get_parent() != null:
-		button.get_parent().remove_child(button)
+	if item is YarnOptionItem:
+		(item as YarnOptionItem).reset()
+	item.visible = false
+	if item.get_parent() != null:
+		item.get_parent().remove_child(item)
 
 	if _button_pool.size() < _max_pool_size:
-		_button_pool.append(button)
+		_button_pool.append(item)
 	else:
-		button.queue_free()
+		item.queue_free()
 
 
-func _get_pooled_button() -> BaseButton:
+func _get_pooled_item() -> Control:
 	while not _button_pool.is_empty():
-		var button: BaseButton = _button_pool.pop_back()
-		if is_instance_valid(button):
-			button.visible = true
-			button.disabled = false
-			return button
+		var pooled: Control = _button_pool.pop_back()
+		if is_instance_valid(pooled):
+			pooled.visible = true
+			if pooled is BaseButton:
+				(pooled as BaseButton).disabled = false
+			return pooled
 
-	var button: BaseButton = null
+	var button: Control = null
 	if option_button_scene != null:
 		var instance := option_button_scene.instantiate()
-		if instance is BaseButton:
+		if instance is YarnOptionItem or instance is BaseButton:
 			button = instance
 		else:
-			push_error("options presenter: option_button_scene must instantiate a BaseButton, got %s" % instance.get_class())
+			push_error("options presenter: option_button_scene must instantiate a YarnOptionItem or BaseButton, got %s" % instance.get_class())
 			if instance != null:
 				instance.queue_free()
 
@@ -308,31 +336,36 @@ func _create_option_buttons() -> void:
 		if hide_unavailable and not option.is_available:
 			continue
 
-		var button := _get_pooled_button()
+		var item := _get_pooled_item()
 
-		if button is Button:
-			button.text = option.get_plain_text()
+		if item is YarnOptionItem:
+			var opt_item := item as YarnOptionItem
+			opt_item.setup(option, i)
+			var item_callback := func(idx: int): _select_option(idx)
+			_button_callbacks[item] = item_callback
+			opt_item.option_selected.connect(item_callback)
+		elif item is Button:
+			var button := item as Button
+			button.text = option.text_without_character_name
 			# Only apply default styling when no custom button scene is set.
 			# When using a custom scene, respect its existing theme/size.
 			if option_button_scene == null:
 				button.custom_minimum_size = Vector2(0, 80)
 				button.add_theme_font_size_override("font_size", 40)
-		elif button.has_method("set_option_text"):
-			button.set_option_text(option.get_plain_text())
-
-		button.disabled = not option.is_available
-
-		var index := i
-		var callback := func(): _select_option(index)
-		_button_callbacks[button] = callback
-		button.pressed.connect(callback)
+			button.disabled = not option.is_available
+			var index := i
+			var callback := func(): _select_option(index)
+			_button_callbacks[button] = callback
+			button.pressed.connect(callback)
+		elif item.has_method("set_option_text"):
+			item.set_option_text(option.get_plain_text())
 
 		if options_container != null:
-			options_container.add_child(button)
+			options_container.add_child(item)
 		else:
-			add_child(button)
+			add_child(item)
 
-		_option_buttons.append(button)
+		_option_buttons.append(item)
 
 
 func _select_option(index: int) -> void:

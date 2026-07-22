@@ -70,6 +70,49 @@ func apply_substitutions() -> void:
 	var _t := text  # triggers lazy computation
 
 
+static var _name_parser: YarnLineParser
+
+var _name_split_done: bool = false
+var _character_name: String = ""
+var _text_without_name: String = ""
+
+## Character name from the option's "Name:" prefix, if it has one.
+var character_name: String:
+	get:
+		_ensure_name_split()
+		return _character_name
+
+## The option text with any character name prefix removed and markup
+## processed, matching [member YarnLine.text_without_character_name].
+var text_without_character_name: String:
+	get:
+		_ensure_name_split()
+		return _text_without_name
+
+
+func _ensure_name_split() -> void:
+	if _name_split_done:
+		return
+	_name_split_done = true
+
+	if _name_parser == null:
+		_name_parser = YarnLineParser.new()
+	var result := _name_parser.parse_string(text, "", true)
+	_text_without_name = result.text
+
+	for attr in result.attributes:
+		if attr.name == YarnLineParser.CHARACTER_ATTRIBUTE:
+			var name_prop: YarnMarkupValue = attr.try_get_property(YarnLineParser.CHARACTER_ATTRIBUTE_NAME_PROPERTY)
+			if name_prop != null:
+				_character_name = name_prop.string_value
+			else:
+				_character_name = result.text.substr(attr.position, attr.length).strip_edges().trim_suffix(":")
+			if attr.length > 0:
+				result = result.delete_range(attr)
+				_text_without_name = result.text
+			break
+
+
 ## Returns the option text with markup tags stripped.
 func get_plain_text() -> String:
 	var plain := text

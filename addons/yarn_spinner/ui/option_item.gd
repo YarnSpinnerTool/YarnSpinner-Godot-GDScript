@@ -61,7 +61,11 @@ func setup(yarn_option: YarnOption, index: int) -> void:
 	option_index = index
 	is_available = yarn_option.is_available
 
-	var display_text := yarn_option.text if not yarn_option.text.is_empty() else yarn_option.raw_text
+	# Names are stripped from option text, the same as Yarn Spinner for
+	# Unity's option items.
+	var display_text := yarn_option.text_without_character_name
+	if display_text.is_empty():
+		display_text = yarn_option.raw_text
 	if text_label != null:
 		text_label.text = display_text
 	if button != null:
