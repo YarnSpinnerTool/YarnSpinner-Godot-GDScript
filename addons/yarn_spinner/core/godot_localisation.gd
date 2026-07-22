@@ -17,15 +17,26 @@
 # ======================================================================== #
 
 class_name YarnGodotLocalisation
-extends YarnLocalisation
-## Localisation provider using Godot's TranslationServer.
+extends RefCounted
+## Yarn Spinner's localisation, built upon on Godot's own systems so
+## text through [TranslationServer] (keys are teh line id with
+## [member translation_prefix] prepended), audio through translation
+## remaps (Project Settings > Localization > Remaps) applied automatically
+## by [ResourceLoader]. There is no separate Yarn localisation backend anymore. 
+## It's not really needed by Godot!
+
+## Emitted when the locale is changed through [method set_current_locale].
+signal locale_changed(locale: String)
 
 var translation_prefix: String = "YARN_"
 var fallback_to_program: bool = true
 var _program: YarnProgram
 
-## Use {locale} as placeholder, e.g. "res://audio/dialogue/{locale}/"
-var audio_path_template: String = ""
+## Folder containing the BASE-language voice files, named after the line id
+## without its "line:" prefix (line:tutorial-tom-01 -> tutorial-tom-01.wav).
+## Localised variants are provided by Godot translation remaps, which
+## ResourceLoader applies automatically on load
+var audio_base_path: String = ""
 var audio_extensions: PackedStringArray = [".ogg", ".wav", ".mp3"]
 var _audio_cache: Dictionary[String, AudioStream] = {}
 var max_audio_cache_size: int = 50
@@ -91,12 +102,7 @@ func get_localised_audio(line_id: String) -> AudioStream:
 		_update_audio_cache_order(cache_key)
 		return _audio_cache[cache_key]
 
-	var audio := _load_audio_for_locale(line_id, locale)
-
-	if audio == null:
-		var base_locale := locale.split("_")[0]  # godot uses _ not -
-		if base_locale != locale:
-			audio = _load_audio_for_locale(line_id, base_locale)
+	var audio := _load_audio(line_id)
 
 	if audio != null:
 		_add_to_audio_cache(cache_key, audio)
@@ -111,26 +117,32 @@ func has_localised_audio(line_id: String) -> bool:
 	if _audio_cache.has(cache_key):
 		return true
 
-	var path := _find_audio_path(line_id, locale)
+	var path := _find_audio_path(line_id)
 	return not path.is_empty()
 
 
-func _load_audio_for_locale(line_id: String, locale: String) -> AudioStream:
-	var path := _find_audio_path(line_id, locale)
+## Loads the baselanguage file andGodot's translation remaps substitute the
+## current locale's variant during load so this needs no locale logic.
+func _load_audio(line_id: String) -> AudioStream:
+	var path := _find_audio_path(line_id)
 	if path.is_empty():
 		return null
 
 	if ResourceLoader.exists(path):
-		return load(path) as AudioStream
+		# CACHE_MODE_IGNORE: Godot caches a remapped resource under its
+		# ORIGINAL path so after a locale switch a plain load() would
+		# return tehpREVIOUS locale's audio. The per-locale cache in
+		# get_localised_audio does the caching instead
+		return ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as AudioStream
 
 	return null
 
 
-func _find_audio_path(line_id: String, locale: String) -> String:
-	if audio_path_template.is_empty():
+func _find_audio_path(line_id: String) -> String:
+	if audio_base_path.is_empty():
 		return ""
 
-	var base_path := audio_path_template.replace("{locale}", locale)
+	var base_path := audio_base_path
 	if not base_path.ends_with("/"):
 		base_path += "/"
 
@@ -229,7 +241,7 @@ func get_debug_info() -> String:
 	lines.append("current locale: %s" % get_current_locale())
 	lines.append("translation prefix: %s" % translation_prefix)
 	lines.append("fallback to program: %s" % str(fallback_to_program))
-	lines.append("audio path template: %s" % audio_path_template)
+	lines.append("audio base path: %s" % audio_base_path)
 	lines.append("loaded locales: %s" % ", ".join(get_available_locales()))
 	lines.append("audio cache size: %d / %d" % [_audio_cache.size(), max_audio_cache_size])
 	return "\n".join(lines)
