@@ -56,6 +56,15 @@ func unregister_function(func_name: String) -> void:
 	_function_param_counts.erase(func_name)
 
 
+## Registers a Yarn command. Declare typed parameters on the handler and the
+## dispatcher converts each argument from the Yarn script to that type —
+## [code]func give(item: String, count: int, loud: bool)[/code] receives a
+## real int and bool from [code]<<give sword 3 true>>[/code]. Supported:
+## String, int, float, bool, Vector2, Vector3, Color, and Node-derived
+## classes (resolved by node name). A value that can't convert is a command
+## error, not a silent default. Use a NAMED method for this — GDScript
+## lambdas carry no parameter metadata, so lambda handlers receive raw
+## strings.
 func register_command(command_name: String, callable: Callable, param_names: PackedStringArray = []) -> void:
 	_commands[command_name] = callable
 	_command_params[command_name] = param_names
@@ -252,120 +261,135 @@ func _make_dispatch_result(status: CommandDispatchStatus, handled: bool, is_asyn
 
 
 func _safe_call(target: Object, method_name: String, args: Array) -> Dictionary:
-	var coerced_args := args.duplicate()
-
-	if target.has_method(method_name):
-		var method_list := target.get_method_list()
-		for method_info in method_list:
-			if method_info["name"] == method_name:
-				var expected_args: Array = method_info.get("args", [])
-				var default_count: int = method_info.get("default_args", []).size()
-				var min_args := expected_args.size() - default_count
-				var max_args := expected_args.size()
-
-				if args.size() < min_args:
-					return {"success": false, "status": CommandDispatchStatus.INVALID_PARAMS, "error": "too few arguments for '%s' (expected %d-%d, got %d)" % [method_name, min_args, max_args, args.size()], "result": null}
-				if args.size() > max_args:
-					return {"success": false, "status": CommandDispatchStatus.INVALID_PARAMS, "error": "too many arguments for '%s' (expected %d-%d, got %d)" % [method_name, min_args, max_args, args.size()], "result": null}
-
-				for i in range(mini(args.size(), expected_args.size())):
-					var expected_type: int = expected_args[i].get("type", TYPE_NIL)
-					var expected_class: String = expected_args[i].get("class_name", "")
-					coerced_args[i] = _coerce_value(args[i], expected_type, expected_class)
-				break
+	var coercion := _coerce_call_args(_find_method_info(target, method_name), args, method_name)
+	if not coercion.success:
+		return {"success": false, "status": coercion.status, "error": coercion.error, "result": null}
 
 	if not is_instance_valid(target):
 		return {"success": false, "status": CommandDispatchStatus.NOT_FOUND, "error": "target node for '%s' has been freed" % method_name, "result": null}
 
-	var result: Variant = target.callv(method_name, coerced_args)
+	var result: Variant = target.callv(method_name, coercion.args)
 	return {"success": true, "status": CommandDispatchStatus.SUCCESS, "error": "", "result": result}
 
 
 func _safe_callv(callable: Callable, args: Array, command_name: String) -> Dictionary:
-	var coerced_args := args.duplicate()
-
-	var obj := callable.get_object()
-	var method_name := callable.get_method()
-
-	if obj != null and not method_name.is_empty():
-		var method_list := obj.get_method_list()
-		for method_info in method_list:
-			if method_info["name"] == method_name:
-				var expected_args: Array = method_info.get("args", [])
-				var default_count: int = method_info.get("default_args", []).size()
-				var min_args := expected_args.size() - default_count
-				var max_args := expected_args.size()
-
-				if args.size() < min_args:
-					return {"success": false, "status": CommandDispatchStatus.INVALID_PARAMS, "error": "too few arguments for '%s' (expected %d-%d, got %d)" % [command_name, min_args, max_args, args.size()], "result": null}
-				if args.size() > max_args:
-					return {"success": false, "status": CommandDispatchStatus.INVALID_PARAMS, "error": "too many arguments for '%s' (expected %d-%d, got %d)" % [command_name, min_args, max_args, args.size()], "result": null}
-
-				for i in range(mini(args.size(), expected_args.size())):
-					var expected_type: int = expected_args[i].get("type", TYPE_NIL)
-					var expected_class: String = expected_args[i].get("class_name", "")
-					coerced_args[i] = _coerce_value(args[i], expected_type, expected_class)
-				break
+	var coercion := _coerce_call_args(
+		_find_method_info(callable.get_object(), callable.get_method()), args, command_name)
+	if not coercion.success:
+		return {"success": false, "status": coercion.status, "error": coercion.error, "result": null}
 
 	if not callable.is_valid():
 		return {"success": false, "status": CommandDispatchStatus.INVALID_CALLABLE, "error": "callable for '%s' is no longer valid" % command_name, "result": null}
 
-	var result: Variant = callable.callv(coerced_args)
+	var result: Variant = callable.callv(coercion.args)
 	return {"success": true, "status": CommandDispatchStatus.SUCCESS, "error": "", "result": result}
 
 
-func _coerce_value(value: Variant, target_type: int, type_class: String = "") -> Variant:
+## Reflection lookup for a method's parameter metadata. Handles static
+## methods registered from a script (Script.get_method_list() describes the
+## Script CLASS itself; the script's own methods come from
+## get_script_method_list()). Empty dictionary when unavailable — lambdas
+## carry no parameter metadata, so their handlers receive raw strings.
+func _find_method_info(obj: Object, method_name: String) -> Dictionary:
+	if obj == null or method_name.is_empty():
+		return {}
+	var method_list: Array
+	if obj is Script:
+		method_list = (obj as Script).get_script_method_list()
+	else:
+		method_list = obj.get_method_list()
+	for method_info in method_list:
+		if method_info["name"] == method_name:
+			return method_info
+	return {}
+
+
+## Validates argument count and converts each string argument to the
+## handler's declared parameter type. Returns {success, status, error, args}.
+func _coerce_call_args(method_info: Dictionary, args: Array, command_name: String) -> Dictionary:
+	var coerced := args.duplicate()
+	if method_info.is_empty():
+		return {"success": true, "status": CommandDispatchStatus.SUCCESS, "error": "", "args": coerced}
+
+	var expected_args: Array = method_info.get("args", [])
+	var default_count: int = method_info.get("default_args", []).size()
+	var min_args := expected_args.size() - default_count
+	var max_args := expected_args.size()
+
+	if args.size() < min_args:
+		return {"success": false, "status": CommandDispatchStatus.INVALID_PARAMS, "error": "too few arguments for '%s' (expected %d-%d, got %d)" % [command_name, min_args, max_args, args.size()], "args": coerced}
+	if args.size() > max_args:
+		return {"success": false, "status": CommandDispatchStatus.INVALID_PARAMS, "error": "too many arguments for '%s' (expected %d-%d, got %d)" % [command_name, min_args, max_args, args.size()], "args": coerced}
+
+	for i in range(mini(args.size(), expected_args.size())):
+		var expected_type: int = expected_args[i].get("type", TYPE_NIL)
+		var expected_class: String = expected_args[i].get("class_name", "")
+		var out := _coerce_value(args[i], expected_type, expected_class)
+		if not out.ok:
+			return {"success": false, "status": CommandDispatchStatus.INVALID_PARAMS,
+				"error": "argument %d of '%s' %s" % [i + 1, command_name, out.error], "args": coerced}
+		coerced[i] = out.value
+	return {"success": true, "status": CommandDispatchStatus.SUCCESS, "error": "", "args": coerced}
+
+
+## Converts one command argument to the handler's declared parameter type.
+## Returns {ok, value, error}: a conversion that cannot be performed is a
+## dispatch error naming what was expected, never a silent zero.
+func _coerce_value(value: Variant, target_type: int, type_class: String = "") -> Dictionary:
 	if typeof(value) == target_type:
-		return value
+		return {"ok": true, "value": value, "error": ""}
 
 	if target_type == TYPE_NIL:
-		return value
+		return {"ok": true, "value": value, "error": ""}
 
 	# Node-typed parameters: resolve string to node via scene tree lookup
 	if target_type == TYPE_OBJECT and value is String:
 		if _is_node_class(type_class):
 			var node := _find_node_by_name(value)
 			if node != null:
-				return node
-			else:
-				push_warning("yarn library: could not find node '%s' for parameter" % value)
-				return null
+				return {"ok": true, "value": node, "error": ""}
+			return {"ok": false, "value": null,
+				"error": "expects a %s, but no node named '%s' was found" % [type_class, value]}
 
 	if not value is String:
-		return value
+		return {"ok": true, "value": value, "error": ""}
 
 	var str_value: String = value
 
 	match target_type:
 		TYPE_INT:
 			if str_value.is_valid_int():
-				return int(str_value)
-			elif str_value.is_valid_float():
-				return int(float(str_value))
-			return 0
+				return {"ok": true, "value": int(str_value), "error": ""}
+			if str_value.is_valid_float():
+				return {"ok": true, "value": int(float(str_value)), "error": ""}
+			return {"ok": false, "value": 0, "error": "expects an int, got '%s'" % str_value}
 
 		TYPE_FLOAT:
 			if str_value.is_valid_float():
-				return float(str_value)
-			elif str_value.is_valid_int():
-				return float(int(str_value))
-			return 0.0
+				return {"ok": true, "value": float(str_value), "error": ""}
+			if str_value.is_valid_int():
+				return {"ok": true, "value": float(int(str_value)), "error": ""}
+			return {"ok": false, "value": 0.0, "error": "expects a number, got '%s'" % str_value}
 
 		TYPE_BOOL:
-			var lower := str_value.to_lower()
-			return lower == "true" or lower == "1" or lower == "yes"
+			match str_value.to_lower():
+				"true", "1", "yes", "on":
+					return {"ok": true, "value": true, "error": ""}
+				"false", "0", "no", "off":
+					return {"ok": true, "value": false, "error": ""}
+			return {"ok": false, "value": false, "error": "expects true/false, got '%s'" % str_value}
 
 		TYPE_VECTOR2:
-			return _parse_vector2(str_value)
+			return {"ok": true, "value": _parse_vector2(str_value), "error": ""}
 
 		TYPE_VECTOR3:
-			return _parse_vector3(str_value)
+			return {"ok": true, "value": _parse_vector3(str_value), "error": ""}
 
 		TYPE_COLOR:
-			return _parse_color(str_value)
+			return {"ok": true, "value": _parse_color(str_value), "error": ""}
 
 		_:
-			return value
+			return {"ok": true, "value": value, "error": ""}
 
 
 func _parse_vector2(s: String) -> Vector2:

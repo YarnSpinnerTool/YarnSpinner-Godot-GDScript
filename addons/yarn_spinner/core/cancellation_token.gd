@@ -67,6 +67,24 @@ func escalate_to_next_content() -> void:
 		request_next_content()
 
 
+## Awaitable stuff... resumes when next content is requested which is immediately 
+## if it already has been. This is the most important bit of our new coroutine-style:
+## [codeblock]
+## func run_line(line: YarnLine, token: YarnCancellationToken = null):
+##     label.text = line.text
+##     await token.wait_for_next_content()
+##     label.text = ""
+## [/codeblock]
+## Once this resumes, you are promising to finish promptly and
+## return so the the runner holds the line open until every presenter's run_line
+## has actually returned. Nothing enforces the promise... a presenter that
+## keeps running holds the whole dialogue! We don't want thaaaaat.
+func wait_for_next_content() -> void:
+	if is_next_content_requested:
+		return
+	await next_content_requested
+
+
 func should_skip() -> bool:
 	return is_next_content_requested
 
@@ -85,34 +103,15 @@ func wait_for_cancellation(timeout: float = 0.0) -> CancellationMode:
 		if tree == null:
 			return CancellationMode.NONE
 
+		# Poll loop
 		var timer := tree.create_timer(timeout)
-		var result_mode := CancellationMode.NONE
-		var completed := false
-
-		var on_cancel := func(mode: CancellationMode):
-			if not completed:
-				result_mode = mode
-				completed = true
-
-		var on_timeout := func():
-			completed = true
-
-		cancellation_requested.connect(on_cancel, CONNECT_ONE_SHOT)
-
-		while not completed:
+		while timer.time_left > 0:
 			if is_cancelled:
-				result_mode = cancellation_mode
-				completed = true
-				break
-			if not timer.time_left > 0:
-				completed = true
-				break
+				return cancellation_mode
 			await tree.process_frame
-
-		if cancellation_requested.is_connected(on_cancel):
-			cancellation_requested.disconnect(on_cancel)
-
-		return result_mode
+		if is_cancelled:
+			return cancellation_mode
+		return CancellationMode.NONE
 	else:
 		var mode: CancellationMode = await cancellation_requested
 		return mode

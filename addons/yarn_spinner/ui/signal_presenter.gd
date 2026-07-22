@@ -91,14 +91,14 @@ func is_option_available(index: int) -> bool:
 
 # -- presenter overrides --
 
-func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
+func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> void:
 	current_line_data = _build_line_dict(line)
 	current_options_data = []
 	is_waiting_for_proceed = true
 	is_waiting_for_choice = false
 
 	line_received.emit(current_line_data)
-	return _line_complete
+	await _line_complete
 
 
 func run_options(options: Array[YarnOption], _token: YarnCancellationToken = null) -> int:
