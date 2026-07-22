@@ -95,14 +95,13 @@ func _ready() -> void:
 				break
 
 
-func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
+func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> void:
 	# Remember the last line for display above options (only if feature is on)
 	if show_last_line:
 		_last_seen_line = line
-	return null
 
 
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	if not _is_showing_options or option_action_prefix.is_empty():
 		return
 
@@ -133,7 +132,10 @@ func on_dialogue_completed() -> void:
 		_selection_made.emit(-1)
 
 
-func run_options(options: Array[YarnOption], _token: YarnCancellationToken = null) -> int:
+func run_options(options: Array[YarnOption], token: YarnCancellationToken = null) -> int:
+	if token != null and token.is_next_content_requested:
+		return -1
+
 	_current_options = options
 	_is_showing_options = true
 	_selected_index = -1
@@ -150,10 +152,27 @@ func run_options(options: Array[YarnOption], _token: YarnCancellationToken = nul
 			_option_buttons[i].grab_focus()
 			break
 
+	# Honour the wind-down contract: when the token fires (option timeout,
+	# or another presenter selected first), dismiss the buttons and finish
+	# with "no selection" instead of staying parked on a click forever.
+	var on_wind_down := func() -> void:
+		if _is_showing_options:
+			_is_showing_options = false
+			_set_presenter_visible(false)
+			_clear_options()
+			_selection_made.emit(-1)
+	if token != null:
+		token.next_content_requested.connect(on_wind_down, CONNECT_ONE_SHOT)
+
 	if use_fade_effect:
 		await _fade_presenter_alpha(0.0, 1.0, fade_up_duration)
 
-	return await _wait_for_selection()
+	var result: int = await _wait_for_selection()
+
+	if token != null and token.next_content_requested.is_connected(on_wind_down):
+		token.next_content_requested.disconnect(on_wind_down)
+
+	return result
 
 
 # ---------------------------------------------------------------------------
