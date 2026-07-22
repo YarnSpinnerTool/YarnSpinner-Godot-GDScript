@@ -66,10 +66,9 @@ signal command_received(command_name: String, command_args: Array)
 
 @export var auto_start: bool = false
 
-## Presenters assigned in the inspector. But, when this list is left EMPTY, any
-## YarnDialoguePresenter nodes found as direct children of this runner are
-## discovered automatically instead; when it has entries, only the listed
-## presenters are used (no child discovery). Thanks, Jon! Good ideaaa!
+## The presenters this runner drives. List them here in the inspector, or
+## add them at runtime with [method add_presenter]. Child nodes are NOT
+## discovered automatically.
 @export var presenters: Array[YarnDialoguePresenter] = []
 
 ## If null, an in-memory storage is created automatically.
@@ -198,10 +197,7 @@ func _ready() -> void:
 	_register_builtin_commands()
 	_register_global_commands()
 	_library.set_target_root(get_tree().root)
-	_discover_presenters()
-	# Presenter children added after startup register themselves too;
-	# _ready-time discovery alone silently ignored late additions.
-	child_entered_tree.connect(_on_child_entered_tree)
+	_register_listed_presenters()
 
 	if auto_discover_commands:
 		call_deferred("_auto_discover_commands")
@@ -317,36 +313,22 @@ func set_content_saliency_strategy(strategy: YarnSaliencyStrategy) -> void:
 		_library.set_vm_context(strategy, variable_storage)
 
 
-func _discover_presenters() -> void:
-	# The explicit inspector list wins outright! Child auto-discovery is
-	# only the fallback for scenes that set nothing up.
-	var has_explicit := false
+func _register_listed_presenters() -> void:
 	for presenter in presenters:
-		if presenter != null:
-			has_explicit = true
-			if presenter not in _presenters:
-				_presenters.append(presenter)
-				presenter.dialogue_runner = self
-	if has_explicit:
-		return
+		if presenter != null and presenter not in _presenters:
+			_presenters.append(presenter)
+			presenter.dialogue_runner = self
 
-	for child in get_children():
-		if child is YarnDialoguePresenter:
-			if child not in _presenters:
-				_presenters.append(child)
-				child.dialogue_runner = self
-
-
-func _on_child_entered_tree(child: Node) -> void:
-	# Late children only auto-register in discovery mode (empty explicit
-	# list) same rule as _discover_presenters. add_presenter() is theh API
-	# for everything else.
-	for presenter in presenters:
-		if presenter != null:
-			return
-	if child is YarnDialoguePresenter and child not in _presenters:
-		_presenters.append(child)
-		child.dialogue_runner = self
+	if _presenters.is_empty():
+		# Not an error (presenters can arrive later via add_presenter), but
+		# an empty list next to presenter children is almost always a scene
+		# that still expects the removed auto-discovery.
+		for child in get_children():
+			if child is YarnDialoguePresenter:
+				push_warning("dialogue runner: the Presenters array is empty, but " +
+					"'%s' is a presenter child. Children are not discovered " % child.name +
+					"automatically; list it in the Presenters array or call add_presenter().")
+				break
 
 
 ## True while options are being presented and no selection has been applied
@@ -760,9 +742,8 @@ func remove_presenter(presenter: YarnDialoguePresenter) -> void:
 ##
 ## Mirrors Yarn Spinner for Unity's
 ## [code]IRequestLineCancellation.RequestLineCancellation[/code], which calls
-## [code]RequestNextLine()[/code] the cancellation token fires (waking
-## coroutine presenters parked on [method YarnCancellationToken.wait_for_next_content])
-## and every presenter's [method YarnDialoguePresenter.request_next] is called.
+## [code]RequestNextLine()[/code]. The cancellation token fires, waking
+## presenters parked on [method YarnCancellationToken.wait_for_next_content].
 ## The line actually ends when all presenters have finished... the token is
 ## the request, the presenters' completion is teh "proof"
 func request_line_cancellation(_line: YarnLine) -> void:
@@ -921,22 +902,19 @@ func get_localisation_debug_info() -> String:
 	return _line_provider.get_debug_info()
 
 
+## Asks the current content to hurry (skip animation, keep it on screen).
+## Delivered through the cancellation token, which presenters watch.
 func request_hurry_up() -> void:
 	if _current_cancellation_token != null:
 		_current_cancellation_token.request_hurry_up()
-	var presenters_copy := _presenters.duplicate()
-	for presenter in presenters_copy:
-		if is_instance_valid(presenter):
-			presenter.request_hurry_up()
 
 
+## Asks the current content to finish and advance. Delivered through the
+## cancellation token: presenters watching it dismiss their content and
+## return, and the runner advances once all of them have returned.
 func request_next_content() -> void:
 	if _current_cancellation_token != null:
 		_current_cancellation_token.request_next_content()
-	var presenters_copy := _presenters.duplicate()
-	for presenter in presenters_copy:
-		if is_instance_valid(presenter):
-			presenter.request_next()
 
 
 func _continue_dialogue() -> void:

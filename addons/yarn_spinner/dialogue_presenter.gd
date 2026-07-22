@@ -185,26 +185,6 @@ func run_options(_options: Array[YarnOption], _token: YarnCancellationToken = nu
 	return -1
 
 
-## Called when the runner requests the presenter to hurry up (e.g.,
-## skip typewriter animation but keep the line visible).
-func request_hurry_up() -> void:
-	pass
-
-
-## Called when the runner requests the presenter to advance to the
-## next piece of content (dismiss the current line).
-##
-## No-op in the base class: a presenter with no active content has nothing
-## to dismiss. Presenters that display content override this and complete
-## their own line (see [YarnLinePresenter], [YarnVoiceOverPresenter]).
-## Calling [method YarnDialogueRunner.signal_content_complete] from here
-## would complete whatever the runner is waiting on — including async
-## commands such as [code]<<wait>>[/code] — whenever the player presses
-## "advance", skipping them.
-func request_next() -> void:
-	pass
-
-
 ## Helper for presenters that want to ask "the line should end now" (e.g. a
 ## voice-over presenter when audio playback finishes).
 ##

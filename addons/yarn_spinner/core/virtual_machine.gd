@@ -18,7 +18,7 @@
 
 class_name YarnVirtualMachine
 extends RefCounted
-## Stack-based VM that executes compiled Yarn bytecode. Port of Unity's VirtualMachine.
+## Stack-based VM that executes compiled Yarn bytecode.
 
 enum ExecutionState {
 	STOPPED,

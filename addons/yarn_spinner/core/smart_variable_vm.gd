@@ -19,7 +19,6 @@
 class_name YarnSmartVariableVM
 extends RefCounted
 ## Lightweight static VM for evaluating compiled smart variable bytecode.
-## Matches Unity's SmartVariableEvaluator.
 
 
 ## Returns {found: bool, value: Variant}.
@@ -105,7 +104,7 @@ static func get_saliency_options_for_node_group(
 	if not node.headers.has("$Yarn.Internal.NodeGroupHub"):
 		return []
 
-	# Mirrors Unity's SmartVariableEvaluationVirtualMachine: every node tagged
+	# Every node tagged
 	# with this group's NodeGroup header is a candidate. The hub node itself
 	# carries no candidate instructions, so we enumerate the program's nodes
 	# rather than scanning the hub. Each candidate's saliency-condition

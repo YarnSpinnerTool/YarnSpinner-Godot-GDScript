@@ -19,7 +19,6 @@
 class_name YarnVariableStorage
 extends Node
 ## Base class for variable storage in Yarn Spinner.
-## Matches Unity's IVariableStorage interface.
 
 enum VariableKind {
 	STORED,

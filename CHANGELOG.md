@@ -93,8 +93,12 @@ if your timing depended on waits being skipped, re-check pacing, please!
 
 ### Behaviour changes
 
-- `request_next` on `YarnLinePresenter` dismisses the line even mid-reveal
-  (so, like Yarn Spinner for Unity). Two-stage "reveal, then advance" lives in
+- Presenters no longer have `request_next()` or `request_hurry_up()`
+  callbacks. The cancellation token is the only wind-down channel: watch it
+  or await it in `run_line`. The runner's `request_next_content()` and
+  `request_hurry_up()` still exist for game code and now just fire the
+  token. A next-content request dismisses a line even mid-reveal, like
+  Yarn Spinner for Unity. Two-stage "reveal, then advance" lives in
   `YarnLineAdvancer`, which was previously broken and now works, and in
   the line presenter's own direct input handling, which is unchanged.
 - `YarnVoiceOverPresenter`: `end_line_when_voice_complete` now defaults to
@@ -134,11 +138,23 @@ per locale on load. It's awesome.
   (which pins a remapped resource to its first-loaded locale) and keeps
   its own per-locale cache
 
-### Presenter discovery: explicit list wins
+### Voice presenter slimmed
 
-If the runner's Presenters array has entries, only those are used. Child child
-auto-discovery still happens, but only when the array is left empty, so you won't get any weird
-surprises, hopefully. Nothing weird.
+`YarnVoiceOverPresenter` no longer keeps its own audio cache:
+`max_cache_size`, `set_audio_for_line()` and `clear_cache()` are gone,
+along with its `prepare_for_lines` pre-loading. The localisation layer
+caches runner-provided audio, and Godot's own resource cache covers the
+fallback path. Inspector tooltips across the addon also no longer cite
+what Yarn Spinner for Unity does; they just say what the property does.
+
+### Presenters must be listed
+
+Child auto-discovery is gone. The runner uses exactly what is in its
+Presenters array, plus anything registered at runtime with
+`add_presenter()` (which is how `YarnDialogueView` registers its two).
+A runner with an empty array and presenter children logs a warning naming
+the first one, so a scene relying on the old discovery tells you what to
+fix.
 
 ### YarnDialogueView
 

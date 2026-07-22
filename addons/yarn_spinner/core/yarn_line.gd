@@ -58,8 +58,7 @@ var markup_result: YarnMarkupParseResult = null
 ## Presenters should route end-of-line requests through
 ## [method YarnDialoguePresenter._request_line_end], which uses this field if
 ## set and otherwise falls back to calling
-## [method YarnDialogueRunner.signal_content_complete] directly. This mirrors
-## the Unity Yarn Spinner [code]IRequestLineCancellation[/code] mechanism.
+## [method YarnDialogueRunner.signal_content_complete] directly.
 var source: Object = null
 
 
@@ -91,7 +90,6 @@ var character_name: String:
 		_character_name = value
 
 ## The text with the character name prefix removed.
-## Equivalent to Unity's TextWithoutCharacterName.
 var text_without_character_name: String:
 	get:
 		_ensure_processed()

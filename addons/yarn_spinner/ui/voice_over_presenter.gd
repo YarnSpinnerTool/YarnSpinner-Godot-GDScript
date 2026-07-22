@@ -39,8 +39,7 @@ signal voice_finished(line: YarnLine)
 @export var wait_time_after_complete: float = 0.0
 ## seconds; 0 = instant stop
 @export var fade_out_time_on_interrupt: float = 0.0
-## When the voice over finishes, ask the runner to end the line (Yarn
-## Spinner for Unity defaults this on too).
+## When the voice over finishes, ask the runner to end the line.
 @export var end_line_when_voice_complete: bool = true
 
 var _is_playing: bool = false
@@ -50,11 +49,6 @@ var _current_line: YarnLine
 ## line's wait timers can tell they are stale after an await.
 var _line_generation := 0
 signal _voice_complete
-## line_id -> AudioStream
-var _audio_cache: Dictionary[String, AudioStream] = {}
-## 0 = unlimited
-@export var max_cache_size: int = 50
-var _cache_access_order: Array[String] = []
 
 
 func _ready() -> void:
@@ -98,9 +92,16 @@ func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
 	voice_started.emit(line, audio)
 
 	if wait_for_audio:
-		# Hold the line open until playback finishes (or the line is
-		# skipped request_next emits this too).
-		await _voice_complete
+		# Hold the line open until playback finishes, or until next content
+		# is requested (a skip), which stops the audio via _skip_voice.
+		if token != null:
+			token.next_content_requested.connect(_skip_voice, CONNECT_ONE_SHOT)
+			if token.is_next_content_requested:
+				_skip_voice()
+		if _is_playing:
+			await _voice_complete
+		if token != null and token.next_content_requested.is_connected(_skip_voice):
+			token.next_content_requested.disconnect(_skip_voice)
 
 
 func on_dialogue_completed() -> void:
@@ -109,28 +110,15 @@ func on_dialogue_completed() -> void:
 	_is_playing = false
 
 
-func request_hurry_up() -> void:
-	# Unity: hurry-up does not interrupt voice over only
-	# next-content does (see request_next). Stopping the audio here also
-	# stranded the _voice_complete ticket, because AudioStreamPlayer.stop()
-	# never emits `finished`.
-	pass
-
-
-func request_next() -> void:
+## Token-driven skip: next content was requested while the voice was
+## playing, so stop the audio and settle the line. Hurry-up deliberately
+## does nothing to voice over.
+func _skip_voice() -> void:
 	if _is_playing:
 		_is_playing = false
 		_stop_audio_with_fade()
 		_voice_complete.emit()
 		voice_finished.emit(_current_line)
-
-
-func prepare_for_lines(line_ids: PackedStringArray) -> void:
-	for line_id in line_ids:
-		if not _audio_cache.has(line_id):
-			var path := _get_audio_path(line_id)
-			if ResourceLoader.exists(path):
-				_add_to_cache(line_id, load(path))
 
 
 func _load_audio_for_line(line: YarnLine) -> AudioStream:
@@ -142,34 +130,11 @@ func _load_audio_for_line(line: YarnLine) -> AudioStream:
 		if localised != null:
 			return localised
 
-	if _audio_cache.has(line.line_id):
-		_update_cache_access(line.line_id)
-		return _audio_cache[line.line_id]
-
 	var path := _get_audio_path(line.line_id)
 	if ResourceLoader.exists(path):
-		var audio := load(path) as AudioStream
-		_add_to_cache(line.line_id, audio)
-		return audio
+		return load(path) as AudioStream
 
 	return null
-
-
-func _add_to_cache(line_id: String, audio: AudioStream) -> void:
-	if max_cache_size > 0:
-		while _audio_cache.size() >= max_cache_size and not _cache_access_order.is_empty():
-			var oldest := _cache_access_order.pop_front()
-			_audio_cache.erase(oldest)
-
-	_audio_cache[line_id] = audio
-	_update_cache_access(line_id)
-
-
-func _update_cache_access(line_id: String) -> void:
-	var idx := _cache_access_order.find(line_id)
-	if idx >= 0:
-		_cache_access_order.remove_at(idx)
-	_cache_access_order.append(line_id)
 
 
 func _get_audio_path(line_id: String) -> String:
@@ -267,15 +232,6 @@ func _on_audio_finished() -> void:
 		# Route through the line's source so wrapper presenters (e.g. the
 		# Interruption add-on) can intercept; falls back to the runner.
 		_request_line_end(_current_line)
-
-
-func clear_cache() -> void:
-	_audio_cache.clear()
-	_cache_access_order.clear()
-
-
-func set_audio_for_line(line_id: String, audio: AudioStream) -> void:
-	_audio_cache[line_id] = audio
 
 
 func _exit_tree() -> void:

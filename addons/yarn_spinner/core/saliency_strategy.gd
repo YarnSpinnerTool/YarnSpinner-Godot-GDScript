@@ -19,7 +19,6 @@
 class_name YarnSaliencyStrategy
 extends RefCounted
 ## Base class for saliency selection strategies.
-## Matches Unity's IContentSaliencyStrategy interface.
 
 enum ContentType {
 	NODE,

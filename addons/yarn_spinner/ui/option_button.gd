@@ -19,11 +19,10 @@
 @icon("res://addons/yarn_spinner/icons/option_item.svg")
 class_name YarnOptionButton
 extends Button
-## option button matching Unity's Option Item prefab: plain grey text that
-## turns white with a dot indicator while focused. hovering focuses the
-## button, mirroring Unity's pointer-enter selection.
+## option button for dialogue choices: plain grey text that turns white
+## with a dot indicator while focused. hovering focuses the button.
 
-## shown while the button has focus (Unity's Selection Indicator image).
+## shown while the button has focus.
 @export var selection_indicator: Control
 
 

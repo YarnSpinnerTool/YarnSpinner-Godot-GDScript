@@ -20,8 +20,7 @@ class_name YarnActionMarkupHandlerNode
 extends Node
 ## Node-based base class for display-time action markup handlers.
 ##
-## Mirrors Yarn Spinner for Unity's [code]ActionMarkupHandler : MonoBehaviour[/code]:
-## attach this as a node in your scene (so it can reference other nodes, find
+## Attach this as a node in your scene (so it can reference other nodes, find
 ## characters, and so on), then add it to a [YarnLinePresenter]'s
 ## [member YarnLinePresenter.event_handlers] list. The presenter invokes these
 ## methods as each character of a line is revealed.

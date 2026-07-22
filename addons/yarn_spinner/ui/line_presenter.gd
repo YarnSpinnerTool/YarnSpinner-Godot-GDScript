@@ -57,13 +57,12 @@ signal continue_requested()
 @export var justify_text: bool = false
 
 ## characters per second for LETTER mode (0 = instant).
-## matches Unity's LinePresenter default typewriter speed.
 @export var characters_per_second: float = 60.0
 @export var words_per_second: float = 10.0
 @export var auto_advance: bool = false
-## seconds to wait before auto-advancing (matches Unity's autoAdvanceDelay).
+## seconds to wait before auto-advancing.
 @export var auto_advance_delay: float = 1.0
-## fade the panel in and out around each line (mirrors Unity's LinePresenter).
+## fade the panel in and out around each line.
 @export var use_fade_effect: bool = true
 @export var fade_up_duration: float = 0.25
 @export var fade_down_duration: float = 0.1
@@ -189,7 +188,7 @@ func _advance_or_hurry() -> void:
 	if _is_fully_revealed:
 		_complete_line()
 	else:
-		request_hurry_up()
+		_hurry()
 
 
 func on_dialogue_started() -> void:
@@ -254,10 +253,21 @@ func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
 
 	# Run the typewriter as a detached coroutine; it emits _line_complete
 	# once the line has been fully read and dismissed. run_line holds the
-	# line open by awaiting that — the presenter contract: return = done.
+	# line open by awaiting that: the presenter contract, return = done.
 	_run_typewriter()
 
-	await _line_complete
+	# The token is the dismissal channel: when next content is requested,
+	# the line completes, revealed or not.
+	if token != null:
+		token.next_content_requested.connect(_dismiss_line, CONNECT_ONE_SHOT)
+		if token.is_next_content_requested:
+			_dismiss_line()
+
+	if _is_displaying:
+		await _line_complete
+
+	if token != null and token.next_content_requested.is_connected(_dismiss_line):
+		token.next_content_requested.disconnect(_dismiss_line)
 
 
 func _build_handlers() -> Array:
@@ -439,16 +449,17 @@ func _is_cancelled() -> bool:
 	return false
 
 
-func request_hurry_up() -> void:
+## Local hurry, from this presenter's own input: skip the typewriter but
+## keep the line up. Runner-driven hurry arrives through the token, which
+## the typewriter already watches.
+func _hurry() -> void:
 	_hurrying = true
 	if _current_token != null:
 		_current_token.request_hurry_up()
 
 
-func request_next() -> void:
-	# Next-content means the line ends now, revealed or not (like Unityy:
-	# RequestNextLine dismisses the line; two-stage hurry-then-advance is
-	# YarnLineAdvancer's job, not the presenter's... this presenter's own
-	# _unhandled_input still offers single-press hurry for direct input).
-	if _is_displaying:
-		_complete_line()
+## Token-driven dismissal: next content was requested, so this line ends
+## now, revealed or not. Two-stage hurry-then-advance is YarnLineAdvancer's
+## job; this presenter's own input still offers single-press hurry.
+func _dismiss_line() -> void:
+	_complete_line()
