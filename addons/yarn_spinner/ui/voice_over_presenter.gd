@@ -39,7 +39,9 @@ signal voice_finished(line: YarnLine)
 @export var wait_time_after_complete: float = 0.0
 ## seconds; 0 = instant stop
 @export var fade_out_time_on_interrupt: float = 0.0
-@export var end_line_when_voice_complete: bool = false
+## When the voice over finishes, ask the runner to end the line (Yarn
+## Spinner for Unity defaults this on too).
+@export var end_line_when_voice_complete: bool = true
 
 var _is_playing: bool = false
 var _fade_tween: Tween
@@ -62,7 +64,7 @@ func _ready() -> void:
 		add_child(audio_player)
 
 
-func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
+func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
 	_line_generation += 1
 	var generation := _line_generation
 	_current_line = line
@@ -73,22 +75,32 @@ func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
 
 	var audio := _load_audio_for_line(line)
 	if audio == null:
-		return null
+		push_error("voice over presenter: no audio found for line '%s'" % line.line_id)
+		if end_line_when_voice_complete:
+			# Just like in Unity: a missing clip in a voice-driven scene should
+			# skip the line, not stall it. Deferred so every presenter has
+			# started this line before the wind-down request fires!
+			_request_line_end.call_deferred(line)
+		return
 
 	_is_playing = true
 
 	if wait_time_before_start > 0.0 and is_inside_tree():
-		await get_tree().create_timer(wait_time_before_start).timeout
+		await YarnAsync.wait(self, wait_time_before_start)
 		if generation != _line_generation or not _is_playing:
-			return null
+			return
+		if token != null and token.is_next_content_requested:
+			# The line was skipped during the pre-play delay.
+			_is_playing = false
+			return
 
 	_play_audio(audio)
 	voice_started.emit(line, audio)
 
 	if wait_for_audio:
-		return _voice_complete
-	else:
-		return null
+		# Hold the line open until playback finishes (or the line is
+		# skipped request_next emits this too).
+		await _voice_complete
 
 
 func on_dialogue_completed() -> void:
@@ -98,10 +110,11 @@ func on_dialogue_completed() -> void:
 
 
 func request_hurry_up() -> void:
-	# Hurry up for voice-over means fade out the audio quickly
-	# (matching Unity's behaviour of interrupting on hurry)
-	if _is_playing:
-		_stop_audio_with_fade()
+	# Unity: hurry-up does not interrupt voice over only
+	# next-content does (see request_next). Stopping the audio here also
+	# stranded the _voice_complete ticket, because AudioStreamPlayer.stop()
+	# never emits `finished`.
+	pass
 
 
 func request_next() -> void:
@@ -121,6 +134,14 @@ func prepare_for_lines(line_ids: PackedStringArray) -> void:
 
 
 func _load_audio_for_line(line: YarnLine) -> AudioStream:
+	# Prefer the runner's audio lookup (set via set_audio_base_path;
+	# localised by Godot's translation remaps on load) so set_locale()
+	# swaps voice as well as text. It has its own cache!
+	if dialogue_runner != null:
+		var localised: AudioStream = dialogue_runner.get_localised_audio(line.line_id)
+		if localised != null:
+			return localised
+
 	if _audio_cache.has(line.line_id):
 		_update_cache_access(line.line_id)
 		return _audio_cache[line.line_id]
@@ -152,7 +173,10 @@ func _update_cache_access(line_id: String) -> void:
 
 
 func _get_audio_path(line_id: String) -> String:
-	var filename := line_id.replace(":", "_").replace("/", "_")
+	# Strip the "line:" prefix first .. audio files are conventionally named
+	# after the bare id (tutorial-tom-01.wav for line:tutorial-tom-01),
+	# matching the localisation resolver's lookup order.
+	var filename := line_id.trim_prefix("line:").replace(":", "_").replace("/", "_")
 	return audio_base_path.path_join(filename + audio_extension)
 
 
@@ -232,7 +256,7 @@ func _on_audio_finished() -> void:
 	var generation := _line_generation
 
 	if wait_time_after_complete > 0.0 and is_inside_tree():
-		await get_tree().create_timer(wait_time_after_complete).timeout
+		await YarnAsync.wait(self, wait_time_after_complete)
 		if generation != _line_generation:
 			return
 

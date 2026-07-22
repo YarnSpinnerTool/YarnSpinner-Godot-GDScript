@@ -37,6 +37,10 @@ signal line_started(line: YarnLine)
 ## emitted when a line finishes displaying
 signal line_finished(line: YarnLine)
 
+## emitted when the line is dismissed from screen (after any fade-out).
+## YarnLineAdvancer uses this to track presentation state.
+signal line_dismissed(line: YarnLine)
+
 ## emitted when the player requests to continue
 signal continue_requested()
 
@@ -64,6 +68,9 @@ signal continue_requested()
 @export var fade_up_duration: float = 0.25
 @export var fade_down_duration: float = 0.1
 @export var continue_action: String = "ui_accept"
+## Advance on any left click while a line is showing (never while options
+## are up). Turn off if your game has clickable UI during dialogue.
+@export var click_anywhere_to_continue: bool = true
 @export var hurry_action: String = "ui_accept"
 @export var use_markup: bool = true
 
@@ -140,29 +147,49 @@ func _find_child_by_name_recursive(node: Node, name_part: String, type_name: Str
 	return null
 
 
-func _input(event: InputEvent) -> void:
-	if not _is_displaying:
-		return
-
-	# Don't consume input when options are showing — let buttons handle it
-	if dialogue_runner != null and not dialogue_runner._current_options.is_empty():
+# Keys arrive via _unhandled_input so UI controls get first look at focus
+# and confirm presses. Mouse clicks CANNOT live there: any Control under
+# the cursor (the dialogue panel itself, a fullscreen fade ColorRect)
+# consumes the click as GUI input first, and click-to-continue dies. So
+# clicks are handled in _input, gated to exactly the window where
+# click-anywhere is the intended UX: a line is displaying and options are
+# not on screen. Set click_anywhere_to_continue false if your game needs
+# clickable UI while lines are up.
+func _unhandled_input(event: InputEvent) -> void:
+	if not _can_take_advance_input():
 		return
 
 	if event.is_action_pressed(continue_action):
-		if _is_fully_revealed:
-			_complete_line()
-		else:
-			request_hurry_up()
+		_advance_or_hurry()
 		get_viewport().set_input_as_handled()
+
+
+func _input(event: InputEvent) -> void:
+	if not click_anywhere_to_continue:
+		return
+	if not _can_take_advance_input():
 		return
 
 	if event is InputEventMouseButton:
 		if event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			if _is_fully_revealed:
-				_complete_line()
-			else:
-				request_hurry_up()
+			_advance_or_hurry()
 			get_viewport().set_input_as_handled()
+
+
+func _can_take_advance_input() -> bool:
+	if not _is_displaying:
+		return false
+	# Don't consume input when options are showing — let buttons handle it
+	if dialogue_runner != null and dialogue_runner.are_options_active():
+		return false
+	return true
+
+
+func _advance_or_hurry() -> void:
+	if _is_fully_revealed:
+		_complete_line()
+	else:
+		request_hurry_up()
 
 
 func on_dialogue_started() -> void:
@@ -182,7 +209,7 @@ func on_dialogue_completed() -> void:
 	_is_fully_revealed = false
 
 
-func run_line(line: YarnLine, token: YarnCancellationToken = null) -> Variant:
+func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
 	_line_generation += 1
 	_current_line = line
 	_current_token = token
@@ -225,12 +252,12 @@ func run_line(line: YarnLine, token: YarnCancellationToken = null) -> Variant:
 
 	line_started.emit(line)
 
-	# Run the typewriter as a detached coroutine; it emits _line_complete once
-	# the line has been fully read and dismissed. run_line itself returns the
-	# completion signal synchronously, which is what the runner awaits.
+	# Run the typewriter as a detached coroutine; it emits _line_complete
+	# once the line has been fully read and dismissed. run_line holds the
+	# line open by awaiting that — the presenter contract: return = done.
 	_run_typewriter()
 
-	return _line_complete
+	await _line_complete
 
 
 func _build_handlers() -> Array:
@@ -306,10 +333,14 @@ func _run_typewriter() -> void:
 
 		if gate and seconds_per_unit > 0.0:
 			while not _is_cancelled() and accumulated < seconds_per_unit:
+				if not is_inside_tree():
+					return
 				var before := Time.get_ticks_usec()
 				await get_tree().process_frame
 				if generation != _line_generation or not _is_displaying:
 					return
+				if not can_process():
+					continue  # paused: the reveal clock stops too
 				accumulated += float(Time.get_ticks_usec() - before) / 1_000_000.0
 			accumulated -= seconds_per_unit
 
@@ -362,7 +393,7 @@ func _on_typewriter_complete(generation: int) -> void:
 	line_finished.emit(_current_line)
 
 	if auto_advance and is_inside_tree():
-		await get_tree().create_timer(auto_advance_delay).timeout
+		await YarnAsync.wait(self, auto_advance_delay)
 		if generation != _line_generation:
 			return
 		if is_inside_tree() and _is_displaying and _is_fully_revealed:
@@ -375,6 +406,7 @@ func _complete_line() -> void:
 	_is_displaying = false
 	_is_fully_revealed = false
 	var generation := _line_generation
+	var dismissed_line := _current_line
 
 	for handler in _active_handlers:
 		if handler.has_method("on_line_will_dismiss"):
@@ -395,6 +427,7 @@ func _complete_line() -> void:
 	var item := _get_presenter_canvas_item()
 	if item != null:
 		item.modulate.a = 1.0
+	line_dismissed.emit(dismissed_line)
 	_line_complete.emit()
 
 
@@ -413,8 +446,9 @@ func request_hurry_up() -> void:
 
 
 func request_next() -> void:
+	# Next-content means the line ends now, revealed or not (like Unityy:
+	# RequestNextLine dismisses the line; two-stage hurry-then-advance is
+	# YarnLineAdvancer's job, not the presenter's... this presenter's own
+	# _unhandled_input still offers single-press hurry for direct input).
 	if _is_displaying:
-		if _is_fully_revealed:
-			_complete_line()
-		else:
-			request_hurry_up()
+		_complete_line()

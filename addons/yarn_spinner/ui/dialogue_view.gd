@@ -21,28 +21,71 @@ class_name YarnDialogueView
 extends CanvasLayer
 ## complete dialogue view combining line and options presenters.
 ## provides a ready-to-use dialogue ui with no additional setup.
+##
+## The visuals come from [member ui_scene] (dialogue_view_ui.tscn by
+## default) open that scene in the editor to restyle the panel, fonts and
+## colours, or point [member ui_scene] at your own scene. A custom scene
+## must contain these scene-unique-named nodes: [code]%Panel[/code],
+## [code]%CharacterContainer[/code], [code]%CharacterLabel[/code],
+## [code]%TextLabel[/code], [code]%ContinueIndicator[/code] and
+## [code]%OptionsContainer[/code].
 
+## The runner this view presents for. Found automatically among ancestors
+## when left unset.
 @export var dialogue_runner: YarnDialogueRunner
-@export var start_node: String = "Start"
+
+## Node used when THIS VIEW starts dialogue (via [method start_dialogue] or
+## [member auto_start]). Leave empty to use the runner's own Start Node
+## set it here only to override the runner.
+@export var start_node: String = ""
+
+## Starts dialogue as soon as the view is ready. Ignored when the runner's
+## own Auto Start is enabled (the runner starts itself; enabling both would
+## race). Prefer configuring auto start on the runner.
 @export var auto_start: bool = false
+
+## The scene providing this view's visuals. Swap it to reskin the dialogue.
+@export var ui_scene: PackedScene = preload("res://addons/yarn_spinner/ui/dialogue_view_ui.tscn")
 
 var line_presenter: YarnLinePresenter
 var options_presenter: YarnOptionsPresenter
-var _panel: PanelContainer
+var _ui: Control
 var _text_label: RichTextLabel
 var _character_label: Label
-var _character_container: HBoxContainer
-var _continue_indicator: Label
-var _options_container: VBoxContainer
+var _character_container: Control
+var _continue_indicator: Control
+var _options_container: Container
 
 
 func _ready() -> void:
-	_build_ui()
+	_instantiate_ui()
 	_setup_presenters()
 
 	visible = false
 
 	_register_presenters()
+
+
+func _instantiate_ui() -> void:
+	if ui_scene == null:
+		push_error("dialogue view: no ui_scene set")
+		return
+
+	_ui = ui_scene.instantiate() as Control
+	if _ui == null:
+		push_error("dialogue view: ui_scene must have a Control root")
+		return
+	add_child(_ui)
+
+	_text_label = _ui.get_node_or_null("%TextLabel")
+	_character_label = _ui.get_node_or_null("%CharacterLabel")
+	_character_container = _ui.get_node_or_null("%CharacterContainer")
+	_continue_indicator = _ui.get_node_or_null("%ContinueIndicator")
+	_options_container = _ui.get_node_or_null("%OptionsContainer")
+
+	if _text_label == null or _options_container == null:
+		push_error("dialogue view: ui_scene is missing required unique-named nodes " +
+			"(%TextLabel, %OptionsContainer — see YarnDialogueView docs)")
 
 
 func _register_presenters() -> void:
@@ -59,7 +102,9 @@ func _register_presenters() -> void:
 		if dialogue_runner.is_running():
 			visible = true
 
-	if auto_start and dialogue_runner != null:
+	# The runner's own auto start wins: it starts itself, and starting here
+	# too would race it (and trip the runner's already-starting guard).
+	if auto_start and dialogue_runner != null and not dialogue_runner.auto_start:
 		call_deferred("start_dialogue")
 
 
@@ -80,65 +125,12 @@ func _on_dialogue_completed() -> void:
 	visible = false
 
 
-func _build_ui() -> void:
-	var root := Control.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.mouse_filter = Control.MOUSE_FILTER_PASS
-	add_child(root)
-
-	_panel = PanelContainer.new()
-	_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	_panel.offset_top = -200
-	_panel.custom_minimum_size = Vector2(0, 200)
-	root.add_child(_panel)
-
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 20)
-	margin.add_theme_constant_override("margin_right", 20)
-	margin.add_theme_constant_override("margin_top", 15)
-	margin.add_theme_constant_override("margin_bottom", 15)
-	_panel.add_child(margin)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 10)
-	margin.add_child(vbox)
-
-	_character_container = HBoxContainer.new()
-	vbox.add_child(_character_container)
-
-	_character_label = Label.new()
-	_character_label.add_theme_font_size_override("font_size", 20)
-	_character_label.add_theme_color_override("font_color", Color(1, 0.9, 0.5))
-	_character_container.add_child(_character_label)
-
-	_character_container.visible = false
-
-	_text_label = RichTextLabel.new()
-	_text_label.bbcode_enabled = true
-	_text_label.fit_content = true
-	_text_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_text_label.add_theme_font_size_override("normal_font_size", 18)
-	vbox.add_child(_text_label)
-
-	_continue_indicator = Label.new()
-	_continue_indicator.text = "▼"
-	_continue_indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_continue_indicator.visible = false
-	vbox.add_child(_continue_indicator)
-
-	_options_container = VBoxContainer.new()
-	_options_container.add_theme_constant_override("separation", 5)
-	_options_container.visible = false
-	vbox.add_child(_options_container)
-
-
 func _setup_presenters() -> void:
 	line_presenter = YarnLinePresenter.new()
 	line_presenter.text_label = _text_label
 	line_presenter.character_label = _character_label
 	line_presenter.character_container = _character_container
 	line_presenter.continue_indicator = _continue_indicator
-	line_presenter.characters_per_second = 60.0
 	add_child(line_presenter)
 
 	options_presenter = YarnOptionsPresenter.new()
@@ -146,12 +138,16 @@ func _setup_presenters() -> void:
 	add_child(options_presenter)
 
 	line_presenter.line_started.connect(func(_line):
-		_options_container.visible = false
-		_text_label.visible = true)
+		if _options_container != null:
+			_options_container.visible = false
+		if _text_label != null:
+			_text_label.visible = true)
 
 	options_presenter.options_shown.connect(func(_opts):
-		_text_label.visible = false
-		_options_container.visible = true)
+		if _text_label != null:
+			_text_label.visible = false
+		if _options_container != null:
+			_options_container.visible = true)
 
 
 func start_dialogue(node_name: String = "") -> void:
@@ -161,6 +157,8 @@ func start_dialogue(node_name: String = "") -> void:
 
 	visible = true
 	if node_name.is_empty():
+		# May still be empty, in which case the runner uses its own
+		# Start Node the view only overrides when explicitly set.
 		node_name = start_node
 	dialogue_runner.start_dialogue(node_name)
 

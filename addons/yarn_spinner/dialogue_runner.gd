@@ -66,8 +66,10 @@ signal command_received(command_name: String, command_args: Array)
 
 @export var auto_start: bool = false
 
-## Presenters assigned in the inspector. Merged with any YarnDialoguePresenter
-## nodes found as direct children of this runner.
+## Presenters assigned in the inspector. But, when this list is left EMPTY, any
+## YarnDialoguePresenter nodes found as direct children of this runner are
+## discovered automatically instead; when it has entries, only the listed
+## presenters are used (no child discovery). Thanks, Jon! Good ideaaa!
 @export var presenters: Array[YarnDialoguePresenter] = []
 
 ## If null, an in-memory storage is created automatically.
@@ -142,6 +144,20 @@ var _current_line: YarnLine
 var _current_options: Array[YarnOption]
 var _waiting_for_content: bool = false
 var _current_cancellation_token: YarnCancellationToken
+## The active options round'sselection promise select_option routes
+## external calls through it so every selection takes the same path.
+var _current_selection: YarnPromise
+## Bumped for every piece of content the runner presents (lines, option
+## lines, options, commands). A presentation join captures it and only
+## resumes the VM if it is still current so nothing weird happens if
+## force-advancing mid-line via signal_content_complete() which might
+## otherwise let the superseded join complete the *next* content early
+var _line_epoch := 0
+
+## Once next content has been requested, a presenter that still hasn't 
+## finished this many seconds later gets named in a warning (the dialogue is waiting on it!
+## I like this being here, even though Unity doesn't do this, as it's helpful.
+const STALL_WARNING_SECONDS := 5.0
 
 
 func _ready() -> void:
@@ -183,6 +199,9 @@ func _ready() -> void:
 	_register_global_commands()
 	_library.set_target_root(get_tree().root)
 	_discover_presenters()
+	# Presenter children added after startup register themselves too;
+	# _ready-time discovery alone silently ignored late additions.
+	child_entered_tree.connect(_on_child_entered_tree)
 
 	if auto_discover_commands:
 		call_deferred("_auto_discover_commands")
@@ -299,16 +318,42 @@ func set_content_saliency_strategy(strategy: YarnSaliencyStrategy) -> void:
 
 
 func _discover_presenters() -> void:
+	# The explicit inspector list wins outright! Child auto-discovery is
+	# only the fallback for scenes that set nothing up.
+	var has_explicit := false
 	for presenter in presenters:
-		if presenter != null and presenter not in _presenters:
-			_presenters.append(presenter)
-			presenter.dialogue_runner = self
+		if presenter != null:
+			has_explicit = true
+			if presenter not in _presenters:
+				_presenters.append(presenter)
+				presenter.dialogue_runner = self
+	if has_explicit:
+		return
 
 	for child in get_children():
 		if child is YarnDialoguePresenter:
 			if child not in _presenters:
 				_presenters.append(child)
 				child.dialogue_runner = self
+
+
+func _on_child_entered_tree(child: Node) -> void:
+	# Late children only auto-register in discovery mode (empty explicit
+	# list) same rule as _discover_presenters. add_presenter() is theh API
+	# for everything else.
+	for presenter in presenters:
+		if presenter != null:
+			return
+	if child is YarnDialoguePresenter and child not in _presenters:
+		_presenters.append(child)
+		child.dialogue_runner = self
+
+
+## True while options are being presented and no selection has been applied
+## yet. Presenters that share an input channel with options UI (e.g a line
+## presenter's click-to-continue) should stand down while this is true
+func are_options_active() -> bool:
+	return not _current_options.is_empty()
 
 
 func _auto_discover_commands() -> void:
@@ -501,6 +546,7 @@ func _clear_run_state() -> void:
 	_content_complete_pending = false
 	_waiting_for_content = false
 	_current_options.clear()
+	_current_selection = null
 
 	if _current_cancellation_token != null:
 		_current_cancellation_token.request_next_content()
@@ -511,10 +557,20 @@ func _clear_run_state() -> void:
 ## notified, then signals fire. Cancelled ends (explicit stop, restart,
 ## VM error) emit dialogue_cancelled before dialogue_completed.
 func _finish_dialogue(was_cancelled: bool) -> void:
+	# If a presenter callback restarts dialogue mid-loop stop notifying:
+	# the remaining presenters now belong to the new run and resetting them
+	# (ie generation bumps, visibility clears) would kill its first line. The
+	# old run's completion signals are also skipped the new run's start
+	# has already fired, and emitting completed after it would invert order
+	var run := _run_id
 	var presenters_copy := _presenters.duplicate()
 	for presenter in presenters_copy:
+		if _run_id != run:
+			return
 		if is_instance_valid(presenter):
 			await _safe_notify_presenter(presenter, "on_dialogue_completed")
+	if _run_id != run:
+		return
 
 	if was_cancelled:
 		dialogue_cancelled.emit()
@@ -699,14 +755,18 @@ func remove_presenter(presenter: YarnDialoguePresenter) -> void:
 
 
 ## Called by a presenter (via [member YarnLine.source]) when it wants the
-## currently-running line to end. The default source is the runner itself, in
-## which case this is equivalent to [method signal_content_complete]. Wrapper
-## presenters (e.g. the Interruption add-on) may substitute themselves as the
-## source and intercept this call.
+## currently-running line to end. Wrapper presenters (e.g. the Interruption
+## add-on) may substitute themselves as the source and intercept this call.
 ##
-## Mirrors Unity Yarn Spinner's [code]IRequestLineCancellation.RequestLineCancellation[/code].
+## Mirrors Yarn Spinner for Unity's
+## [code]IRequestLineCancellation.RequestLineCancellation[/code], which calls
+## [code]RequestNextLine()[/code] the cancellation token fires (waking
+## coroutine presenters parked on [method YarnCancellationToken.wait_for_next_content])
+## and every presenter's [method YarnDialoguePresenter.request_next] is called.
+## The line actually ends when all presenters have finished... the token is
+## the request, the presenters' completion is teh "proof"
 func request_line_cancellation(_line: YarnLine) -> void:
-	signal_content_complete()
+	request_next_content()
 
 
 func signal_content_complete() -> void:
@@ -736,22 +796,43 @@ func signal_content_complete() -> void:
 
 
 func select_option(option_index: int) -> void:
+	# Route external calls through the active options round when one is in
+	# flight the same path a presenter selection takes so a direct call
+	# cannot leave the options join armed against a stale selection promise.
+	if _current_selection != null and not _current_selection.is_settled:
+		if option_index < 0 or option_index >= _current_options.size():
+			push_error("dialogue runner: invalid option index %d (have %d options)" % [option_index, _current_options.size()])
+			return
+		_current_selection.settle(option_index)
+		return
+	await _apply_selected_option(option_index)
+
+
+func _apply_selected_option(option_index: int) -> void:
 	if option_index < 0 or option_index >= _current_options.size():
 		push_error("dialogue runner: invalid option index %d (have %d options)" % [option_index, _current_options.size()])
 		return
 
 	var selected_option: YarnOption = _current_options[option_index]
-
-	_vm.set_selected_option(option_index)
 	_current_options.clear()
 
+	# Present the option BEFORE resuming the VM. set_selected_option
+	# flips the VM back to RUNNING, and when a presenter selects
+	# synchronously (inside the SHOW_OPTIONS emission) the VM's instruction
+	# loop is still on the stack resuming first would let it steamrol
+	# straight past the echo line.
 	if show_selected_option_as_line and selected_option != null:
 		var run := _run_id
 		await _run_option_as_line(selected_option)
 		if run != _run_id:
 			return
 
-	call_deferred("_continue_dialogue")
+	_vm.set_selected_option(option_index)
+
+	# Use the guarded continueasthe VM may already be suspended on the next
+	# piece of content by the time this deferred fires the unsafe variant
+	# would force SUSPENDED back to RUNNING and steamroll that content.
+	call_deferred("_continue_dialogue_safe")
 
 
 func _run_option_as_line(option: YarnOption) -> void:
@@ -767,30 +848,32 @@ func _run_option_as_line(option: YarnOption) -> void:
 		print("dialogue runner: running selected option as line: %s" % line.get_plain_text())
 
 	var run := _run_id
+	_line_epoch += 1
 	_waiting_for_content = true
 	_current_cancellation_token = YarnCancellationToken.new()
+	var token := _current_cancellation_token
 
 	# Mark ourselves as the source the presenters should route end-of-line
 	# requests through. Wrapper presenters (e.g. the Interruption add-on) may
 	# substitute themselves as the source before dispatching to children.
 	line.source = self
 
-	var presenters_copy := _presenters.duplicate()
+	var promises := _start_line_presenters(line, run)
 
-	var completion_signals: Array[Signal] = []
-	for presenter in presenters_copy:
+	for promise in promises:
 		if run != _run_id:
 			return
-		var result: Variant = presenter.run_line(line, _current_cancellation_token)
-		if result is Signal:
-			completion_signals.append(result)
+		await promise.wait()
+		if run != _run_id:
+			return
 
-	for sig: Signal in completion_signals:
-		if run != _run_id:
-			return
-		await sig
-		if run != _run_id:
-			return
+	# The option line is done; fire its token so presenter sub-coroutines
+	# parked on it (and the stall watchdog) wind down. select_option resumes
+	# the VM itself, so signal_content_complete is not called here which
+	# means the waiting flag must be cleared here instead, or the deferred
+	# _continue_dialogue_safe bails forever and the dialogue hangs.
+	_waiting_for_content = false
+	token.request_next_content()
 
 
 func get_locale() -> String:
@@ -810,8 +893,12 @@ func has_locale(locale_code: String) -> bool:
 
 
 ## use {locale} placeholder, e.g., "res://audio/dialogue/{locale}/"
-func set_audio_path_template(template: String) -> void:
-	_line_provider.set_audio_path_template(template)
+## Points voice-over lookup at the folder of BASE-language audio files
+## (named after the line id: line:tutorial-tom-01 -> tutorial-tom-01.wav).
+## Localised audio comes from Godot's translation remaps (Project Settings >
+## Localization > Remaps), applied automatically when the file loads! MAGIC
+func set_audio_base_path(path: String) -> void:
+	_line_provider.set_audio_base_path(path)
 
 
 func export_for_godot_translation(output_path: String) -> Error:
@@ -887,6 +974,8 @@ func _on_line(line: YarnLine) -> void:
 		return
 
 	var run := _run_id
+	_line_epoch += 1
+	var epoch := _line_epoch
 	_current_line = line
 
 	if _line_provider != null:
@@ -901,25 +990,108 @@ func _on_line(line: YarnLine) -> void:
 	# substitute themselves as the source before dispatching to children.
 	line.source = self
 
-	var presenters_copy := _presenters.duplicate()
+	var promises := _start_line_presenters(line, run)
 
-	var completion_signals: Array[Signal] = []
-	for presenter in presenters_copy:
+	for promise in promises:
 		if run != _run_id:
 			return
-		var result: Variant = presenter.run_line(line, _current_cancellation_token)
-		if result is Signal:
-			completion_signals.append(result)
-
-	for sig: Signal in completion_signals:
-		if run != _run_id:
-			return
-		await sig
+		await promise.wait()
 		if run != _run_id:
 			return
 
-	if _is_running:
+	# Only the join for the current content may resume the VM if user code
+	# force-advanced mid-line via signal_content_complete, this join is
+	# superseded and must stay silent! SILENT!
+	if _is_running and epoch == _line_epoch:
 		signal_content_complete()
+
+
+## Starts run_line on every presenter concurrently one detached wrapper
+## coroutine per presenter, all launched in the same same frame and returns one
+## promise per presenter, settled when that presenter has fully finished the
+## line. Also arms the warn-only stall watchdog for the batch!
+func _start_line_presenters(line: YarnLine, run: int) -> Array[YarnPromise]:
+	# Capture the token before starting anyone: a presenter that stops the
+	# dialogue synchronously inside run_line nulls _current_cancellation_token.
+	var token := _current_cancellation_token
+	var promises: Array[YarnPromise] = []
+	# Freed presenters must be skipped before the call: the wrapper's typed
+	# parameter rejects a freed object outright, which would abort the call
+	# and strand an unsettled promise. `started` stays index-aligned with
+	# `promises` for the watchdog.
+	var started: Array[YarnDialoguePresenter] = []
+	for presenter in _presenters.duplicate():
+		if run != _run_id:
+			break
+		if not is_instance_valid(presenter):
+			continue
+		var promise := YarnPromise.new()
+		promises.append(promise)
+		started.append(presenter)
+		_run_presenter_line(presenter, line, token, promise)
+	_watch_presentation_stall(token, started, promises, "line")
+	return promises
+
+
+## Runs one presenter's run_line and settles its promise when the presenter
+## has returned the whole presenter system: run_line comes back when
+## the presenter is finished with the line, awaiting internally for
+## anything that takes time
+func _run_presenter_line(presenter: YarnDialoguePresenter, line: YarnLine,
+		token: YarnCancellationToken, promise: YarnPromise) -> void:
+	if not is_instance_valid(presenter):
+		promise.settle()
+		return
+	# A presenter freeed or removed from the tree mid-line can never resume
+	# its coroutine... count it as finished so the join cannot hang on it
+	# (settle() latches.. so this is a noop when the presenter finished
+	# normally first)
+	var on_exit := func() -> void:
+		promise.settle()
+	presenter.tree_exiting.connect(on_exit, CONNECT_ONE_SHOT)
+	await presenter.run_line(line, token)
+	promise.settle()
+	if is_instance_valid(presenter) and presenter.tree_exiting.is_connected(on_exit):
+		presenter.tree_exiting.disconnect(on_exit)
+
+
+## Warn-only stall diagnostic! Once next content has been requested, every
+## presenter is implicitly promising to finish promptly nothing can
+## enforce that, so if a promise is still unsettled STALL_WARNING_SECONDS
+## later, name the presenter: a forgotten return otherwise presents as a
+## silent hang. Never advances teh dialogue
+func _watch_presentation_stall(token: YarnCancellationToken,
+		presenters: Array[YarnDialoguePresenter], promises: Array[YarnPromise],
+		what: String) -> void:
+	if token == null:
+		return
+	var run := _run_id
+	await token.wait_for_next_content()
+	if run != _run_id or not is_inside_tree():
+		return
+	var any_pending := false
+	for promise in promises:
+		if not promise.is_settled:
+			any_pending = true
+			break
+	if not any_pending:
+		return
+	await YarnAsync.wait(self, STALL_WARNING_SECONDS)
+	if run != _run_id:
+		return
+	for i in promises.size():
+		if promises[i].is_settled:
+			continue
+		var who := "a freed presenter"
+		if i < presenters.size() and is_instance_valid(presenters[i]):
+			who = str(presenters[i].name)
+			var presenter_script: Script = presenters[i].get_script()
+			if presenter_script != null and not presenter_script.resource_path.is_empty():
+				who += " (%s)" % presenter_script.resource_path
+		push_warning(("dialogue runner: %s presenter %s has not finished %.0f seconds " +
+			"after next content was requested. Once the cancellation token fires, " +
+			"run_line/run_options must wrap up and return — dialogue is waiting " +
+			"on it.") % [what, who, STALL_WARNING_SECONDS])
 
 
 func _on_options(options: Array[YarnOption]) -> void:
@@ -934,55 +1106,65 @@ func _on_options(options: Array[YarnOption]) -> void:
 			_line_provider.get_localised_option(option)
 
 	_current_cancellation_token = YarnCancellationToken.new()
+	var token := _current_cancellation_token
 	var presenters_copy := _presenters.duplicate()
 
-	var timeout_triggered := false
+	# The first presenter to produce a valid selection settles this promise
+	# (settle() latches, so later selections are no-ops ). It settles with -1
+	# when every presenter finished without selecting, or on timeout.
+	var selection := YarnPromise.new()
+	_current_selection = selection
+	var done_promises: Array[YarnPromise] = []
+
+	# The timeout lambda must not write to a local (GDScript lambdas capture
+	# primitives by value) the token's latched flag doubles as the record
+	# that a wind-down fired before any selection...
 	if option_timeout > 0.0:
 		_start_option_timeout(option_timeout, func():
-			timeout_triggered = true
-			if _current_cancellation_token != null:
-				_current_cancellation_token.request_next_content())
+			token.request_next_content()
+			selection.settle(-1))
 
-	# Start all presenters concurrently (matching Unity's WhenAll pattern).
-	# The first presenter to return a valid selection wins.
-	var selected_option_index := -1
-	var pending_signals: Array[Signal] = []
-
+	# Start all presenters concurrently (matching Unity's WhenAll pattern!).
+	# Freed presenters skipped before the call see _start_line_presenters.
+	var started: Array[YarnDialoguePresenter] = []
 	for presenter in presenters_copy:
-		if run != _run_id or timeout_triggered:
-			break
-		var result: Variant = await presenter.run_options(options, _current_cancellation_token)
 		if run != _run_id:
 			return
-		if result is Signal:
-			pending_signals.append(result)
-		elif result is int and result >= 0 and selected_option_index < 0:
-			selected_option_index = result
+		if not is_instance_valid(presenter):
+			continue
+		var done := YarnPromise.new()
+		done_promises.append(done)
+		started.append(presenter)
+		_run_presenter_options(presenter, options, token, selection, done)
 
-	# If no presenter returned synchronously, await their signals
-	if selected_option_index < 0:
-		for sig: Signal in pending_signals:
-			if run != _run_id or timeout_triggered:
-				break
-			var result: Variant = await sig
-			if run != _run_id:
-				return
-			if result is int and result >= 0 and selected_option_index < 0:
-				selected_option_index = int(result)
-				break
+	_watch_options_completion(done_promises, selection)
+	_watch_presentation_stall(token, started, done_promises, "options")
 
+	var selected_value: Variant = await selection.wait()
 	if run != _run_id or not _is_running:
 		return
+	_current_selection = null
+
+	var selected_option_index := -1
+	if selected_value is int:
+		selected_option_index = int(selected_value)
 
 	if selected_option_index >= 0:
-		await select_option(selected_option_index)
+		# Ask the remaining presenters to wind down per the token contract
+		# they must finish once this fires!
+		token.request_next_content()
+		await _apply_selected_option(selected_option_index)
 		return
 
-	if allow_option_fallthrough or timeout_triggered:
+	if allow_option_fallthrough or token.is_next_content_requested:
 		push_warning("dialogue runner: no presenter handled options, using fallthrough")
+		token.request_next_content()
 		_vm.set_selected_option(YarnVirtualMachine.NO_OPTION_SELECTED)
 		_current_options.clear()
-		call_deferred("_continue_dialogue")
+		# Guarded continue for the same reason as select_option: a synchronous
+		# fallthrough happens inside the SHOW_OPTIONS emission and the VM may
+		# already be suspended on the next piece of content.
+		call_deferred("_continue_dialogue_safe")
 	else:
 		push_error("yarn spinner: no presenter handled the dialogue options and " +
 			"'Allow Option Fallthrough' is disabled. Either:\n" +
@@ -997,24 +1179,66 @@ func _start_option_timeout(timeout: float, on_timeout: Callable) -> void:
 	if not is_inside_tree():
 		return
 	var run := _run_id
-	await get_tree().create_timer(timeout).timeout
+	await YarnAsync.wait(self, timeout)
 	if run == _run_id and _is_running and not _current_options.is_empty():
 		on_timeout.call()
+
+
+## Runs one presenter's run_options and settles [param done] when it has
+## returned (same contract as run_line). A valid selection (>= 0) also
+## settles the shared [param selection] promise first one wins.
+func _run_presenter_options(presenter: YarnDialoguePresenter, options: Array[YarnOption],
+		token: YarnCancellationToken, selection: YarnPromise, done: YarnPromise) -> void:
+	if not is_instance_valid(presenter):
+		done.settle()
+		return
+	# See _run_presenter_line: a presenter that leaves the tree counts as
+	# finished, so the options round cannot hang on it.
+	var on_exit := func() -> void:
+		done.settle()
+	presenter.tree_exiting.connect(on_exit, CONNECT_ONE_SHOT)
+	var result: Variant = await presenter.run_options(options, token)
+	if result is int and int(result) >= 0:
+		selection.settle(int(result))
+	done.settle()
+	if is_instance_valid(presenter) and presenter.tree_exiting.is_connected(on_exit):
+		presenter.tree_exiting.disconnect(on_exit)
+
+
+## Settles [param selection] with -1 once every presenter has finished
+## without selecting, so options with no willing presenter fall through
+## instead of hanging. A real selection wins tehrace!
+func _watch_options_completion(done_promises: Array[YarnPromise], selection: YarnPromise) -> void:
+	var run := _run_id
+	for done in done_promises:
+		await done.wait()
+		if run != _run_id:
+			return
+	selection.settle(-1)
 
 
 func _on_command(command_text: String) -> void:
 	var run := _run_id
 	_waiting_for_content = true
+	# A superseded line join must not complete this command (see _line_epoch)
+	# and symmetrically, if this command is force-advanced past while its
+	# async work is still running, the stale completion below must not end
+	# whatever content is presenting by then.
+	_line_epoch += 1
+	var epoch := _line_epoch
 
 	var _parsed := YarnCommandParser.parse(command_text)
 	if not _parsed.is_empty():
 		command_received.emit(_parsed[0], _parsed.slice(1))
 
-	var result := _library.dispatch_command(command_text, self)
+	# Awaited: coroutine command handlers (like the built-in <<wait>>) run
+	# to completion inside dispatch. The epoch captured above guards the
+	# completion below against content that advanced past us meanwhile.
+	var result := await _library.dispatch_command(command_text, self)
 
 	if not result.handled:
 		if await _handle_builtin_command(command_text):
-			if run == _run_id:
+			if run == _run_id and epoch == _line_epoch:
 				signal_content_complete()
 			return
 
@@ -1057,7 +1281,7 @@ func _on_command(command_text: String) -> void:
 			else:
 				await async_result
 
-	if run != _run_id or not _is_running:
+	if run != _run_id or not _is_running or epoch != _line_epoch:
 		return
 
 	signal_content_complete()
@@ -1111,7 +1335,9 @@ func _on_prepare_for_lines(line_ids: PackedStringArray) -> void:
 		_safe_call_presenter(presenter, "prepare_for_lines", [line_ids])
 
 
-func _safe_notify_presenter(presenter: YarnDialoguePresenter, method: String) -> void:
+# Deliberately untyped parameter: a typed YarnDialoguePresenter argument
+# would make the CALL itself error on a freed object, before this guard runs!
+func _safe_notify_presenter(presenter: Variant, method: String) -> void:
 	if not is_instance_valid(presenter):
 		return
 
@@ -1121,9 +1347,14 @@ func _safe_notify_presenter(presenter: YarnDialoguePresenter, method: String) ->
 	var result: Variant = presenter.call(method)
 	if result is Signal:
 		await result
+	elif result is Object and result != null and result.has_signal("completed"):
+		# Coroutine overrides called via call() return a function state;
+		# wait for it the same way _on_command waits for async commands.
+		await result.completed
 
 
-func _safe_call_presenter(presenter: YarnDialoguePresenter, method: String, args: Array) -> void:
+# Untyped for the same reason as _safe_notify_presenter.
+func _safe_call_presenter(presenter: Variant, method: String, args: Array) -> void:
 	if not is_instance_valid(presenter):
 		return
 
@@ -1193,9 +1424,12 @@ func _register_global_commands() -> void:
 				_library.register_function(func_name, info.get("callable"), info.get("param_count", -1))
 
 
-func _cmd_wait(duration_str: String = "1.0") -> Signal:
-	var duration := float(duration_str) if duration_str.is_valid_float() else 1.0
-	return get_tree().create_timer(duration).timeout
+func _cmd_wait(duration: float = 1.0) -> void:
+	# The library coerces <<wait 2>>'s string argument to this float from
+	# the declared parameter type — commands take real types, not strings.
+	# Pause-respecting <<wait>> must not keep elapsing under a pause menu lol
+	# Fixed this thanks to Leonardo.
+	await YarnAsync.wait(self, duration)
 
 
 func _regenerate_ysls_pressed() -> void:

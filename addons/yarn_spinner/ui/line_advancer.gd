@@ -95,6 +95,36 @@ func _on_dialogue_started() -> void:
 	_is_presenting_line = false
 	_is_line_complete = false
 	_frames_since_advance = 0
+	# Presenters are discovered by the runner's _ready, which runs after
+	# ours when we're its child — so bind to line presenters here, at the
+	# first moment the merged presenter list is guaranteed complete.
+	_connect_line_presenter_signals()
+
+
+func _connect_line_presenter_signals() -> void:
+	if dialogue_runner == null:
+		return
+	for presenter in dialogue_runner.get_presenters():
+		if presenter is YarnLinePresenter:
+			var lp := presenter as YarnLinePresenter
+			if not lp.line_started.is_connected(_on_line_started):
+				lp.line_started.connect(_on_line_started)
+			if not lp.line_finished.is_connected(_on_line_finished):
+				lp.line_finished.connect(_on_line_finished)
+			if not lp.line_dismissed.is_connected(_on_line_dismissed):
+				lp.line_dismissed.connect(_on_line_dismissed)
+
+
+func _on_line_started(_line: YarnLine) -> void:
+	on_line_presentation_started()
+
+
+func _on_line_finished(_line: YarnLine) -> void:
+	on_line_fully_revealed()
+
+
+func _on_line_dismissed(_line: YarnLine) -> void:
+	on_line_presentation_ended()
 
 
 func _on_dialogue_completed() -> void:
@@ -122,7 +152,7 @@ func _process(_delta: float) -> void:
 		_frames_since_advance += 1
 
 
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	if not is_active:
 		return
 
@@ -170,16 +200,19 @@ func _input(event: InputEvent) -> void:
 			return
 
 	if combine_hurry_and_advance:
+		# Only consume input we actually acted on: swallowing presses while
+		# no line is up starves everything else of the confirm button.
 		if _is_presenting_line and not _is_line_complete:
 			hurry_up_requested.emit()
 			if dialogue_runner != null:
 				dialogue_runner.request_hurry_up()
+			get_viewport().set_input_as_handled()
 		elif _is_line_complete:
 			_frames_since_advance = 0
 			advance_requested.emit()
 			if dialogue_runner != null:
 				dialogue_runner.request_next_content()
-		get_viewport().set_input_as_handled()
+			get_viewport().set_input_as_handled()
 		return
 
 	if hurry_pressed and _is_presenting_line and not _is_line_complete:
