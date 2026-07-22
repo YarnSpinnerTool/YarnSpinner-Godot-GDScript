@@ -27,13 +27,19 @@ extends Node
 ## Extends [Node] so presenters can be non-visual (audio, signals, analytics).
 ## UI presenters can use [method _set_presenter_visible] to toggle visibility.
 ##
-## [b]Presenter contract:[/b]
-## - [method run_line]: Return a [Signal] that completes when the line is done
-##   displaying, OR return [code]null[/code] to indicate the line was handled
-##   synchronously (the runner advances immediately).
-## - [method run_options]: Return the selected option index (>= 0), or -1 if
-##   this presenter does not handle options. The first presenter to return a
-##   valid selection wins; others are cancelled via the token.
+## [b]Presenters...[/b] [method run_line] returns when a
+## presenter has finished with the line. Present your content, then
+## [code]await[/code] whatever takes time (a typewriter, audio,
+## [code]await token.wait_for_next_content()[/code]), clean up, and return.
+## A presenter with nothing to wait for simply returns immediately.
+## [br]The runner starts every presenter in the same frame and advances only
+## when [b]all[/b] of them have returned. Once the token reports next
+## content requested you are promising to finish promptly but nothing
+## enforces it, the runner just waits (and warns after a few seconds).
+## [br][method run_options] follows the same rule, returning the selected
+## option index (>= 0), or -1 if this presenter does not handle options.
+## The first valid selection wins! The token then fires so the rest wind
+## down proeprly
 
 ## Reference to the dialogue runner this presenter is registered with.
 ## Set automatically when the presenter is added to a runner.
@@ -98,6 +104,8 @@ func _fade_presenter_alpha(from_alpha: float, to_alpha: float, duration: float, 
 			return
 		if cancel.is_valid() and cancel.call():
 			break
+		if not can_process():
+			continue
 		elapsed += get_process_delta_time()
 		item.modulate.a = lerpf(from_alpha, to_alpha, clampf(elapsed / duration, 0.0, 1.0))
 	item.modulate.a = to_alpha
@@ -136,23 +144,26 @@ func prepare_for_lines(_line_ids: PackedStringArray) -> void:
 ## markup applied) and character name via [code]line.character_name[/code].
 ##
 ## [param token] can be used to detect when the runner requests hurry-up
-## or skip via [method YarnCancellationToken.is_hurry_up_requested] and
-## [method YarnCancellationToken.is_next_content_requested].
+## or skip via [member YarnCancellationToken.is_hurry_up_requested] and
+## [member YarnCancellationToken.is_next_content_requested], or awaited via
+## [method YarnCancellationToken.wait_for_next_content]. The runner always
+## passes a valid token; the [code]null[/code] default exists only so the
+## method can be called manually in tests.
 ##
-## [b]Return value:[/b]
-## - Return a [Signal] that completes when the line is finished displaying.
-##   The runner will await it before advancing.
-## - Return [code]null[/code] if the line was handled synchronously. The
-##   runner advances immediately.
+## Returning ends this presenter's involvement with the line so await
+## anything that takes time before you do typically
+## [code]await token.wait_for_next_content()[/code] to hold your content on
+## screen until the line is dismissed. The runner advances only once every
+## presenter has returned.
 ##
-## The base implementation just returns [code]null[/code] ("not handled").
+## The base implementation returns immediately ("nothing to present").
 ## It must not call [method YarnDialogueRunner.signal_content_complete]:
 ## with several presenters attached, a passive one doing so completes every
 ## line the instant it appears, cutting off the presenters that actually
-## display it. The runner already advances by itself when no presenter
-## returns a completion signal.
-func run_line(_line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
-	return null
+## display it. The runner already advances by itself once all presenters
+## have returned
+func run_line(_line: YarnLine, _token: YarnCancellationToken = null) -> void:
+	pass
 
 
 ## Present dialogue options to the player.
@@ -160,14 +171,16 @@ func run_line(_line: YarnLine, _token: YarnCancellationToken = null) -> Variant:
 ## Override this in your subclass to display options. Each option's text
 ## is available via [code]option.text[/code] (lazy-computed).
 ##
-## [param token] can be used to detect cancellation/timeout.
+## [b]Return value[/b] (same rule as [method run_line].. return when done):
+## - The selected option index (int >= 0), awaiting the player's choice
+##   first if needed!
+## - -1 if this presenter does not handle options, all done
 ##
-## [b]Return value:[/b]
-## - Return the selected option index (>= 0).
-## - Return -1 if this presenter does not handle options.
-##
-## When multiple presenters are active, all are started concurrently.
-## The first to return a valid selection (>= 0) wins; others are cancelled.
+## When multiple presenters are active all are started concurrently. The
+## first valid selection (>=0 wins; the token then fires so the others
+## wind down — honour it (hide your UI and return -1 when
+## [member YarnCancellationToken.is_next_content_requested] becomes true,
+## e.g. on option timeout)
 func run_options(_options: Array[YarnOption], _token: YarnCancellationToken = null) -> int:
 	return -1
 
