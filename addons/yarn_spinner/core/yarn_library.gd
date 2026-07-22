@@ -193,6 +193,11 @@ func call_function(func_name: String, stack: Array, vm: YarnVirtualMachine) -> V
 
 
 ## Returns {status, handled, is_async, result, error}.
+##
+## This is a coroutine and MUST be awaited: coroutine command handlers run
+## to completion inside it (so for `<<wait 2>>` the two seconds elapse
+## before it returns). Handlers that return a Signal instead are reported
+## via is_async/result for the caller to await.
 func dispatch_command(command_text: String, dialogue_runner: Node) -> Dictionary:
 	if command_text.strip_edges().is_empty():
 		return _make_dispatch_result(CommandDispatchStatus.EMPTY_COMMAND, false, false, null, "empty command")
@@ -211,7 +216,7 @@ func dispatch_command(command_text: String, dialogue_runner: Node) -> Dictionary
 			push_error("yarn library: command '%s' has invalid callable" % command_name)
 			return _make_dispatch_result(CommandDispatchStatus.INVALID_CALLABLE, false, false, null, "command '%s' has invalid callable" % command_name)
 
-		var call_result := _safe_callv(callable, args, command_name)
+		var call_result := await _safe_callv(callable, args, command_name)
 		if call_result.success:
 			var is_async := _is_async_result(call_result.result)
 			return _make_dispatch_result(CommandDispatchStatus.SUCCESS, true, is_async, call_result.result, "")
@@ -240,7 +245,7 @@ func dispatch_command(command_text: String, dialogue_runner: Node) -> Dictionary
 				"node '%s' is not a %s (required for command '%s')" % [target_name, expected_class, command_name])
 
 		var instance_args: Array[String] = args.slice(1)
-		var call_result := _safe_call(target_node, method_name, instance_args)
+		var call_result := await _safe_call(target_node, method_name, instance_args)
 		if call_result.success:
 			var is_async := _is_async_result(call_result.result)
 			return _make_dispatch_result(CommandDispatchStatus.SUCCESS, true, is_async, call_result.result, "")
@@ -268,7 +273,8 @@ func _safe_call(target: Object, method_name: String, args: Array) -> Dictionary:
 	if not is_instance_valid(target):
 		return {"success": false, "status": CommandDispatchStatus.NOT_FOUND, "error": "target node for '%s' has been freed" % method_name, "result": null}
 
-	var result: Variant = target.callv(method_name, coercion.args)
+	# Awaited for the same reason as _safe_callv: coroutine handlers.
+	var result: Variant = await target.callv(method_name, coercion.args)
 	return {"success": true, "status": CommandDispatchStatus.SUCCESS, "error": "", "result": result}
 
 
@@ -281,7 +287,11 @@ func _safe_callv(callable: Callable, args: Array, command_name: String) -> Dicti
 	if not callable.is_valid():
 		return {"success": false, "status": CommandDispatchStatus.INVALID_CALLABLE, "error": "callable for '%s' is no longer valid" % command_name, "result": null}
 
-	var result: Variant = callable.callv(coercion.args)
+	# MUST be awaited: un-awaited callv on a coroutine handler is a hard
+	# runtime error ("Trying to call an async function without 'await'").
+	# For coroutine handlers this waits until they finish; for everything
+	# else the await is a no-op and result is the plain return value.
+	var result: Variant = await callable.callv(coercion.args)
 	return {"success": true, "status": CommandDispatchStatus.SUCCESS, "error": "", "result": result}
 
 
@@ -307,7 +317,10 @@ func _find_method_info(obj: Object, method_name: String) -> Dictionary:
 ## Validates argument count and converts each string argument to the
 ## handler's declared parameter type. Returns {success, status, error, args}.
 func _coerce_call_args(method_info: Dictionary, args: Array, command_name: String) -> Dictionary:
-	var coerced := args.duplicate()
+	# Deliberately untyped: args arrives as Array[String], and a typed
+	# duplicate() would reject the coerced ints/floats/bools/Nodes.
+	var coerced: Array = []
+	coerced.assign(args)
 	if method_info.is_empty():
 		return {"success": true, "status": CommandDispatchStatus.SUCCESS, "error": "", "args": coerced}
 

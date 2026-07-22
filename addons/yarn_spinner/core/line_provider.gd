@@ -45,7 +45,7 @@ func set_program(program: YarnProgram) -> void:
 	godot_localisation.set_program(program)
 
 
-func get_localisation() -> YarnLocalisation:
+func get_localisation() -> YarnGodotLocalisation:
 	return godot_localisation
 
 
@@ -153,9 +153,10 @@ func get_translation_prefix() -> String:
 	return godot_localisation.translation_prefix
 
 
-## Use {locale} as placeholder, e.g. "res://audio/dialogue/{locale}/"
-func set_audio_path_template(template: String) -> void:
-	godot_localisation.audio_path_template = template
+## Folder of the base-language voice files; localised variants come from
+## Godot translation remaps.
+func set_audio_base_path(path: String) -> void:
+	godot_localisation.audio_base_path = path
 
 
 func export_for_godot_translation(output_path: String) -> Error:
@@ -196,9 +197,6 @@ func unregister_bbcode_processor(processor: YarnMarkupAttributeProcessor) -> voi
 
 func get_debug_info() -> String:
 	var lines: Array[String] = []
-	lines.append("localisation type: GODOT")
-	lines.append("")
-	lines.append("--- active provider ---")
 	lines.append(get_localisation().get_debug_info())
 	lines.append("")
 	lines.append("shadow lines: %d" % _shadow_lines.size())
