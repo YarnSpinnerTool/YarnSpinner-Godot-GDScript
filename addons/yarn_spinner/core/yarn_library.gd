@@ -337,7 +337,7 @@ func _coerce_call_args(method_info: Dictionary, args: Array, command_name: Strin
 	for i in range(mini(args.size(), expected_args.size())):
 		var expected_type: int = expected_args[i].get("type", TYPE_NIL)
 		var expected_class: String = expected_args[i].get("class_name", "")
-		var out := _coerce_value(args[i], expected_type, expected_class)
+		var out := _coerce_value(args[i], expected_type, expected_class, expected_args[i].get("name", ""))
 		if not out.ok:
 			return {"success": false, "status": CommandDispatchStatus.INVALID_PARAMS,
 				"error": "argument %d of '%s' %s" % [i + 1, command_name, out.error], "args": coerced}
@@ -348,7 +348,7 @@ func _coerce_call_args(method_info: Dictionary, args: Array, command_name: Strin
 ## Converts one command argument to the handler's declared parameter type.
 ## Returns {ok, value, error}: a conversion that cannot be performed is a
 ## dispatch error naming what was expected, never a silent zero.
-func _coerce_value(value: Variant, target_type: int, type_class: String = "") -> Dictionary:
+func _coerce_value(value: Variant, target_type: int, type_class: String = "", param_name: String = "") -> Dictionary:
 	if typeof(value) == target_type:
 		return {"ok": true, "value": value, "error": ""}
 
@@ -390,6 +390,11 @@ func _coerce_value(value: Variant, target_type: int, type_class: String = "") ->
 					return {"ok": true, "value": true, "error": ""}
 				"false", "0", "no", "off":
 					return {"ok": true, "value": false, "error": ""}
+			# Flag style (matches Yarn Spinner): passing a bool parameter's own
+			# name as a bareword infers true, e.g. <<play_animation ... wait>>
+			# for a parameter named "wait".
+			if not param_name.is_empty() and str_value == param_name:
+				return {"ok": true, "value": true, "error": ""}
 			return {"ok": false, "value": false, "error": "expects true/false, got '%s'" % str_value}
 
 		TYPE_VECTOR2:
