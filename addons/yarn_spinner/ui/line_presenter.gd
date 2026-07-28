@@ -235,6 +235,10 @@ func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
 		if justify_text:
 			display_text = "[fill]%s[/fill]" % display_text
 		text_label.text = display_text
+		# Lay out the whole line before revealing any of it, so word wrap is
+		# precalculated and words never jump between lines mid-typewriter
+		# (matches TMP's maxVisibleCharacters behaviour).
+		text_label.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING
 		text_label.visible_characters = 0
 
 	# Unity's continue arrow is visible for the whole line, not just once the

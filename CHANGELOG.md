@@ -1,11 +1,61 @@
 # Yarn Spinner for Godot (GDScript) — Changelog
 
+## Alpha 8 (2026-07-28)
+
+Lots of nice little qualkity of life changes! Scene-based options, some tweaks to boolean flag parameters (to match Yarn Spinner for Unity), and a word wrap fix in the line presenter. If you show options with the built-in presenter, note that
+option text no longer includes the character name prefix.
+
+### Options are scene-based
+
+The options presenter now instantiates a scene per option, similar to the way Yarn
+Spinner for Unity instantiates its Option Item prefab. The default is the
+new `ui/option_item.tscn` (a `YarnOptionItem` wrapping a focus-styled
+button); edit that scene or point `option_button_scene` at your own to
+restyle options. Plain `BaseButton` scenes still work. When
+every option in a group is unavailable, the presenter now declines
+immediately instead of waiting on an empty screen. Option text no longer
+includes the character name prefix (an option written as
+`-> Tom: Who are you?` displays as "Who are you?"), the same as Yarn Spinner forUnity's option items; `YarnOption` gained `character_name` and
+`text_without_character_name` if you need either piece.
+
+The voice over samples' options are styled similarly to the Yarn Spinner for Unity voice over sample's Option Item (60pt flat text, grey until selected, bottom-centre
+panel).
+
+### Word wrap is precalculated
+
+The line presenter now lays out the whole line before the typewriter reveals
+any of it, so words no longer jump to the next line partway through being
+typed! Hooray. A word that won't fit on the current line starts on the next one
+from its first character, which is what Yarn Spinner for Unity's TMP does with
+`maxVisibleCharacters`. Sorry about that. Shoutout if you're still having problems.
+
+### Boolean parameters accept their name as a flag
+
+A command parameter of type `bool` can now be set to `true` by passing the
+parameter's own name as a bareword, matching Yarn Spinner for Unity's convention. So for a handler like:
+
+```gdscript
+func _yarn_command_play_animation(layer: String, state: String, wait: bool = false) -> void: ...
+```
+
+both of these now work, and mean the same thing:
+
+```
+<<play_animation Tom Gesture LookAround wait>>
+<<play_animation Tom Gesture LookAround true>>
+```
+
+`true`/`1`/`yes`/`on` (and `false`/`0`/`no`/`off`) keep working as before;
+this only adds the flag form.
+
+If you only write command handlers without a trailing `bool` flag, or you
+already pass `true`/`false` explicitly, nothing should really change.
+
 ## Alpha 7 (2026-07-22)
 
 This alpha reworks how presenters and the dialogue runner talk to each
 other! If you implemented presenters or commands against an earlier alpha,
-read the Breaking changes, please! Most migrations _should_ be signature change and the
-deletion of boilerplate. Hopefully.
+read the Breaking changes, please! Most migrations _should_ be signature change and the deletion of boilerplate. Hopefully.
 
 ### Breaking: one presenter contract
 
