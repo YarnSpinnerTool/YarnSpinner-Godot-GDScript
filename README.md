@@ -17,7 +17,9 @@ Visit the [documentation](https://docs.yarnspinner.dev/yarn-spinner-for-godot/go
 
 ## Samples
 
-The samples live in their own project in the [YarnSpinner-Godot-Samples](https://github.com/YarnSpinnerTool/YarnSpinner-Godot-Samples) repository. To try them, open the samples project in Godot 4.6+, install this addon at `addons/yarn_spinner`, then open the Scene for the sample you want and run it with the "Run Current Scene" (F6) button.
+The samples live in their own project in the [YarnSpinner-Godot-Samples](https://github.com/YarnSpinnerTool/YarnSpinner-Godot-Samples) repository. 
+
+The samples project ships without this addon: copy this repository's `addons/yarn_spinner/` folder into the samples project's `addons/` directory first (the samples README has step-by-step instructions), then open the project in Godot 4.6+, open the scene for the sample you want, and run it with "Run Current Scene" (F6).
 
 The intention is that Yarn Spinner for Godot (C#) and Godot (GDScript) will ship with a full suite of samples on par with the samples supplied as part of Yarn Spinner for Unity.
 
@@ -48,11 +50,16 @@ This project uses the Yarn Spinner Public License. You're free to use it in your
 
 ## Installation
 
-1. Copy the `addons/yarn_spinner/` folder into your Godot project's `addons/` directory.
-2. In the Godot editor, go to **Project > Project Settings > Plugins** and enable **Yarn Spinner**.
-3. Install `ysc` (the [Yarn Spinner Console](https://github.com/YarnSpinnerTool/YarnSpinner-Console) tool) from : `dotnet tool install YarnSpinner.Console --global --version 3.2.2`
-4. Drop your `.yarnproject` and `.yarn` files into your Godot project. The plugin automatically compiles them via `ysc` on import -- any time a `.yarn` file or the `.yarnproject` changes, Godot reimports and recompiles.
-5. Assign the imported `.yarnproject` to a Dialogue Runner in your scene.
+The addon is the `addons/yarn_spinner/` folder inside this repository. That folder is the only part that goes into your project; the rest of the repository (tests, compiler sources, this file) stays behind.
+
+1. Clone or download this repository.
+2. Copy `addons/yarn_spinner/` into your Godot project's `addons/` directory, or symlink it from your checkout. The result should be `res://addons/yarn_spinner/plugin.cfg` in your project.
+3. In the Godot editor, go to **Project > Project Settings > Plugins** and enable **Yarn Spinner**.
+4. Install `ysc` (the [Yarn Spinner Console](https://github.com/YarnSpinnerTool/YarnSpinner-Console) tool): `dotnet tool install YarnSpinner.Console --global --version 3.2.2`
+5. Drop your `.yarnproject` and `.yarn` files into your Godot project. The plugin automatically compiles them via `ysc` on import -- any time a `.yarn` file or the `.yarnproject` changes, Godot reimports and recompiles.
+6. Assign the imported `.yarnproject` to a Dialogue Runner in your scene.
+
+If Godot reports missing dependencies on `res://addons/yarn_spinner/...` paths, or scripts fail to parse with `Could not find type "YarnDialogueRunner"`, the addon isn't at the path the project expects. The usual cause is copying the whole repository into `addons/`, which puts the addon at `addons/YarnSpinner-Godot-GDScript/addons/yarn_spinner`. Move the inner `yarn_spinner` folder so it sits directly under `addons/`, then reload the project.
 
 ## How It Works
 

@@ -702,8 +702,33 @@ const SAMPLE_CARD_WIDTH := 268.0
 const SAMPLE_THUMB_HEIGHT := 150.0
 const SAMPLE_THUMB_OVERRIDES := ["thumbnail.png", "thumbnail.jpg", "screenshot.png", "screenshot.jpg"]
 
+## The order samples appear in the gallery: a learning path from first steps
+## through core features, presentation, voice, and finally saliency. Folders
+## not listed here sort after these, alphabetically.
+const SAMPLE_ORDER := [
+	"welcome",
+	"yarn_basics",
+	"simple_3d",
+	"feature_tour",
+	"commands_and_functions",
+	"instance_commands",
+	"inline_events",
+	"node_internals",
+	"replacement_markup",
+	"themed_line_presenter",
+	"options_that_timeout",
+	"phone_chat",
+	"background-chatter",
+	"voice_over",
+	"voice_over_3d",
+	"basic-saliency",
+	"custom-saliency",
+	"advanced_saliency",
+]
+
 ## One-line blurbs shown on each sample card, keyed by folder name.
 const SAMPLE_DESCRIPTIONS := {
+	"advanced_saliency": "Set the cast, the room and the scenario, then watch saliency stage the right scene.",
 	"background-chatter": "Ambient NPC conversations play out around you, each line floating above its speaker.",
 	"basic-saliency": "Characters change what they say with the day and time, using node and line groups.",
 	"commands_and_functions": "Drive your game from Yarn with custom commands, and read game state back with functions.",
@@ -713,6 +738,7 @@ const SAMPLE_DESCRIPTIONS := {
 	"instance_commands": "Commands that target a specific object instance in the scene.",
 	"node_internals": "Peek at node titles, headers and metadata from the running dialogue.",
 	"options_that_timeout": "Options that expire if the player takes too long to choose.",
+	"phone_chat": "A texting conversation told in chat bubbles, typing indicator and all.",
 	"replacement_markup": "Custom markup that swaps text for icons and richly styled spans.",
 	"simple_3d": "The smallest possible 3D scene that runs a single Yarn line.",
 	"themed_line_presenter": "Restyle the built-in line presenter to match the look of your game.",
@@ -986,7 +1012,7 @@ func _show_opened_scene() -> void:
 
 
 ## Finds each sample folder under res://samples/ (excluding shared) and its
-## entry scene, returning [{ name, scene }] sorted by name.
+## entry scene, returning [{ name, scene }] in [constant SAMPLE_ORDER] order.
 func _find_samples() -> Array:
 	var samples: Array = []
 	var base := "res://samples"
@@ -1002,7 +1028,14 @@ func _find_samples() -> Array:
 				samples.append({"name": entry.replace("-", "_").capitalize(), "scene": scene, "folder": entry})
 		entry = dir.get_next()
 	dir.list_dir_end()
-	samples.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.name < b.name)
+	samples.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var ia := SAMPLE_ORDER.find(a.folder)
+		var ib := SAMPLE_ORDER.find(b.folder)
+		if ia < 0 and ib < 0:
+			return a.name < b.name
+		if ia < 0 or ib < 0:
+			return ib < 0
+		return ia < ib)
 	return samples
 
 
