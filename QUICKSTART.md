@@ -11,12 +11,13 @@ This gets you from zero to running dialogue in about five minutes. It assumes yo
 > [!TIP]
 > **Please submit issues or feature requests via this form during the pre-release period:** http://yarnspinner.dev/pre-release-feedback
 
-Visit the [documentation](https://docs.yarnspinner.dev/yar-spinner-for-godot/godot-gdscript) and [Yarn Spinner site](https://yarnspiner.dev) for more information.
+Visit the [documentation](https://docs.yarnspinner.dev/yarn-spinner-for-godot/godot-gdscript) and [Yarn Spinner site](https://yarnspinner.dev) for more information.
 
 ## Install the Plugin
 
-1. Copy `addons/yarn_spinner/` into your Godot project's `addons/` directory.
-2. Go to **Project > Project Settings > Plugins** and enable **Yarn Spinner**.
+1. Clone or download [YarnSpinner-Godot-GDScript](https://github.com/YarnSpinnerTool/YarnSpinner-Godot-GDScript). The addon is the `addons/yarn_spinner/` folder inside it.
+2. Copy that folder into your Godot project's `addons/` directory, so the plugin config is at `res://addons/yarn_spinner/plugin.cfg`. Don't copy the whole repository in; that nests the addon one level too deep.
+3. Go to **Project > Project Settings > Plugins** and enable **Yarn Spinner**.
 
 ## Add Your Yarn Files
 
@@ -29,7 +30,7 @@ If `ysc` (the Yarn Spinner compiler) is on your system PATH, compilation is auto
 Install the required version of `ysc` globally with:
 
 ```
-dotnet tool install YarnSpinner.Console --global --version 3.2.2`
+dotnet tool install YarnSpinner.Console --global --version 3.2.2
 ```
 
 ### Manual compilation
@@ -92,20 +93,20 @@ Commands let Yarn tell your game to do things. The easiest way is the naming con
 # On any node in your scene tree:
 
 func _yarn_command_shake(intensity: float) -> void:
-    # <<shake 2.5>>
-    # Runs instantly, dialogue continues immediately
-    camera.shake(intensity)
+	# <<shake 2.5>>
+	# Runs instantly, dialogue continues immediately
+	camera.shake(intensity)
 
 func _yarn_command_fade(duration: float) -> Signal:
-    # <<fade 0.5>>
-    # Returns a Signal -- dialogue waits for it to complete
-    var tween = create_tween()
-    tween.tween_property($Overlay, "modulate:a", 1.0, duration)
-    return tween.finished
+	# <<fade 0.5>>
+	# Returns a Signal -- dialogue waits for it to complete
+	var tween = create_tween()
+	tween.tween_property($Overlay, "modulate:a", 1.0, duration)
+	return tween.finished
 
 func _yarn_command_wait(seconds: float) -> Signal:
-    # <<wait 1.5>>
-    return get_tree().create_timer(seconds).timeout
+	# <<wait 1.5>>
+	return get_tree().create_timer(seconds).timeout
 ```
 
 Make sure `auto_discover_commands` is enabled on the dialogue runner (it is by default). The runner scans the scene tree on startup and registers everything it finds.
@@ -144,21 +145,21 @@ Functions let Yarn read values from your game. Register them with a name and par
 
 ```gdscript
 func _ready():
-    dialogue_runner.add_function("player_health", _get_health, 0)
-    dialogue_runner.add_function("has_item", _check_item, 1)
+	dialogue_runner.add_function("player_health", _get_health, 0)
+	dialogue_runner.add_function("has_item", _check_item, 1)
 
 func _get_health() -> float:
-    return player.health
+	return player.health
 
 func _check_item(item_name: String) -> bool:
-    return inventory.has(item_name)
+	return inventory.has(item_name)
 ```
 
 Use them in Yarn expressions:
 
 ```yarn
 <<if player_health() < 50>>
-    You're not looking so good.
+	You're not looking so good.
 <<endif>>
 
 <<if has_item("key")>>
