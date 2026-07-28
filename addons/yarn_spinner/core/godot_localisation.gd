@@ -181,7 +181,7 @@ func _add_to_audio_cache(key: String, audio: AudioStream) -> void:
 
 	if max_audio_cache_size > 0:
 		while _audio_cache.size() > max_audio_cache_size and not _audio_cache_order.is_empty():
-			var oldest := _audio_cache_order.pop_front()
+			var oldest: Variant = _audio_cache_order.pop_front()
 			_audio_cache.erase(oldest)
 
 

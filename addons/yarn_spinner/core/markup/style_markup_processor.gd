@@ -51,7 +51,7 @@ func process_close() -> String:
 	if _style_stack.is_empty():
 		return ""
 
-	var style := _style_stack.pop_back()
+	var style: Variant = _style_stack.pop_back()
 
 	match style:
 		"bold", "b":

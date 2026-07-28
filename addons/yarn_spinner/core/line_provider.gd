@@ -25,7 +25,7 @@ extends RefCounted
 var godot_localisation: YarnGodotLocalisation
 var _program: YarnProgram
 
-## Fallback mappings when the primary localisation is missing a translation.
+## Maps shadow line IDs to the (line:-prefixed) IDs of the lines they shadow.
 var _shadow_lines: Dictionary[String, String] = {}
 
 ## Legacy accessor; prefer get_current_locale()/set_current_locale().
@@ -70,41 +70,49 @@ func has_locale(locale_code: String) -> bool:
 func get_localised_line(line: YarnLine) -> void:
 	if _program != null and _program.line_metadata.has(line.line_id):
 		line.metadata = _program.line_metadata[line.line_id]
-		_parse_shadow_metadata(line.line_id, line.metadata)
 
-	line.raw_text = _get_string_with_shadow(line.line_id)
+	# A shadow line displays another line's content: swap in the source ID
+	# before any lookup, so text and assets both come from the source line.
+	var source_id := _resolve_source_line_id(line.line_id)
+
+	line.raw_text = _get_string(source_id)
+	if line.raw_text.is_empty():
+		push_warning("line provider: no text found for line '%s' in locale '%s'" % [line.line_id, get_current_locale()])
+		line.raw_text = line.line_id
 	line.apply_substitutions()
 	line.parse_markup()
+
+
+## Returns the ID of the line this line shadows (with its "line:" prefix),
+## or "" if it is not a shadow line. A #shadow:some_id tag is compiled to
+## "shadow:some_id" metadata; the source line's string table key is
+## "line:some_id".
+func get_shadow_line_source(line_id: String) -> String:
+	if _shadow_lines.has(line_id):
+		return _shadow_lines[line_id]
+	if _program != null and _program.line_metadata.has(line_id):
+		_parse_shadow_metadata(line_id, _program.line_metadata[line_id])
+	return _shadow_lines.get(line_id, "")
 
 
 ## Parses #shadow:other_line_id tags from metadata.
 func _parse_shadow_metadata(line_id: String, metadata: PackedStringArray) -> void:
 	for tag in metadata:
 		if tag.begins_with("shadow:"):
-			var shadow_id := tag.substr(7)  # length of "shadow:"
-			_shadow_lines[line_id] = shadow_id
+			_shadow_lines[line_id] = "line:" + tag.substr(7)  # length of "shadow:"
 			return
 
 
+## The ID whose content a line should display: the shadow source for a
+## shadow line, otherwise the line's own ID.
+func _resolve_source_line_id(line_id: String) -> String:
+	var source := get_shadow_line_source(line_id)
+	return line_id if source.is_empty() else source
+
+
 func get_localised_option(option: YarnOption) -> void:
-	option.raw_text = _get_string(option.line_id)
+	option.raw_text = _get_string(_resolve_source_line_id(option.line_id))
 	option.apply_substitutions()
-
-
-## Tries primary localisation, then shadow line, then returns line_id as fallback.
-func _get_string_with_shadow(line_id: String) -> String:
-	var text := _get_string(line_id)
-
-	if text.is_empty() and _shadow_lines.has(line_id):
-		var shadow_id: String = _shadow_lines[line_id]
-		var shadow_text := _get_string(shadow_id)
-		if not shadow_text.is_empty():
-			return shadow_text
-
-	if text.is_empty():
-		return line_id
-
-	return text
 
 
 ## Checks localisation system, then falls back to program string table.
@@ -130,15 +138,18 @@ func unregister_shadow_line(line_id: String) -> void:
 
 
 func get_localised_audio(line_id: String) -> AudioStream:
-	return get_localisation().get_localised_audio(line_id)
+	return get_localisation().get_localised_audio(_resolve_source_line_id(line_id))
 
 
 func has_localised_audio(line_id: String) -> bool:
-	return get_localisation().has_localised_audio(line_id)
+	return get_localisation().has_localised_audio(_resolve_source_line_id(line_id))
 
 
 func prepare_for_lines(line_ids: PackedStringArray) -> void:
-	get_localisation().prepare_for_lines(line_ids)
+	var resolved := PackedStringArray()
+	for line_id in line_ids:
+		resolved.append(_resolve_source_line_id(line_id))
+	get_localisation().prepare_for_lines(resolved)
 
 
 func clear_shadow_lines() -> void:

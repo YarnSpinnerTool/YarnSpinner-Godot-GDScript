@@ -1,5 +1,32 @@
 # Yarn Spinner for Godot (GDScript) — Changelog
 
+## Alpha 9 (in progress)
+
+### Strict warning compatibility
+
+A handful of internal variable declarations relied on inferring their type
+from a `Variant` value, which fails to compile in projects that escalate
+GDScript's `INFERENCE_ON_VARIANT` warning to an error. Those declarations
+now use explicit types, so the addon compiles cleanly under strict warning
+settings.
+
+### Sample gallery ordering and thumbnails
+
+The Samples tab in the Yarn Spinner editor screen now lists samples in a
+learning-path order (starting points first, then core features,
+presentation, voice over, and saliency) instead of alphabetically, and
+every sample card has an up-to-date gameplay screenshot.
+
+### Fixed
+
+- Shadow lines (`#shadow:`) now display their source line's text, and play
+  its voice over audio, instead of showing a raw line ID. The line provider
+  resolves the shadow source before any lookup, the same way Yarn Spinner
+  for Unity does.
+- A line with no text in the current locale now logs a warning naming the
+  line and locale. It still displays the line ID as before, but no longer
+  does so silently.
+
 ## Alpha 8 (2026-07-28)
 
 Lots of nice little qualkity of life changes! Scene-based options, some tweaks to boolean flag parameters (to match Yarn Spinner for Unity), and a word wrap fix in the line presenter. If you show options with the built-in presenter, note that

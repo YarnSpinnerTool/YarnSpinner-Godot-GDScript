@@ -125,12 +125,19 @@ func _load_audio_for_line(line: YarnLine) -> AudioStream:
 	# Prefer the runner's audio lookup (set via set_audio_base_path;
 	# localised by Godot's translation remaps on load) so set_locale()
 	# swaps voice as well as text. It has its own cache!
+	# A shadow line plays its source line's audio, so resolve the ID first.
+	var source_line_id := line.line_id
 	if dialogue_runner != null:
+		var provider := dialogue_runner.get_line_provider()
+		if provider != null:
+			var shadow_source := provider.get_shadow_line_source(line.line_id)
+			if not shadow_source.is_empty():
+				source_line_id = shadow_source
 		var localised: AudioStream = dialogue_runner.get_localised_audio(line.line_id)
 		if localised != null:
 			return localised
 
-	var path := _get_audio_path(line.line_id)
+	var path := _get_audio_path(source_line_id)
 	if ResourceLoader.exists(path):
 		return load(path) as AudioStream
 

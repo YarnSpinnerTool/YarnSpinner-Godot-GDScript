@@ -268,7 +268,7 @@ func _add_to_cache(line_id: String, resource: Resource, cache_name: String) -> v
 	if max_cache_size > 0:
 		var total_size := _cache.size() + _audio_cache.size() + _image_cache.size()
 		while total_size >= max_cache_size and not _cache_access_order.is_empty():
-			var oldest := _cache_access_order.pop_front()
+			var oldest: Variant = _cache_access_order.pop_front()
 			_cache.erase(oldest)
 			_audio_cache.erase(oldest)
 			_image_cache.erase(oldest)

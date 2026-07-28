@@ -259,7 +259,10 @@ func _compile_native(source_file: String, abs_path: String, source_files: Packed
 	var line_metadata := {}
 	for line_id in result.string_table:
 		var entry: Dictionary = result.string_table[line_id]
-		string_table[line_id] = entry.get("text", "")
+		# Shadow lines compile with null text (their content comes from the
+		# line they shadow); store "" so typed String lookups stay valid.
+		var text: Variant = entry.get("text", "")
+		string_table[line_id] = text if text is String else ""
 		var meta: Array = entry.get("metadata", [])
 		if not meta.is_empty():
 			var tags := PackedStringArray()

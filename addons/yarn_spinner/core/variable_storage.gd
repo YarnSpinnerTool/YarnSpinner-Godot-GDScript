@@ -94,7 +94,7 @@ func subscribe(owner: Node, variable_name: String, listener: Callable) -> int:
 ## Listener receives only the new value, coerced to expected_type.
 func subscribe_typed(owner: Node, variable_name: String, listener: Callable, expected_type: int) -> int:
 	var typed_wrapper := func(var_name: String, new_val: Variant, old_val: Variant):
-		var typed_value := _coerce_to_type(new_val, expected_type)
+		var typed_value: Variant = _coerce_to_type(new_val, expected_type)
 		listener.call(typed_value)
 
 	return subscribe(owner, variable_name, typed_wrapper)

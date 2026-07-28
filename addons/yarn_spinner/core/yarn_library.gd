@@ -185,7 +185,7 @@ func call_function(func_name: String, stack: Array, vm: YarnVirtualMachine) -> V
 		args.push_front(stack.pop_back())
 
 	# Variadic functions (param_count == -1) receive args as a single array
-	var param_count := _function_param_counts.get(func_name, -1)
+	var param_count: int = _function_param_counts.get(func_name, -1)
 	if param_count == -1:
 		return callable.call(args)
 	else:
