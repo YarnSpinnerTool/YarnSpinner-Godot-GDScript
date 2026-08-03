@@ -17,12 +17,16 @@
 # ======================================================================== #
 
 @icon("res://addons/yarn_spinner/icons/dialogue_presenter.svg")
+@abstract
 class_name YarnDialoguePresenter
 extends Node
 ## Base class for presenting Yarn dialogue to the player.
 ##
 ## Subclass this to create your own dialogue UI. Override [method run_line]
 ## to display dialogue lines and [method run_options] to display choices.
+## This class is abstract: attach a subclass such as [YarnLinePresenter]
+## ([code]ui/line_presenter.gd[/code]) or [YarnOptionsPresenter]
+## ([code]ui/options_presenter.gd[/code]) to your nodes, not this script.
 ##
 ## Extends [Node] so presenters can be non-visual (audio, signals, analytics).
 ## UI presenters can use [method _set_presenter_visible] to toggle visibility.

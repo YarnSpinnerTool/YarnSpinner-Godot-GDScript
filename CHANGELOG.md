@@ -17,6 +17,16 @@ learning-path order (starting points first, then core features,
 presentation, voice over, and saliency) instead of alphabetically, and
 every sample card has an up-to-date gameplay screenshot.
 
+### YarnDialoguePresenter is abstract
+
+`YarnDialoguePresenter` is now marked `@abstract`, matching its Yarn Spinner for Unity
+equivalent (`DialoguePresenterBase`). Attaching the base script to a node
+used to look like it worked, then displayed nothing at runtime; the editor
+now refuses the attach outright. Attach one of the presenters from
+`addons/yarn_spinner/ui/` (`YarnLinePresenter`, `YarnOptionsPresenter`,
+and friends), or subclass the base for your own. Existing subclasses are
+unaffected!
+
 ### Fixed
 
 - Shadow lines (`#shadow:`) now display their source line's text, and play

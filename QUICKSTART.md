@@ -60,11 +60,13 @@ Game (Node2D)
 │       └── OptionsContainer (VBoxContainer)
 ```
 
-1. **YarnDialogueRunner** -- add a Node, attach the `YarnDialogueRunner` script. In the inspector, set `Yarn Project` to your `.yarnproject` file.
+1. **YarnDialogueRunner** -- add a Node, attach the `YarnDialogueRunner` script (`addons/yarn_spinner/dialogue_runner.gd`). In the inspector, set `Yarn Project` to your `.yarnproject` file.
 
-2. **LinePresenter** -- add a PanelContainer, attach the `YarnLinePresenter` script. Give it a `RichTextLabel` child named `TextLabel` for dialogue text, a `Label` named `CharacterLabel` for the speaker name, and optionally a `Label` named `ContinueIndicator`.
+2. **LinePresenter** -- add a PanelContainer, attach the `YarnLinePresenter` script (`addons/yarn_spinner/ui/line_presenter.gd`). Give it a `RichTextLabel` child named `TextLabel` for dialogue text, a `Label` named `CharacterLabel` for the speaker name, and optionally a `Label` named `ContinueIndicator`.
 
-3. **OptionsPresenter** -- add a PanelContainer, attach the `YarnOptionsPresenter` script. Give it a `VBoxContainer` child named `OptionsContainer` -- buttons are created automatically at runtime.
+3. **OptionsPresenter** -- add a PanelContainer, attach the `YarnOptionsPresenter` script (`addons/yarn_spinner/ui/options_presenter.gd`). Give it a `VBoxContainer` child named `OptionsContainer` -- buttons are created automatically at runtime.
+
+The ready-made presenter scripts all live in `addons/yarn_spinner/ui/`. The `dialogue_presenter.gd` at the addon's root is the abstract base class you subclass to write a custom presenter; it can't be attached to a node directly.
 
 ## Wire It Up
 
