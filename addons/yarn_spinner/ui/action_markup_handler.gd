@@ -232,5 +232,5 @@ class ContinueButtonHandler extends YarnActionMarkupHandler:
 
 	func _on_button_pressed() -> void:
 		_button_pressed = true
-		if dialogue_runner != null and dialogue_runner.has_method("request_next_line"):
-			dialogue_runner.request_next_line()
+		if dialogue_runner != null:
+			dialogue_runner.request_next_content()

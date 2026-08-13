@@ -25,9 +25,16 @@ Make sure you have a `.yarnproject` and your `.yarn` files, then drop them into 
 
 ### Automatic compilation
 
-If `ysc` (the Yarn Spinner compiler) is on your system PATH, compilation is automatic. Whenever Godot imports or reimports the `.yarnproject`, the plugin runs `ysc compile` for all `.yarn` files in scope. Editing a `.yarn` file or the `.yarnproject` itself triggers a reimport, so you never need to compile manually.
+Compilation is automatic and needs no setup: the addon bundles the Yarn
+Spinner compiler as a native binary (`addons/yarn_spinner/native/bin/`),
+so there's nothing to install. Whenever Godot imports or reimports the
+`.yarnproject`, the plugin compiles all `.yarn` files in scope. Editing a
+`.yarn` file or the `.yarnproject` itself triggers a reimport, so you
+never need to compile manually.
 
-Install the required version of `ysc` globally with:
+If the bundled binary isn't available for your platform, the plugin falls
+back to the `ysc` command line tool. Install the required version globally
+with:
 
 ```
 dotnet tool install YarnSpinner.Console --global --version 3.2.2
@@ -80,9 +87,9 @@ extends Node2D
 @onready var options_presenter := $CanvasLayer/OptionsPresenter
 
 func _ready():
-    dialogue_runner.add_presenter(line_presenter)
-    dialogue_runner.add_presenter(options_presenter)
-    dialogue_runner.start_dialogue("Start")
+	dialogue_runner.add_presenter(line_presenter)
+	dialogue_runner.add_presenter(options_presenter)
+	dialogue_runner.start_dialogue("Start")
 ```
 
 That's it. Run the scene and your dialogue plays.
@@ -124,19 +131,19 @@ class_name Character
 extends Node2D
 
 func _yarn_command_move(destination: String) -> Signal:
-    var target := get_node("/root/Game/Waypoints/" + destination)
-    var tween := create_tween()
-    tween.tween_property(self, "position", target.position, 1.0)
-    return tween.finished
+	var target := get_node("/root/Game/Waypoints/" + destination)
+	var tween := create_tween()
+	tween.tween_property(self, "position", target.position, 1.0)
+	return tween.finished
 ```
 
 Register the class as an instance command source:
 
 ```gdscript
 func _ready():
-    var library := dialogue_runner.get_library()
-    library.register_instance_command("move", Character)
-    library.set_target_root(self)
+	var library := dialogue_runner.get_library()
+	library.register_instance_command("move", Character)
+	library.set_target_root(self)
 ```
 
 Now `<<move mae center>>` finds the node named "mae", checks it's a `Character`, and calls `_yarn_command_move("center")` on it.
@@ -165,7 +172,7 @@ Use them in Yarn expressions:
 <<endif>>
 
 <<if has_item("key")>>
-    The door opens.
+	The door opens.
 <<endif>>
 
 You have {format("{0}", player_health())} health remaining.
@@ -204,7 +211,7 @@ dialogue_runner.dialogue_started.connect(func(): show_dialogue_ui())
 dialogue_runner.dialogue_completed.connect(func(): hide_dialogue_ui())
 dialogue_runner.node_started.connect(func(name): print("Entered: ", name))
 dialogue_runner.node_completed.connect(func(name): print("Left: ", name))
-dialogue_runner.unhandled_command.connect(func(text): print("Unknown: ", text))
+dialogue_runner.command_unhandled.connect(func(text): print("Unknown: ", text))
 ```
 
 ## Useful Settings
@@ -229,28 +236,30 @@ On `YarnOptionsPresenter`:
 
 ## Custom Presenters
 
-To make your own persenter UI subclass `YarnDialoguePresenter`:
+To make your own presenter UI, subclass `YarnDialoguePresenter`. `run_line`
+returns nothing: hold the line open by awaiting inside it, and return when
+the line is done. The token tells you when the player wants to hurry up or
+skip.
 
 ```gdscript
 extends YarnDialoguePresenter
 
-func run_line(line: YarnLine) -> Variant:
-    $Label.text = line.get_plain_text()
-    visible = true
-    # Wait for player to click
-    await $Button.pressed
-    visible = false
-    return null
+func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
+	$Label.text = line.get_plain_text()
+	visible = true
+	# Wait for player to click (or the runner asking us to move on)
+	await $Button.pressed
+	visible = false
 
-func run_options(options: Array[YarnOption]) -> int:
-    # Build your own UI, return the index of the selected option
-    for i in options.size():
-        var btn = Button.new()
-        btn.text = options[i].get_plain_text()
-        btn.pressed.connect(func(): selected = i)
-        $Container.add_child(btn)
-    await $Container.get_child(0).pressed  # Simplified
-    return selected
+func run_options(options: Array[YarnOption], token: YarnCancellationToken = null) -> int:
+	# Build your own UI, return the index of the selected option
+	for i in options.size():
+		var btn = Button.new()
+		btn.text = options[i].get_plain_text()
+		btn.pressed.connect(func(): selected = i)
+		$Container.add_child(btn)
+	await $Container.get_child(0).pressed  # Simplified
+	return selected
 ```
 
 Register it the same way:

@@ -252,16 +252,16 @@ func test_bool_conversion():
 
 # --- Built-in format function ---
 
-func test_format_with_placeholders():
-	assert_eq(_lib._builtin_format(["Hello {0}, you have {1} gold", "Alice", 50]), "Hello Alice, you have 50 gold")
+func test_format_with_placeholder():
+	assert_eq(_lib._builtin_format("Hello {0}", "Alice"), "Hello Alice")
 
 
-func test_format_with_specifiers():
-	assert_eq(_lib._builtin_format(["Value is {0:F2}", 3.14]), "Value is 3.14")
+func test_format_repeats_placeholder():
+	assert_eq(_lib._builtin_format("{0} {0}", "Alice"), "Alice Alice")
 
 
-func test_format_empty():
-	assert_eq(_lib._builtin_format([]), "")
+func test_format_no_placeholder():
+	assert_eq(_lib._builtin_format("no placeholder here", "Alice"), "no placeholder here")
 
 
 # --- Enum operations ---

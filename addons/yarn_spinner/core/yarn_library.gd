@@ -33,6 +33,14 @@ enum CommandDispatchStatus {
 	PARSE_ERROR,
 }
 
+## Sentinel returned by [method call_function] when the invoked function
+## reported an error via [method report_function_error]. A StringName is a
+## distinct Variant type from String, so it can never collide with a
+## legitimate function return value.
+const FUNCTION_ERROR := &"__yarn_function_error__"
+
+var _function_error: String = ""
+
 var _functions: Dictionary[String, Callable] = {}
 var _commands: Dictionary[String, Callable] = {}
 var _function_param_counts: Dictionary[String, int] = {}
@@ -148,6 +156,21 @@ func _find_node_recursive(node: Node, target_name: String) -> Node:
 	return null
 
 
+## Records that a built-in function received input it cannot handle.
+## [method call_function] returns [constant FUNCTION_ERROR] on the same
+## call, which the virtual machine treats as a reason to stop the dialogue.
+func report_function_error(message: String) -> void:
+	_function_error = message
+	push_error("yarn library: %s" % message)
+
+
+## Returns the pending function error message and clears it.
+func take_function_error() -> String:
+	var message := _function_error
+	_function_error = ""
+	return message
+
+
 func has_function(func_name: String) -> bool:
 	return _functions.has(func_name)
 
@@ -186,10 +209,12 @@ func call_function(func_name: String, stack: Array, vm: YarnVirtualMachine) -> V
 
 	# Variadic functions (param_count == -1) receive args as a single array
 	var param_count: int = _function_param_counts.get(func_name, -1)
-	if param_count == -1:
-		return callable.call(args)
-	else:
-		return callable.callv(args)
+	var result: Variant = callable.call(args) if param_count == -1 else callable.callv(args)
+
+	if not _function_error.is_empty():
+		return FUNCTION_ERROR
+
+	return result
 
 
 ## Returns {status, handled, is_async, result, error}.
@@ -614,7 +639,7 @@ func _register_builtin_functions() -> void:
 	register_function("has_any_content", _builtin_has_any_content, 1)
 
 	register_function("format_invariant", _builtin_format_invariant, 1)
-	register_function("format", _builtin_format, -1)
+	register_function("format", _builtin_format, 2)
 
 	register_function("plural", _builtin_plural, -1)
 	register_function("ordinal", _builtin_ordinal, -1)
@@ -627,8 +652,7 @@ func _register_builtin_functions() -> void:
 
 func _builtin_string(value: Variant) -> String:
 	if value is float:
-		var s := "%.6f" % value
-		return s.rstrip("0").rstrip(".")
+		return YarnNumber.to_display_string(value)
 	return str(value)
 
 
@@ -639,22 +663,32 @@ func _builtin_number(value: Variant) -> float:
 		elif value.is_valid_int():
 			return float(int(value))
 		else:
-			push_warning("yarn library: cannot convert '%s' to number, returning 0" % value)
+			report_function_error("number(): cannot convert '%s' to a number" % value)
 			return 0.0
 	if value is bool:
 		return 1.0 if value else 0.0
 	if value is float or value is int:
 		return float(value)
-	push_warning("yarn library: cannot convert value to number, returning 0")
+	report_function_error("number(): cannot convert value to a number")
 	return 0.0
 
 
 func _builtin_bool(value: Variant) -> bool:
 	if value is String:
-		return value.to_lower() == "true" or value == "1"
-	if value is float:
-		return value != 0.0
-	return bool(value)
+		match value.to_lower():
+			"true":
+				return true
+			"false":
+				return false
+			_:
+				report_function_error("bool(): cannot convert '%s' to a bool, expected 'true' or 'false'" % value)
+				return false
+	if value is float or value is int:
+		return value != 0
+	if value is bool:
+		return value
+	report_function_error("bool(): cannot convert value to a bool")
+	return false
 
 
 func _builtin_random() -> float:
@@ -685,7 +719,7 @@ func _builtin_dice(sides: float) -> int:
 
 
 func _builtin_round(value: float) -> int:
-	return int(roundf(value))
+	return int(_round_half_to_even(value))
 
 
 func _builtin_round_places(value: float, places: float) -> float:
@@ -694,7 +728,24 @@ func _builtin_round_places(value: float, places: float) -> float:
 		push_warning("yarn library: round_places() called with negative places %s, using 0" % places)
 		int_places = 0
 	var multiplier := pow(10, int_places)
-	return roundf(value * multiplier) / multiplier
+	return _round_half_to_even(value * multiplier) / multiplier
+
+
+## Round half to even ("banker's rounding"), the rounding yarn's round()
+## uses. Godot's own roundf() rounds half away
+## from zero (2.5 -> 3), which is not the rounding yarn scripts are
+## written against.
+func _round_half_to_even(value: float) -> float:
+	var floored := floorf(value)
+	var diff := value - floored
+	if diff > 0.5:
+		return floored + 1.0
+	if diff < 0.5:
+		return floored
+	# Exactly halfway: round to the even neighbour.
+	if int(floored) % 2 == 0:
+		return floored
+	return floored + 1.0
 
 
 func _builtin_floor(value: float) -> int:
@@ -826,24 +877,25 @@ func _builtin_mod(a: float, b: float) -> float:
 	return fmod(a, b)
 
 
-func _builtin_format(args: Array) -> String:
-	if args.is_empty():
-		return ""
-	var format_str: String = str(args[0])
-	for i in range(1, args.size()):
-		var placeholder := "{%d}" % (i - 1)
-		var value_str := str(args[i])
-		if format_str.contains(placeholder):
-			format_str = format_str.replace(placeholder, value_str)
-		else:
-			# Handle format specifiers like {0:F2} by stripping the specifier
-			var prefix := "{%d:" % (i - 1)
-			var start_pos := format_str.find(prefix)
-			if start_pos >= 0:
-				var end_pos := format_str.find("}", start_pos)
-				if end_pos >= 0:
-					format_str = format_str.substr(0, start_pos) + value_str + format_str.substr(end_pos + 1)
-	return format_str
+static var _format_placeholder_regex: RegEx
+
+
+## format(format_string, argument): replaces every {0} in format_string with
+## argument. Any other numbered placeholder ({1}, {2}, ...) is an error —
+## format() takes exactly one substitution argument, matching the reference
+## runtimes.
+func _builtin_format(format_string: String, argument: Variant) -> String:
+	if _format_placeholder_regex == null:
+		_format_placeholder_regex = RegEx.new()
+		_format_placeholder_regex.compile("\\{(\\d+)\\}")
+
+	for m in _format_placeholder_regex.search_all(format_string):
+		var index := int(m.get_string(1))
+		if index != 0:
+			report_function_error("format(): invalid placeholder {%d} in '%s', only {0} is supported" % [index, format_string])
+			return format_string
+
+	return format_string.replace("{0}", _builtin_string(argument))
 
 
 func _builtin_length(value: String) -> int:
@@ -895,16 +947,17 @@ func _op_number_multiply(a: float, b: float) -> float:
 
 
 func _op_number_divide(a: float, b: float) -> float:
-	if b == 0.0:
-		return INF if a >= 0.0 else -INF  # Unity returns Infinity
+	# Float division by zero follows IEEE-754 (inf, -inf, or nan for 0/0).
+	# No guard: a hand-rolled one
+	# gets the 0/0 case wrong.
 	return a / b
 
 
 func _op_number_modulo(a: float, b: float) -> float:
-	if b == 0.0:
-		push_error("yarn library: modulo by zero")
+	if int(b) == 0:
+		report_function_error("modulo by zero")
 		return 0.0
-	# Unity converts to int before modulo
+	# Operands convert to int before modulo
 	return float(int(a) % int(b))
 
 

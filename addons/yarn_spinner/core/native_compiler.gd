@@ -64,37 +64,20 @@ static func compile(files: Array[Dictionary], declarations: Array[Dictionary] = 
 		input["declarations"] = declarations
 	var input_json := JSON.stringify(input)
 
-	# Write to temp file (avoids stdin pipe limitations on Windows)
-	var temp_path := OS.get_cache_dir().path_join("yarn_compile_input.json")
-	var temp_file := FileAccess.open(temp_path, FileAccess.WRITE)
-	if temp_file == null:
-		return _error_result("Failed to create temp file: %s" % error_string(FileAccess.get_open_error()))
-	temp_file.store_string(input_json)
-	temp_file.close()
-
-	# Execute native compiler
-	var output := []
-	var exit_code := OS.execute(bin_path, [], output, true, false)
-
-	# Clean up temp - but first we need to pipe stdin
-	# Actually OS.execute doesn't support stdin. Use a shell pipe instead.
-	DirAccess.remove_absolute(temp_path)
-
-	if exit_code == -1:
-		return _error_result("Failed to execute native compiler at: %s" % bin_path)
-
-	# For stdin piping, use create_process + write
 	return _compile_via_pipe(bin_path, input_json)
 
 
-## Compile using process pipe (stdin/stdout).
+## Compile by feeding the input JSON to the binary's stdin.
 static func _compile_via_pipe(bin_path: String, input_json: String) -> Dictionary:
-	# Use OS.create_process isn't available for stdin writing in GDScript.
-	# Write input to temp file and redirect via shell.
-	var temp_path := OS.get_cache_dir().path_join("yarn_compile_input.json")
+	# The binary reads its job from stdin, and OS.execute can't write to a
+	# child's stdin, so the JSON goes into a temp file that the shell
+	# redirects. The filename includes the process id and a timestamp so
+	# concurrent editor instances sharing one cache dir don't race.
+	var temp_path := OS.get_cache_dir().path_join(
+		"yarn_compile_input_%d_%d.json" % [OS.get_process_id(), Time.get_ticks_usec()])
 	var temp_file := FileAccess.open(temp_path, FileAccess.WRITE)
 	if temp_file == null:
-		return _error_result("Failed to create temp file")
+		return _error_result("Failed to create temp file: %s" % error_string(FileAccess.get_open_error()))
 	temp_file.store_string(input_json)
 	temp_file.close()
 
@@ -103,9 +86,15 @@ static func _compile_via_pipe(bin_path: String, input_json: String) -> Dictionar
 	var os_name := OS.get_name().to_lower()
 
 	if os_name == "windows":
+		# Args are passed separately; Godot's process launcher quotes any
+		# argument containing spaces, so paths survive cmd's parsing.
 		exit_code = OS.execute("cmd.exe", ["/c", "type", temp_path, "|", bin_path], output, true, false)
 	else:
-		exit_code = OS.execute("/bin/sh", ["-c", bin_path + " < " + temp_path.c_escape()], output, true, false)
+		# Both paths are single-quoted for the shell (embedded quotes
+		# escaped), so spaces and metacharacters in either path can't
+		# break or inject into the command.
+		var cmd := "exec %s < %s" % [_shell_quote(bin_path), _shell_quote(temp_path)]
+		exit_code = OS.execute("/bin/sh", ["-c", cmd], output, true, false)
 
 	DirAccess.remove_absolute(temp_path)
 
@@ -114,6 +103,11 @@ static func _compile_via_pipe(bin_path: String, input_json: String) -> Dictionar
 
 	var result_json: String = output[0] if output[0] is String else str(output[0])
 	return _parse_result(result_json)
+
+
+## Wrap a string in single quotes for POSIX sh, escaping embedded quotes.
+static func _shell_quote(s: String) -> String:
+	return "'" + s.replace("'", "'\\''") + "'"
 
 
 static func _parse_result(result_json: String) -> Dictionary:

@@ -27,8 +27,59 @@ now refuses the attach outright. Attach one of the presenters from
 and friends), or subclass the base for your own. Existing subclasses are
 unaffected!
 
+### Changed
+
+- The `plural` annd `ordinal` markup markers now use the full set of Unicode
+  CLDR plural rules, covering over a hundred languages, instead of a
+  hand-picked list of about twenty. Languages such as Welsh, Irish,
+  Scottish Gaelic, Breton, Maltese, Slovenian, Lithuanian, Latvian,
+  Icelandic, and most South and Southeast Asian languages now get correct
+  plural forms in `[plural value="%" ...]` and `[ordinal value="%" ...]`
+  text, rather than falling back to a generic "one for 1, other for
+  everything else" guess. The rules are onm their own file,
+  `cldr_plural_rules.gd`, so they can be extended without touching the
+  markup replacement code itself! Woo! This took a while.
+- Command text is now split into arguments the same way Yarn Spinner for
+  Unity does: only double quotes delimit a quoted argument, and inside one
+  only `\\` and `\"` are treated as escapes. Single quotes and stray
+  backslashes are no longer special. **This is breaking** if a command
+  relied on single quotes to group an argument (`<<say 'hello there'>>`
+  used to produce one argument; it now produces two, `'hello` and
+  `there'`) or on a backslash escaping something other than a quote or
+  another backslash. Wrap arguments that ned spaces in double quotes
+  instead, and expect a literal backslash wherever your command text has
+  one...
+- `bool()` and `number()` now stop the dialoue with a clear error when
+  given input they can't convert, instead of logging a warning and
+  quietly substituting `false` or `0`. `bool()` also no longer accepts
+  `"1"` as a stand-in for `"true"` — only `"true"` and `"false"`
+  (case-insensitive) convert from a string. `format()` now takes exactly
+  one substitution argument, `format(formatString, argument)`, matching
+  every other Yarn Spinner runtime; every `{0}` in the format string is
+  replaced, and any other numbered placeholder is an error rather than
+  being left in the text or silently stripped.
+- Numbers are now stored and displayed as 32-bit floats, matching the
+  Yarn Spinner value model, and print using the same shortest
+  round-trip formatting as the other runtimes (`0.1` stays `0.1`,
+  `10000000` stays plain, `1000000000` becomes `1E+09`) instead of a
+  fixed six-decimal-place format that could show trailing precision Yarn
+  never had. I felt this was important for parity with the TypeScript runner
+  that is used for people's testing.
+- Malformed markup now logs a warning describing what went wrong and
+  where, instead of failing silently and falling back to the raw text.
+
 ### Fixed
 
+- `[plural]` and `[ordinal]` markup now follows the active locale. The
+  line's locale was being set after its text had already been parsed, so
+  every line used English plural and ordinal rules regardless of what
+  `set_locale()` was called with.
+- Option text now processes `select`, `plural`, and `ordinal` markup, the
+  same as lines do. These markers in an option used to be stripped to
+  nothing by the display path.
+- Modulo by zero now stops the dialogue with a clear error instead of
+  returning 0. Note the divisor converts to an integer first, so a
+  divisor smaller than 1 also counts as zero.
 - Shadow lines (`#shadow:`) now display their source line's text, and play
   its voice over audio, instead of showing a raw line ID. The line provider
   resolves the shadow source before any lookup, the same way Yarn Spinner
@@ -36,6 +87,50 @@ unaffected!
 - A line with no text in the current locale now logs a warning naming the
   line and locale. It still displays the line ID as before, but no longer
   does so silently.
+- The continue button installed by the action markup handler now advances
+  the line. It was calling a method that doesn't exist on the dialogue
+  runner, behind a guard that hid the mistake, so pressing it did nothing.
+- Preloaded assets are now actually used. Background loads started by
+  `preload_assets()` were never collected, so every line fell back to a
+  synchronous load anyway, and a line ID that had ever been preloaded could
+  never be requested again. Finished loads are now collected whenever an
+  asset is fetched.
+- The bundled native compiler is invoked once per compile instead of twice.
+  The first invocation was a leftover that ran the binary with no input and
+  could stall the editor waiting on it.
+- Compiling with the native compiler now works when the project or the
+  Godot cache directory has spaces or shell metacharacters in its path, and
+  two editor instances compiling at the same time no longer overwrite each
+  other's temporary files.
+- Dividing zero by zero in a Yarn expression now produces NaN, matching
+  Yarn Spinner for Unity. A hand-rolled guard was returning infinity.
+- A broken script now stops the dialogue with a clear error instead of
+  limping on with wrong values! Calling an unknown function, or reading a
+  variable that doesn't exist anywhere (storage, smart variables, or the
+  program's initial values), used to log and continue with null on the
+  VM stack, which sent the story down branches nobody wrote. All Yarn
+  Spinner runtimes now fail identically here hooray.
+- A smart variable whose expression leaves the wrong number of values on
+  the stack is now reported as an error instead of silently returning
+  whichever value happened to be on top.
+- `round()` and `round_places()` now round half to even ("banker's
+  rounding", so 2.5 rounds to 2 and 3.5 to 4), matching every other Yarn
+  Spinner runtime. Godot's own `roundf()` rounds half away from zero. Agian,
+  important while folks are testing/using the TypeScript runner as part
+  of their toolchain (e.g. VSCode).
+
+### Documentation
+
+- The custom presenter example in the quick start now uses the new
+  presenter contract (`run_line(line, token) -> void`, await inside). The
+  old example still showed the pre-Alpha 7 return-a-Variant style!
+- Corrected signal and property names in the README and quick start:
+  `command_unhandled` (not `unhandled_command`) and
+  `show_selected_option_as_line` (not `run_selected_option_as_line`).
+- The docs now lead with the bundled native compiler, which needs no
+  setup. Installing `ysc` via the .NET SDK is documented as the fallback
+  for platforms without a bundled binary. This will improve in the next
+  alpha, so probably worth still keeping `ysc` around for now.
 
 ## Alpha 8 (2026-07-28)
 

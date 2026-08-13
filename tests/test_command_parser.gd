@@ -16,10 +16,14 @@ func test_quoted_string_argument():
 	assert_eq(parts[2], "character")
 
 
-func test_single_quoted_argument():
+func test_single_quotes_have_no_special_meaning():
+	# Only double quotes delimit a quoted span; single quotes are literal
+	# characters.
 	var parts := YarnCommandParser.parse("say 'hello world'")
-	assert_eq(parts.size(), 2)
-	assert_eq(parts[1], "hello world")
+	assert_eq(parts.size(), 3)
+	assert_eq(parts[0], "say")
+	assert_eq(parts[1], "'hello")
+	assert_eq(parts[2], "world'")
 
 
 func test_escaped_characters():

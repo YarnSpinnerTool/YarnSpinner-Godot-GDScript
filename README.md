@@ -55,8 +55,8 @@ The addon is the `addons/yarn_spinner/` folder inside this repository. That fold
 1. Clone or download this repository.
 2. Copy `addons/yarn_spinner/` into your Godot project's `addons/` directory, or symlink it from your checkout. The result should be `res://addons/yarn_spinner/plugin.cfg` in your project.
 3. In the Godot editor, go to **Project > Project Settings > Plugins** and enable **Yarn Spinner**.
-4. Install `ysc` (the [Yarn Spinner Console](https://github.com/YarnSpinnerTool/YarnSpinner-Console) tool): `dotnet tool install YarnSpinner.Console --global --version 3.2.2`
-5. Drop your `.yarnproject` and `.yarn` files into your Godot project. The plugin automatically compiles them via `ysc` on import -- any time a `.yarn` file or the `.yarnproject` changes, Godot reimports and recompiles.
+4. Drop your `.yarnproject` and `.yarn` files into your Godot project. The plugin compiles them automatically on import using its bundled compiler -- any time a `.yarn` file or the `.yarnproject` changes, Godot reimports and recompiles. No separate install is needed.
+5. Only if the bundled compiler isn't available for your platform: install `ysc` (the [Yarn Spinner Console](https://github.com/YarnSpinnerTool/YarnSpinner-Console) tool) as a fallback with `dotnet tool install YarnSpinner.Console --global --version 3.2.2`.
 6. Assign the imported `.yarnproject` to a Dialogue Runner in your scene.
 
 If Godot reports missing dependencies on `res://addons/yarn_spinner/...` paths, or scripts fail to parse with `Could not find type "YarnDialogueRunner"`, the addon isn't at the path the project expects. The usual cause is copying the whole repository into `addons/`, which puts the addon at `addons/YarnSpinner-Godot-GDScript/addons/yarn_spinner`. Move the inner `yarn_spinner` folder so it sits directly under `addons/`, then reload the project.
@@ -65,7 +65,7 @@ If Godot reports missing dependencies on `res://addons/yarn_spinner/...` paths, 
 
 The Yarn Spinner compiler (`ysc`) compiles `.yarn` scripts into a binary protobuf program. This plugin reads that binary at import time, parses it into an in-memory program representation, and executes it in a stack-based virtual machine. The VM handles control flow, variable storage, function calls, and content delivery. A dialogue runner orchestrates the VM and routes lines, options, and commands to presenter nodes in your scene tree.
 
-You write dialogue in Yarn, and the plugin compiles and runs it. If `ysc` is on your PATH, compilation happens automatically when Godot imports the `.yarnproject` file.
+You write dialogue in Yarn, and the plugin compiles and runs it. Compilation happens automatically when Godot imports the `.yarnproject` file, using the compiler binary bundled with the addon (or `ysc` from your PATH as a fallback).
 
 ## Architecture
 
@@ -88,10 +88,10 @@ The central node. Add it to your scene, assign a `.yarnproject`, an call `start_
 - `auto_start` -- start dialogue when the scene loads
 - `variable_storage` -- where game state is stored (auto-created if not set)
 - `saliency_strategy` -- how to pick between competing content candidates
-- `run_selected_option_as_line` -- re-display the chosen option as a line of dialogue
+- `show_selected_option_as_line` -- re-display the chosen option as a line of dialogue
 - `auto_discover_commands` -- find `_yarn_command_*` methods in your scene automatically
 
-Signals: `dialogue_started`, `dialogue_completed`, `node_started`, `node_completed`, `unhandled_command`.
+Signals: `dialogue_started`, `dialogue_completed`, `dialogue_cancelled`, `node_started`, `node_completed`, `command_unhandled`, `command_received`.
 
 ### YarnLinePresenter
 

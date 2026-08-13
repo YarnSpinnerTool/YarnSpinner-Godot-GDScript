@@ -83,6 +83,13 @@ func load_mappings_from_csv(path: String) -> Error:
 
 
 func get_asset(line_id: String) -> Resource:
+	# Harvest any finished background loads first, so a preloaded asset is
+	# served from cache instead of falling through to a synchronous load.
+	# Nothing else drives the pending-load queue; without this, results are
+	# never collected and their entries block re-requests forever.
+	if not _pending_loads.is_empty():
+		poll_threaded_loads()
+
 	if _cache.has(line_id):
 		_update_access_order(line_id)
 		return _cache[line_id]
@@ -108,6 +115,9 @@ func get_asset(line_id: String) -> Resource:
 
 
 func get_audio(line_id: String) -> AudioStream:
+	if not _pending_loads.is_empty():
+		poll_threaded_loads()
+
 	if _audio_cache.has(line_id):
 		_update_access_order(line_id)
 		return _audio_cache[line_id]
@@ -126,6 +136,9 @@ func get_audio(line_id: String) -> AudioStream:
 
 
 func get_texture(line_id: String) -> Texture2D:
+	if not _pending_loads.is_empty():
+		poll_threaded_loads()
+
 	if _image_cache.has(line_id):
 		_update_access_order(line_id)
 		return _image_cache[line_id]

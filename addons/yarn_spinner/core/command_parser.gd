@@ -21,29 +21,61 @@ extends RefCounted
 ## Parses Yarn command strings with support for quoted arguments and escapes.
 
 
+## Whitespace characters that separate unquoted tokens in yarn command text.
+const _WHITESPACE := [" ", "\t", "\n", "\r"]
+
+
 ## Returns [command_name, arg1, arg2, ...].
+##
+## Splits on whitespace outside quotes. Only double quotes delimit a quoted
+## span; inside one, \\ and \" are the only escapes, and closing the quote
+## flushes the token immediately even if more non-whitespace text follows
+## (so text before a quote merges with it, but text after does not). Single
+## quotes and backslashes outside quotes carry no special meaning.
 static func parse(command_text: String) -> Array[String]:
 	var parts: Array[String] = []
 	var current := ""
-	var quote_char := ""
-	var escape_next := false
+	var length := command_text.length()
+	var i := 0
 
-	for c in command_text:
-		if escape_next:
-			current += c
-			escape_next = false
-		elif c == "\\":
-			escape_next = true
-		elif quote_char.is_empty() and (c == "\"" or c == "'"):
-			quote_char = c
-		elif c == quote_char:
-			quote_char = ""
-		elif c == " " and quote_char.is_empty():
+	while i < length:
+		var c := command_text[i]
+
+		if c in _WHITESPACE:
 			if not current.is_empty():
 				parts.append(current)
 				current = ""
-		else:
-			current += c
+			i += 1
+			continue
+
+		if c == "\"":
+			i += 1
+			var closed := false
+			while i < length:
+				var qc := command_text[i]
+				if qc == "\\":
+					var next_c := command_text[i + 1] if i + 1 < length else ""
+					if next_c == "\\" or next_c == "\"":
+						current += next_c
+						i += 2
+					else:
+						current += qc
+						i += 1
+				elif qc == "\"":
+					i += 1
+					closed = true
+					break
+				else:
+					current += qc
+					i += 1
+			parts.append(current)
+			current = ""
+			if not closed:
+				return parts
+			continue
+
+		current += c
+		i += 1
 
 	if not current.is_empty():
 		parts.append(current)

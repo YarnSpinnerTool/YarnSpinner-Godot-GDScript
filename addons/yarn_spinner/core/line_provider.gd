@@ -79,6 +79,7 @@ func get_localised_line(line: YarnLine) -> void:
 	if line.raw_text.is_empty():
 		push_warning("line provider: no text found for line '%s' in locale '%s'" % [line.line_id, get_current_locale()])
 		line.raw_text = line.line_id
+	line.locale_code = get_current_locale()
 	line.apply_substitutions()
 	line.parse_markup()
 
@@ -112,6 +113,7 @@ func _resolve_source_line_id(line_id: String) -> String:
 
 func get_localised_option(option: YarnOption) -> void:
 	option.raw_text = _get_string(_resolve_source_line_id(option.line_id))
+	option.locale_code = get_current_locale()
 	option.apply_substitutions()
 
 

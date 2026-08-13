@@ -44,6 +44,9 @@ var raw_text: String = ""
 ## #hashtag metadata from the yarn source.
 var metadata: PackedStringArray = PackedStringArray()
 
+## BCP-47 locale for [plural] and [ordinal] rules. Set by the line provider.
+var locale_code: String = "en"
+
 
 # ---------------------------------------------------------------------------
 # Lazy-computed text
@@ -52,12 +55,17 @@ var metadata: PackedStringArray = PackedStringArray()
 var _text_computed: bool = false
 var _text: String = ""
 
-## Final text after substitution. Computed lazily on first access.
+## Final text after substitution and markup processing (select, plural,
+## and ordinal markers resolve here, the same as [member YarnLine.text]).
+## Computed lazily on first access.
 var text: String:
 	get:
 		if not _text_computed:
 			_text_computed = true
 			_text = YarnLineParser.expand_substitutions(raw_text, substitutions)
+			_ensure_parser_initialized()
+			var result := _name_parser.parse_string(_text, locale_code, true)
+			_text = result.text
 		return _text
 	set(value):
 		_text = value
@@ -71,6 +79,15 @@ func apply_substitutions() -> void:
 
 
 static var _name_parser: YarnLineParser
+
+
+static func _ensure_parser_initialized() -> void:
+	if _name_parser == null:
+		_name_parser = YarnLineParser.new()
+		var builtin_replacer := YarnBuiltInMarkupReplacer.new()
+		_name_parser.register_marker_processor("select", builtin_replacer)
+		_name_parser.register_marker_processor("plural", builtin_replacer)
+		_name_parser.register_marker_processor("ordinal", builtin_replacer)
 
 var _name_split_done: bool = false
 var _character_name: String = ""
@@ -95,9 +112,8 @@ func _ensure_name_split() -> void:
 		return
 	_name_split_done = true
 
-	if _name_parser == null:
-		_name_parser = YarnLineParser.new()
-	var result := _name_parser.parse_string(text, "", true)
+	_ensure_parser_initialized()
+	var result := _name_parser.parse_string(text, locale_code, true)
 	_text_without_name = result.text
 
 	for attr in result.attributes:

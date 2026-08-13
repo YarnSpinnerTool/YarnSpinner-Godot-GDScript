@@ -53,6 +53,9 @@ static func try_evaluate(node: YarnNode, variable_storage: YarnVariableStorage, 
 				if library == null:
 					return {found = false, value = null}
 				var result: Variant = library.call_function(instruction.function_name, stack, null)
+				if result == YarnLibrary.FUNCTION_ERROR:
+					library.take_function_error()
+					return {found = false, value = null}
 				if result != null:
 					stack.push_back(result)
 
@@ -68,20 +71,18 @@ static func try_evaluate(node: YarnNode, variable_storage: YarnVariableStorage, 
 				if not _is_truthy(value):
 					ip = instruction.destination
 
-			YarnInstruction.OpCode.JUMP_TO:
-				ip = instruction.destination
-
 			YarnInstruction.OpCode.STOP:
-				break
-
-			YarnInstruction.OpCode.RETURN:
 				break
 
 			_:
 				# unsupported opcode for smart variable evaluation
 				return {found = false, value = null}
 
-	if stack.is_empty():
+	if stack.size() != 1:
+		# A well-formed smart variable node leaves exactly one value: its
+		# result. Anything else means the expression bytecode is corrupt,
+		# and returning whatever happens to be on top would hide that.
+		push_error("smart variable vm: expected exactly 1 value on the stack after evaluation, found %d" % stack.size())
 		return {found = false, value = null}
 
 	return {found = true, value = stack.back()}

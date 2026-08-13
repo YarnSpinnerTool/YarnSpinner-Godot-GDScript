@@ -742,6 +742,8 @@ static func _squish_split_attributes(attributes: Array) -> void:
 ## parse a string and produce a markup parse result.
 func parse_string(input: String, locale_code: String, add_implicit_character: bool = true) -> YarnMarkupParseResult:
 	var result := _parse_string_with_diagnostics(input, locale_code, true, true, add_implicit_character)
+	for diagnostic in result.diagnostics:
+		push_warning("markup: %s" % diagnostic._to_string())
 	return result.markup
 
 
@@ -806,6 +808,7 @@ static func expand_substitutions(text: String, substitutions: Array) -> String:
 		return ""
 
 	for i in range(substitutions.size()):
-		text = text.replace("{%d}" % i, str(substitutions[i]))
+		var value: Variant = substitutions[i]
+		text = text.replace("{%d}" % i, "" if value == null else str(value))
 
 	return text

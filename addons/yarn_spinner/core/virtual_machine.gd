@@ -460,8 +460,14 @@ func _execute_next_instruction() -> void:
 			# Fall back to Program.InitialValues if not in storage.
 			if value == null and program != null:
 				value = program.get_initial_value(instruction.variable_name)
-			if value == null and not instruction.variable_name.begins_with("$Yarn.Internal."):
-				push_error("virtual machine: variable '%s' not found" % instruction.variable_name)
+			if value == null:
+				# A missing variable can't be papered over with null: the
+				# next instruction would consume it and send the story down
+				# a branch nobody wrote.
+				push_error("virtual machine: variable '%s' not found - stopping dialogue" % instruction.variable_name)
+				_has_error = true
+				current_state = ExecutionState.STOPPED
+				return
 			_push(value)
 
 		YarnInstruction.OpCode.STORE_VARIABLE:
@@ -633,12 +639,33 @@ func _execute_show_options() -> void:
 
 
 func _execute_call_function(instruction: YarnInstruction) -> void:
+	var func_name := instruction.function_name
+
+	# A missing library or unknown function can't be skipped: the compiler
+	# emitted this call expecting its result on the stack, so carrying on
+	# would leave every later instruction reading the wrong values.
 	if _library == null:
-		push_error("virtual machine: no library set for function call")
+		push_error("virtual machine: no library set for function call '%s' - stopping dialogue" % func_name)
+		_has_error = true
+		current_state = ExecutionState.STOPPED
+		return
+	if not _library.has_function(func_name):
+		# The library logs the detailed registration advice; this error is
+		# about why execution stops.
+		_library.call_function(func_name, _stack, self)
+		push_error("virtual machine: unknown function '%s' - stopping dialogue" % func_name)
+		_has_error = true
+		current_state = ExecutionState.STOPPED
 		return
 
-	var func_name := instruction.function_name
 	var result: Variant = _library.call_function(func_name, _stack, self)
+	if result == YarnLibrary.FUNCTION_ERROR:
+		var message := _library.take_function_error()
+		push_error("virtual machine: function '%s' failed (%s) - stopping dialogue" % [func_name, message])
+		_has_error = true
+		last_error = message
+		current_state = ExecutionState.STOPPED
+		return
 	if result != null:
 		_push(result)
 
@@ -783,6 +810,8 @@ func _execute_select_saliency_candidate() -> void:
 
 
 func _push(value: Variant) -> void:
+	if value is float:
+		value = YarnNumber.to_f32(value)
 	_stack.push_back(value)
 
 
@@ -830,9 +859,7 @@ func _value_to_string(value: Variant) -> String:
 	if value is bool:
 		return "true" if value else "false"
 	if value is float:
-		var s := "%.6f" % value
-		s = s.rstrip("0").rstrip(".")
-		return s
+		return YarnNumber.to_display_string(value)
 	return str(value)
 
 

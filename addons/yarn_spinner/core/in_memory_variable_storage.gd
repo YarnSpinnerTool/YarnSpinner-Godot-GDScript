@@ -65,6 +65,8 @@ func set_value(variable_name: String, value: Variant) -> void:
 		return
 	if not validate_value_type(variable_name, value):
 		return
+	if value is float:
+		value = YarnNumber.to_f32(value)
 	var old_value: Variant = _variables.get(variable_name)
 	_variables[variable_name] = value
 	if old_value != value:
