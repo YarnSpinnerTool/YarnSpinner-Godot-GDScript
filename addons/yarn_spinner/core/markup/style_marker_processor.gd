@@ -39,38 +39,32 @@ func process_replacement_marker(
 		var error := MarkupDiagnostic.new("unable to identify a name for the style.")
 		return ReplacementMarkerResult.new([error], 0)
 
-	var style_name := style_prop.string_value.to_lower()
+	var style_name := style_prop.to_string_value().to_lower()
 	var original_length: int = child_builder[0].length()
 	var open_tag := ""
 	var close_tag := ""
 
 	if styles.has(style_name):
 		var style: Dictionary = styles[style_name]
-		open_tag = style.get("start", "")
-		close_tag = style.get("end", "")
-		child_builder[0] = open_tag + child_builder[0] + close_tag
-		return ReplacementMarkerResult.new([], child_builder[0].length() - original_length)
-
-	match style_name:
-		"bold", "b":
-			open_tag = "[b]"
-			close_tag = "[/b]"
-		"italic", "i":
-			open_tag = "[i]"
-			close_tag = "[/i]"
-		"underline", "u":
-			open_tag = "[u]"
-			close_tag = "[/u]"
-		"strikethrough", "s":
-			open_tag = "[s]"
-			close_tag = "[/s]"
-		"code":
-			open_tag = "[code]"
-			close_tag = "[/code]"
-		_:
-			# pass unknown styles through as custom bbcode tags
-			open_tag = "[%s]" % style_name
-			close_tag = "[/%s]" % style_name
+		open_tag = YarnMarkupParser.brackets_to_tags(style.get("start", ""))
+		close_tag = YarnMarkupParser.brackets_to_tags(style.get("end", ""))
+	else:
+		match style_name:
+			"bold", "b":
+				open_tag = YarnMarkupParser.bbcode_tag("b")
+				close_tag = YarnMarkupParser.bbcode_tag("/b")
+			"italic", "i":
+				open_tag = YarnMarkupParser.bbcode_tag("i")
+				close_tag = YarnMarkupParser.bbcode_tag("/i")
+			"underline", "u":
+				open_tag = YarnMarkupParser.bbcode_tag("u")
+				close_tag = YarnMarkupParser.bbcode_tag("/u")
+			"strikethrough", "s":
+				open_tag = YarnMarkupParser.bbcode_tag("s")
+				close_tag = YarnMarkupParser.bbcode_tag("/s")
+			"code":
+				open_tag = YarnMarkupParser.bbcode_tag("code")
+				close_tag = YarnMarkupParser.bbcode_tag("/code")
 
 	child_builder[0] = open_tag + child_builder[0] + close_tag
 	var invisible_chars: int = child_builder[0].length() - original_length

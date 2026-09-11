@@ -21,7 +21,7 @@ extends YarnVariableStorage
 ## In-memory implementation of variable storage.
 
 var _variables: Dictionary = {}
-var validate_variable_names: bool = false
+var validate_variable_names: bool = true
 
 ## Assign a Label or RichTextLabel to display variables in-game.
 @export var debug_text_view: Control
@@ -51,12 +51,9 @@ func _update_debug_view() -> void:
 func _validate_variable_name(variable_name: String) -> bool:
 	if not validate_variable_names:
 		return true
-	if variable_name.is_empty():
-		push_error("variable storage: variable name cannot be empty")
-		return false
 	if not variable_name.begins_with("$"):
-		push_warning("variable storage: variable '%s' should start with '$'" % variable_name)
-		# don't fail, just warn - many scripts omit the $
+		push_error("variable storage: %s is not a valid variable name: variable names must start with a '$'. (Did you mean to use '$%s'?)" % [variable_name, variable_name])
+		return false
 	return true
 
 
@@ -65,15 +62,18 @@ func set_value(variable_name: String, value: Variant) -> void:
 		return
 	if not validate_value_type(variable_name, value):
 		return
+	if value is int:
+		value = float(value)
 	if value is float:
 		value = YarnNumber.to_f32(value)
 	var old_value: Variant = _variables.get(variable_name)
 	_variables[variable_name] = value
-	if old_value != value:
-		_notify_listeners(variable_name, value, old_value)
+	_notify_listeners(variable_name, value, old_value)
 
 
 func try_get_value(variable_name: String) -> Dictionary:
+	if not _validate_variable_name(variable_name):
+		return {found = false, value = null}
 	if _variables.has(variable_name):
 		return {found = true, value = _variables[variable_name]}
 	return {found = false, value = null}
@@ -110,24 +110,21 @@ func contains(variable_name: String) -> bool:
 
 
 func get_debug_list() -> String:
-	var lines := PackedStringArray()
+	var text := ""
 	for var_name in _variables:
 		var value: Variant = _variables[var_name]
-		var type_name := _get_type_name(value)
-		lines.append("%s = %s (%s)" % [var_name, str(value), type_name])
-	return "\n".join(lines)
+		text += "%s = %s (%s)\n" % [var_name, YarnVirtualMachine._value_to_string(value), _get_type_name(value)]
+	return text
 
 
 func _get_type_name(value: Variant) -> String:
 	match typeof(value):
 		TYPE_BOOL:
-			return "bool"
-		TYPE_INT:
-			return "int"
-		TYPE_FLOAT:
-			return "float"
+			return "Boolean"
+		TYPE_INT, TYPE_FLOAT:
+			return "Single"
 		TYPE_STRING:
-			return "string"
+			return "String"
 		_:
 			return type_string(typeof(value))
 

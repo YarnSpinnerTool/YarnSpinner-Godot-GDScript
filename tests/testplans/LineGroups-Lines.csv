@@ -1,0 +1,22 @@
+id,text,file,node,lineNumber
+line:e853ca80,"Baker: Hey there, friend! Made some fresh pies for you!",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,11
+line:7e63cdf7,"Baker: Hey there! Fresh pies, right out of the oven!",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,12
+line:c432c46e,Baker: Want another?,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,17
+line:5202c319,Baker: How about another pie?,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,18
+line:f197a787,Baker: Another pie?,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,19
+line:67a7a0f0,Baker: Another pie for my best customer?,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,21
+line:ddf6a969,Baker: What d'ya say?,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,23
+line:4bc6ae1e,Baker: How about it?,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,24
+line:dadb118e,Baker: Want one?,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,25
+line:4ceb16f9,Buy Pie,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,27
+line:794e9143,Baker: Thank you kindly!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,28
+line:ef7e9634,Baker: Pleasure doin' business with you!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,29
+line:552f9fad,Baker: Enjoy!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,30
+line:c31f98da,Don't Buy Pie,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,32
+line:608afc44,"Baker: Aw, that's a shame!",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,33
+line:f6bafb33,"Baker: Dang, no sale today!",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,34
+line:4cebf2aa,"Baker: Come back another time, then!",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,Start,35
+line:9a610499,Baker: Hey there!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,BakerSeesPlayer,40
+line:0b7cbb09,Baker: Fresh pies!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,BakerSeesPlayer,41
+line:9d4cbc7e,Baker: Fresh and hot pies!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,BakerSeesPlayer,42
+line:faa74d2c,Baker: Popular pies!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/LineGroups.yarn,BakerSeesPlayer,43

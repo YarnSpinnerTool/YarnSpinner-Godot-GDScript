@@ -53,11 +53,9 @@ func test_validate_rejects_non_yarn_types():
 	assert_push_error_count(1)
 
 
-func test_validate_rejects_type_change():
+func test_validate_allows_type_change():
 	_storage.set_value("$name", "Alice")
-	# Can't assign a number to a string variable
-	assert_false(_storage.validate_value_type("$name", 42))
-	assert_push_error_count(1)
+	assert_true(_storage.validate_value_type("$name", 42))
 
 
 func test_validate_allows_compatible_types():

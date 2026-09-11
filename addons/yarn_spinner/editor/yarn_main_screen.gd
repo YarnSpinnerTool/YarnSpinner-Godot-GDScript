@@ -57,6 +57,7 @@ var _node_list: ItemList
 ## Files grouped by .yarnproject: [{ name: String, project_path: String, files: [res:// paths] }, ...].
 ## A trailing "(Unassociated)" group collects .yarn files not matched by any project.
 var _project_groups: Array = []
+var _title_regex: RegEx
 
 # --- editor / commands ---
 var _code_edit: CodeEdit
@@ -528,16 +529,21 @@ func _refresh_node_outline() -> void:
 	_node_list.clear()
 
 	var filter := _node_filter.text.to_lower() if _node_filter else ""
+	if _title_regex == null:
+		_title_regex = RegEx.create_from_string("^[ \\t]*title[ \\t]*:[ \\t]*([^\\s/]+)[ \\t]*(?://.*)?$")
 	var lines := _code_edit.text.split("\n")
 	var in_header := true
 	for i in lines.size():
 		var stripped := lines[i].strip_edges()
-		if stripped == "---":
+		if in_header and stripped.begins_with("---"):
 			in_header = false
-		elif stripped == "===":
+		elif not in_header and stripped.begins_with("==="):
 			in_header = true
-		elif in_header and stripped.begins_with("title:"):
-			var node_name := stripped.substr(6).strip_edges()
+		elif in_header:
+			var title_match := _title_regex.search(lines[i].trim_suffix("\r"))
+			if title_match == null:
+				continue
+			var node_name := title_match.get_string(1)
 			if not filter.is_empty() and not node_name.to_lower().contains(filter):
 				continue
 			var idx := _node_list.add_item(node_name, _editor_icon("Active"))

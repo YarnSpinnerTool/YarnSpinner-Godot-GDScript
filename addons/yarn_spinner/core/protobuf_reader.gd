@@ -46,15 +46,16 @@ func init_from_file(path: String) -> Error:
 	_buffer = file.get_buffer(file.get_length())
 	file.close()
 	_position = 0
+	has_error = false
 	return OK
 
 
 func is_eof() -> bool:
-	return _position >= _buffer.size()
+	return has_error or _position >= _buffer.size()
 
 
 func is_at_end(end_pos: int) -> bool:
-	return _position >= end_pos
+	return has_error or _position >= end_pos
 
 
 func get_position() -> int:
@@ -130,8 +131,11 @@ func read_double() -> float:
 
 func read_bytes() -> PackedByteArray:
 	var length := read_varint()
-	if _position + length > _buffer.size():
+	if has_error:
+		return PackedByteArray()
+	if length < 0 or _position + length > _buffer.size():
 		push_error("protobuf reader: length-delimited field extends past buffer")
+		has_error = true
 		return PackedByteArray()
 	var result := _buffer.slice(_position, _position + length)
 	_position += length
@@ -159,17 +163,33 @@ func skip_field(wire_type: int) -> void:
 		WireType.VARINT:
 			read_varint()
 		WireType.FIXED64:
-			_position += 8
+			_advance(8)
 		WireType.LENGTH_DELIM:
 			var length := read_varint()
-			_position += length
+			if not has_error:
+				_advance(length)
 		WireType.FIXED32:
-			_position += 4
+			_advance(4)
 		_:
 			push_error("protobuf reader: unknown wire type %d" % wire_type)
+			has_error = true
+
+
+func _advance(count: int) -> void:
+	if count < 0 or _position + count > _buffer.size():
+		push_error("protobuf reader: attempted to skip past end of buffer (pos=%d, skip=%d, size=%d)" % [_position, count, _buffer.size()])
+		has_error = true
+		return
+	_position += count
 
 
 ## Returns the end position for sub-parsing.
 func begin_embedded_message() -> int:
 	var length := read_varint()
+	if has_error:
+		return _position
+	if length < 0 or _position + length > _buffer.size():
+		push_error("protobuf reader: embedded message extends past buffer")
+		has_error = true
+		return _position
 	return _position + length

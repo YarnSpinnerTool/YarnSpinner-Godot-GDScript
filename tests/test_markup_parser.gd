@@ -53,7 +53,7 @@ func test_self_closing_tag():
 
 func test_escaped_bracket():
 	var result := _parser.parse("\\[not a tag\\]")
-	assert_eq(result.text, "[not a tag]")
+	assert_eq(result.text, "[lb]not a tag[rb]")
 
 
 # --- Inline style shortcuts (regression: previously dropped silently) ---

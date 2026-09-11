@@ -47,6 +47,35 @@ static func fade_alpha(
 	return tween.finished
 
 
+static func fade_alpha_async(
+	target: CanvasItem,
+	from_alpha: float,
+	to_alpha: float,
+	duration: float,
+	token: YarnCancellationToken = null
+) -> void:
+	if target == null:
+		push_error("YarnEffects.fade_alpha_async: target is null")
+		return
+
+	if duration <= 0.0 or not target.is_inside_tree():
+		target.modulate.a = to_alpha
+		return
+
+	target.modulate.a = from_alpha
+	var elapsed := 0.0
+	while (token == null or not token.is_hurry_up_requested) and elapsed < duration:
+		await target.get_tree().process_frame
+		if not is_instance_valid(target) or not target.is_inside_tree():
+			return
+		if not target.can_process():
+			continue
+		elapsed += target.get_process_delta_time()
+		target.modulate.a = lerpf(from_alpha, to_alpha, clampf(elapsed / duration, 0.0, 1.0))
+
+	target.modulate.a = to_alpha
+
+
 static func fade_in(
 	target: CanvasItem,
 	duration: float = DEFAULT_FADE_DURATION,
@@ -79,7 +108,8 @@ static func fade_container(
 static func typewriter(
 	label: RichTextLabel,
 	text: String,
-	characters_per_second: float
+	characters_per_second: float,
+	token: YarnCancellationToken = null
 ) -> Signal:
 	if label == null:
 		push_error("YarnEffects.typewriter: label is null")
@@ -88,19 +118,16 @@ static func typewriter(
 	label.text = text
 	label.visible_ratio = 0.0
 
-	if characters_per_second <= 0:
+	var total_chars := label.get_total_character_count()
+	if characters_per_second <= 0 or total_chars == 0 or _is_hurried(token) or not label.is_inside_tree():
 		label.visible_ratio = 1.0
-		return Signal()
-
-	var total_chars := text.length()
-	if total_chars == 0:
-		label.visible_ratio = 1.0
-		return Signal()
+		return _next_frame(label)
 
 	var duration := float(total_chars) / characters_per_second
 
 	var tween := label.create_tween()
 	tween.tween_property(label, "visible_ratio", 1.0, duration)
+	_finish_on_hurry(tween, token, duration)
 
 	return tween.finished
 
@@ -110,7 +137,8 @@ static func typewriter_with_line(
 	label: RichTextLabel,
 	line: YarnLine,
 	characters_per_second: float,
-	pause_handler: YarnPauseEventProcessor = null
+	pause_handler: YarnPauseEventProcessor = null,
+	token: YarnCancellationToken = null
 ) -> Signal:
 	if label == null:
 		push_error("YarnEffects.typewriter_with_line: label is null")
@@ -120,69 +148,51 @@ static func typewriter_with_line(
 		push_error("YarnEffects.typewriter_with_line: line is null")
 		return Signal()
 
-	var text := line.text
-	label.text = text
-	label.visible_ratio = 0.0
+	var line_typewriter := YarnTypewriter.LetterTypewriter.new()
+	line_typewriter.characters_per_second = characters_per_second
+	line_typewriter.text_element = label
+	if pause_handler != null:
+		line_typewriter.action_markup_handlers = [pause_handler]
 
-	if characters_per_second <= 0:
-		label.visible_ratio = 1.0
+	var markup := line.get_markup_result_without_character_name()
+	var display_text := line.get_bbcode_text()
+	line_typewriter.prepare_for_content(markup, display_text)
+
+	if not label.is_inside_tree():
+		label.visible_characters = -1
 		return Signal()
 
-	var total_chars := text.length()
-	if total_chars == 0:
-		label.visible_ratio = 1.0
-		return Signal()
-
-	if pause_handler != null:
-		pause_handler.on_prepare_for_line(line, label)
-		pause_handler.on_line_display_begin(line, label)
-
-	var char_delay := 1.0 / characters_per_second
-	var tree := label.get_tree()
-
-	for i in range(total_chars):
-		if pause_handler != null and pause_handler.has_pause_at(i):
-			var pause_duration := pause_handler.get_pause_duration(i)
-			if pause_duration > 0 and tree != null:
-				await tree.create_timer(pause_duration).timeout
-
-		label.visible_characters = i + 1
-
-		if tree != null:
-			await tree.create_timer(char_delay).timeout
-
-	if pause_handler != null:
-		pause_handler.on_line_display_complete()
-
-	return Signal()
+	var done := YarnPromise.new()
+	_run_line_typewriter(line_typewriter, markup, display_text, token, done)
+	return done.completed
 
 
 static func typewriter_words(
 	label: RichTextLabel,
 	text: String,
-	words_per_second: float
+	words_per_second: float,
+	token: YarnCancellationToken = null
 ) -> Signal:
 	if label == null:
 		push_error("YarnEffects.typewriter_words: label is null")
 		return Signal()
 
 	label.text = text
-	label.visible_ratio = 0.0
 
-	if words_per_second <= 0:
-		label.visible_ratio = 1.0
-		return Signal()
+	var boundaries := YarnTypewriter.word_boundaries(label.get_parsed_text())
+	if words_per_second <= 0 or boundaries.is_empty() or _is_hurried(token) or not label.is_inside_tree():
+		label.visible_characters = -1
+		return _next_frame(label)
 
-	var words := text.split(" ", false)
-	var total_words := words.size()
-	if total_words == 0:
-		label.visible_ratio = 1.0
-		return Signal()
+	label.visible_characters = boundaries[0]
 
-	var duration := float(total_words) / words_per_second
-
+	var seconds_per_word := 1.0 / words_per_second
 	var tween := label.create_tween()
-	tween.tween_property(label, "visible_ratio", 1.0, duration)
+	for index in range(1, boundaries.size()):
+		tween.tween_interval(seconds_per_word)
+		tween.tween_callback(label.set.bind("visible_characters", boundaries[index]))
+	tween.tween_callback(label.set.bind("visible_characters", -1))
+	_finish_on_hurry(tween, token, seconds_per_word * boundaries.size())
 
 	return tween.finished
 
@@ -213,8 +223,8 @@ static func shake(
 
 	var original_pos := target.position
 	var tween := target.create_tween()
-	var steps := int(duration * frequency)
-	var step_duration := duration / steps
+	var steps := maxi(int(duration * frequency), 1)
+	var step_duration := maxf(duration, 0.0) / steps
 
 	for i in range(steps):
 		var offset := Vector2(
@@ -227,3 +237,41 @@ static func shake(
 	tween.tween_property(target, "position", original_pos, step_duration)
 
 	return tween.finished
+
+
+static func _run_line_typewriter(
+	line_typewriter: YarnTypewriter,
+	markup: YarnMarkupParseResult,
+	display_text: String,
+	token: YarnCancellationToken,
+	done: YarnPromise
+) -> void:
+	var tree := line_typewriter.text_element.get_tree()
+	var start_frame := Engine.get_process_frames()
+	await line_typewriter.run_typewriter(markup, display_text, token)
+	if Engine.get_process_frames() == start_frame and tree != null:
+		await tree.process_frame
+	done.settle()
+
+
+static func _is_hurried(token: YarnCancellationToken) -> bool:
+	return token != null and token.is_hurry_up_requested
+
+
+static func _next_frame(node: Node) -> Signal:
+	if node.is_inside_tree():
+		return node.get_tree().process_frame
+	return Signal()
+
+
+static func _finish_on_hurry(tween: Tween, token: YarnCancellationToken, duration: float) -> void:
+	if token == null:
+		return
+	var finish := func() -> void:
+		if tween.is_valid() and tween.is_running():
+			tween.custom_step(duration + 1.0)
+	var release := func() -> void:
+		if token.hurry_up_requested.is_connected(finish):
+			token.hurry_up_requested.disconnect(finish)
+	token.hurry_up_requested.connect(finish, CONNECT_ONE_SHOT)
+	tween.finished.connect(release, CONNECT_ONE_SHOT)

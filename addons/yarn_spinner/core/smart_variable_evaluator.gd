@@ -63,7 +63,10 @@ func try_evaluate_from_program(variable_name: String, program: YarnProgram, libr
 	var smart_nodes := program.get_smart_variable_nodes()
 	for node in smart_nodes:
 		if node.node_name == variable_name:
-			return YarnSmartVariableVM.try_evaluate(node, _variable_storage, library)
+			var result := YarnSmartVariableVM.try_evaluate(node, _variable_storage, library)
+			if result.has("error"):
+				push_error("smart variable evaluator: %s" % result.error)
+			return result
 	return {found = false, value = null}
 
 

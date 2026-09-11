@@ -20,13 +20,7 @@ class_name YarnBuiltInMarkupReplacer
 extends YarnAttributeMarkerProcessor
 ## marker processor for built-in select, plural, and ordinal replacement markers.
 
-static var _value_placeholder_regex: RegEx
-
-
-func _init() -> void:
-	if _value_placeholder_regex == null:
-		_value_placeholder_regex = RegEx.new()
-		_value_placeholder_regex.compile("(?<!\\\\)%")
+static var _value_placeholder_regex: RegEx = RegEx.create_from_string("(?<!\\\\)%")
 
 
 func process_replacement_marker(
@@ -54,9 +48,9 @@ func process_replacement_marker(
 		"plural", "ordinal":
 			match value_prop.type:
 				YarnMarkupValue.ValueType.INTEGER:
-					return ReplacementMarkerResult.new(_plural_replace(marker, locale_code, child_builder, float(value_prop.integer_value)), 0)
+					return ReplacementMarkerResult.new(_plural_replace(marker, locale_code, child_builder, float(value_prop.integer_value), value_prop.to_string_value()), 0)
 				YarnMarkupValue.ValueType.FLOAT:
-					return ReplacementMarkerResult.new(_plural_replace(marker, locale_code, child_builder, value_prop.float_value), 0)
+					return ReplacementMarkerResult.new(_plural_replace(marker, locale_code, child_builder, YarnNumber.to_f32(value_prop.float_value), value_prop.to_string_value()), 0)
 				_:
 					var diags := [MarkupDiagnostic.new("Asked to pluralise '%s' but this type doesn't support pluralisation" % value_prop.to_string_value())]
 					return ReplacementMarkerResult.new(diags, 0)
@@ -80,7 +74,7 @@ func _select_replace(marker: YarnMarkupAttribute, child_builder: Array, value: S
 	return diagnostics
 
 
-func _plural_replace(marker: YarnMarkupAttribute, locale_code: String, child_builder: Array, numeric_value: float) -> Array:
+func _plural_replace(marker: YarnMarkupAttribute, locale_code: String, child_builder: Array, numeric_value: float, display_value: String) -> Array:
 	var diagnostics: Array = []
 
 	var plural_case := _get_plural_case(locale_code, numeric_value, marker.name == "ordinal")
@@ -88,30 +82,24 @@ func _plural_replace(marker: YarnMarkupAttribute, locale_code: String, child_bui
 
 	var replacement_value := marker.try_get_property(plural_case_name)
 	if replacement_value == null:
-		diagnostics.append(MarkupDiagnostic.new("no replacement for %s's plural case of %s was found" % [str(numeric_value), plural_case_name]))
+		diagnostics.append(MarkupDiagnostic.new("no replacement for %s's plural case of %s was found" % [display_value, plural_case_name]))
 		return diagnostics
 
 	if replacement_value.type != YarnMarkupValue.ValueType.STRING:
 		diagnostics.append(MarkupDiagnostic.new("select replacement values are expected to be strings, not %s" % replacement_value.type))
 
 	var input := replacement_value.to_string_value()
-	var formatted_value := str(int(numeric_value)) if numeric_value == int(numeric_value) else str(numeric_value)
-	child_builder[0] += _value_placeholder_regex.sub(input, formatted_value, true)
+	child_builder[0] += _value_placeholder_regex.sub(input, display_value, true)
 
 	return diagnostics
 
 
 ## get CLDR plural case for a number.
 func _get_plural_case(locale_code: String, value: float, is_ordinal: bool) -> String:
-	var language_code := locale_code.split("-")[0].split("_")[0].to_lower()
-
-	var abs_value := absf(value)
-	var int_value := int(abs_value)
-
 	if is_ordinal:
-		return _get_ordinal_plural_case(language_code, int_value)
+		return _get_ordinal_plural_case(locale_code, value)
 	else:
-		return _get_cardinal_plural_case(language_code, abs_value)
+		return _get_cardinal_plural_case(locale_code, value)
 
 
 ## CLDR cardinal plural case, delegated to YarnCldrPluralRules.
@@ -120,5 +108,5 @@ func _get_cardinal_plural_case(language: String, value: float) -> String:
 
 
 ## CLDR ordinal plural case, delegated to YarnCldrPluralRules.
-func _get_ordinal_plural_case(language: String, value: int) -> String:
+func _get_ordinal_plural_case(language: String, value: float) -> String:
 	return YarnCldrPluralRules.get_ordinal_case(language, value)

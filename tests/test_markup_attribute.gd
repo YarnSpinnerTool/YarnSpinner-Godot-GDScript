@@ -79,6 +79,25 @@ func test_has_value():
 	assert_true(attr_with_val.has_value())
 
 
+func test_duplicate_property_names_keep_first_value():
+	var first := YarnMarkupProperty.from_int("b", 1)
+	var second := YarnMarkupProperty.from_int("b", 2)
+	var attr := YarnMarkupAttribute.new(0, 0, 0, "a", [first, second])
+	assert_push_error("same key")
+	assert_eq(attr.properties.size(), 1)
+	assert_eq(attr.try_get_int_property("b"), 1)
+
+
+func test_value_to_string_matches_reference_formatting():
+	assert_eq(YarnMarkupValue.from_bool(true).to_string_value(), "True")
+	assert_eq(YarnMarkupValue.from_bool(false).to_string_value(), "False")
+	assert_eq(YarnMarkupValue.from_float(1.0).to_string_value(), "1")
+	assert_eq(YarnMarkupValue.from_float(13.37).to_string_value(), "13.37")
+	assert_eq(YarnMarkupValue.from_float(-0.0).to_string_value(), "-0")
+	assert_eq(YarnMarkupValue.from_int(-1).to_string_value(), "-1")
+	assert_eq(YarnMarkupValue.from_string("x").to_string_value(), "x")
+
+
 # --- YarnMarkupParseResult ---
 
 func test_parse_result_text_for_attribute():

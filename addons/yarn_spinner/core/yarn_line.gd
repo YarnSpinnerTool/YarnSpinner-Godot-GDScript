@@ -66,94 +66,68 @@ var source: Object = null
 # Lazy-computed properties
 # ---------------------------------------------------------------------------
 
-var _text_computed: bool = false
-var _text: String = ""
-var _character_name: String = ""
+var _text_override: String = ""
+var _has_text_override: bool = false
+var _character_name_override: String = ""
+var _has_character_name_override: bool = false
 
-## Final text after substitution, markup processing, and character name
-## extraction. Computed lazily on first access.
+## Final text after substitution and markup processing. Computed lazily on
+## first access.
 var text: String:
 	get:
+		if _has_text_override:
+			return _text_override
 		_ensure_processed()
-		return _text
+		return markup_result.text
 	set(value):
-		_text = value
-		_text_computed = true
+		_text_override = value
+		_has_text_override = true
 
 ## Character name extracted from [character] markup or implicit "Name:" pattern.
 ## Computed lazily alongside [member text].
 var character_name: String:
 	get:
+		if _has_character_name_override:
+			return _character_name_override
 		_ensure_processed()
-		return _character_name
+		return markup_result.get_character_name()
 	set(value):
-		_character_name = value
+		_character_name_override = value
+		_has_character_name_override = true
 
 ## The text with the character name prefix removed.
 var text_without_character_name: String:
 	get:
-		_ensure_processed()
-		return _text
+		if _has_text_override:
+			return _text_override
+		return get_markup_result_without_character_name().text
 
 
 # ---------------------------------------------------------------------------
 # Processing
 # ---------------------------------------------------------------------------
 
-static var _line_parser: YarnLineParser
-
-
-static func _ensure_parser_initialized() -> void:
-	if _line_parser == null:
-		_line_parser = YarnLineParser.new()
-		var builtin_replacer := YarnBuiltInMarkupReplacer.new()
-		_line_parser.register_marker_processor("select", builtin_replacer)
-		_line_parser.register_marker_processor("plural", builtin_replacer)
-		_line_parser.register_marker_processor("ordinal", builtin_replacer)
-
-
 func _ensure_processed() -> void:
-	if _text_computed:
+	if markup_result != null:
 		return
-	_text_computed = true
+	set_markup_result(YarnLineParser.create_with_builtin_replacers().parse_string(YarnLineParser.expand_substitutions(raw_text, substitutions), locale_code, true))
 
-	# Step 1: Apply substitutions
-	_text = YarnLineParser.expand_substitutions(raw_text, substitutions)
 
-	# Step 2: Parse markup
-	_ensure_parser_initialized()
-	markup_result = _line_parser.parse_string(_text, locale_code, true)
-	_text = markup_result.text
-
-	# Step 3: Extract character name
-	var char_attr: YarnMarkupAttribute = null
-	for attr in markup_result.attributes:
-		if attr.name == YarnLineParser.CHARACTER_ATTRIBUTE and _character_name.is_empty():
-			char_attr = attr
-			var name_prop: YarnMarkupValue = attr.try_get_property(YarnLineParser.CHARACTER_ATTRIBUTE_NAME_PROPERTY)
-			if name_prop != null:
-				_character_name = name_prop.string_value
-			else:
-				_character_name = markup_result.text_for_attribute(attr).strip_edges().trim_suffix(":")
-
-	# Step 4: Strip character prefix from displayed text
-	if char_attr != null and char_attr.length > 0:
-		markup_result = markup_result.delete_range(char_attr)
-		_text = markup_result.text
-
-	# Step 5: Populate markup_attributes
+func set_markup_result(result: YarnMarkupParseResult) -> void:
+	markup_result = result
 	markup_attributes.clear()
-	for attr in markup_result.attributes:
-		markup_attributes.append(attr)
+	if result != null:
+		markup_attributes.assign(result.attributes)
 
 
 ## Force reprocessing (e.g. if raw_text or substitutions changed after creation).
 func invalidate() -> void:
-	_text_computed = false
-	_text = ""
-	_character_name = ""
-	markup_attributes.clear()
 	markup_result = null
+	markup_attributes.clear()
+	_text_override = ""
+	_has_text_override = false
+	_character_name_override = ""
+	_has_character_name_override = false
 
 
 # ---------------------------------------------------------------------------
@@ -172,22 +146,17 @@ func parse_markup() -> void:
 	_ensure_processed()
 
 
-## Returns [member text] (substitutions and markup already applied).
+## Returns [member text_without_character_name] (substitutions and markup already applied).
 func get_plain_text() -> String:
-	return text
+	return text_without_character_name
 
 
 ## Returns text with markup converted to BBCode for RichTextLabel.
-func get_bbcode_text(parser: YarnMarkupParser = null) -> String:
+func get_bbcode_text(parser: YarnMarkupParser = null, include_character_name: bool = false) -> String:
 	if parser == null:
 		parser = YarnMarkupParser.new()
-	parser.locale_code = locale_code
-	var source_text := raw_text if not raw_text.is_empty() else _text
-	source_text = YarnLineParser.expand_substitutions(source_text, substitutions)
-	var result := parser.parse(source_text)
-	if result.character_name and _character_name.is_empty():
-		_character_name = result.character_name
-	return result.text
+	var result := get_markup_result() if include_character_name else get_markup_result_without_character_name()
+	return parser.convert_to_bbcode(result)
 
 
 ## Ensures processing, then returns the full markup result.
@@ -196,25 +165,24 @@ func get_markup_result() -> YarnMarkupParseResult:
 	return markup_result
 
 
+func get_markup_result_without_character_name() -> YarnMarkupParseResult:
+	_ensure_processed()
+	return markup_result.without_character_name()
+
+
 ## Deletes the text covered by an attribute and re-parses.
 func delete_attribute_text(attr: YarnMarkupAttribute) -> void:
 	_ensure_processed()
-	if markup_result == null:
-		return
 	for result_attr in markup_result.attributes:
 		if result_attr.name == attr.name and result_attr.position == attr.position:
-			markup_result = markup_result.delete_range(result_attr)
-			_text = markup_result.text
+			set_markup_result(markup_result.delete_range(result_attr))
 			break
 
 
 ## Returns the first attribute with the given name, or null.
 func try_get_attribute(attr_name: String) -> YarnMarkupAttribute:
 	_ensure_processed()
-	for attr in markup_attributes:
-		if attr.name == attr_name:
-			return attr
-	return null
+	return markup_result.try_get_attribute_with_name(attr_name)
 
 
 ## Returns the substring of text covered by an attribute.
@@ -222,6 +190,6 @@ func text_for_attribute(attr: YarnMarkupAttribute) -> String:
 	_ensure_processed()
 	if attr.length == 0:
 		return ""
-	if _text.length() < attr.position + attr.length:
+	if markup_result.text.length() < attr.position + attr.length:
 		return ""
-	return _text.substr(attr.position, attr.length)
+	return markup_result.text.substr(attr.position, attr.length)

@@ -41,6 +41,25 @@ func try_get_attribute_with_name(attr_name: String) -> YarnMarkupAttribute:
 	return null
 
 
+func get_character_name() -> String:
+	var attr := try_get_attribute_with_name(YarnLineParser.CHARACTER_ATTRIBUTE)
+	if attr == null:
+		return ""
+	var name_prop: YarnMarkupValue = attr.try_get_property(YarnLineParser.CHARACTER_ATTRIBUTE_NAME_PROPERTY)
+	if name_prop == null:
+		return ""
+	return name_prop.string_value
+
+
+func without_character_name() -> YarnMarkupParseResult:
+	var attr := try_get_attribute_with_name(YarnLineParser.CHARACTER_ATTRIBUTE)
+	if attr == null:
+		return self
+	var result := delete_range(attr)
+	result.attributes.append(attr)
+	return result
+
+
 ## returns the substring of text covered by an attribute.
 func text_for_attribute(attr: YarnMarkupAttribute) -> String:
 	if attr.length == 0:

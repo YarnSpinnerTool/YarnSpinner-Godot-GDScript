@@ -1,0 +1,10 @@
+id,text,file,node,lineNumber
+line:2e18df8d,Visited: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupVisitTracking.yarn,Start,3
+line:b828d8fa,Visit Count: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupVisitTracking.yarn,Start,4
+line:0279d163,Visited: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupVisitTracking.yarn,Start,6
+line:9449d614,Visit Count: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupVisitTracking.yarn,Start,7
+line:37dcb28a,Visited: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupVisitTracking.yarn,Start,9
+line:a1ecb5fd,Visit Count: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupVisitTracking.yarn,Start,10
+line:1bbdbc64,Visited: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupVisitTracking.yarn,Start,12
+line:8d8dbb13,Visit Count: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupVisitTracking.yarn,Start,13
+line:e85bf666,I'm a node group,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupVisitTracking.yarn,NodeGroup,18

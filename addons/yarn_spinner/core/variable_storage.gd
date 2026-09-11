@@ -32,13 +32,23 @@ var _program: YarnProgram
 var smart_variable_evaluator: YarnSmartVariableEvaluator
 var _change_listeners: Dictionary[String, Array] = {}
 var _global_listeners: Array[Callable] = []
+var _value_listeners: Dictionary[String, Array] = {}
+var _global_value_listeners: Array[Callable] = []
 var _subscriptions: Dictionary[int, Dictionary] = {}
 var _next_subscription_id: int = 0
 var _node_subscriptions: Dictionary[int, Array] = {}
 
+static var _crc32_table: PackedInt64Array = PackedInt64Array()
+static var _crc32_ready := false
+static var _crc32_mutex: Mutex = Mutex.new()
+
 
 func set_program(program: YarnProgram) -> void:
 	_program = program
+
+
+func get_program() -> YarnProgram:
+	return _program
 
 
 ## Listener callable receives (variable_name: String, new_value: Variant, old_value: Variant).
@@ -66,6 +76,27 @@ func register_global_listener(listener: Callable) -> void:
 
 func unregister_global_listener(listener: Callable) -> void:
 	_global_listeners.erase(listener)
+
+
+func add_change_listener(variable_name: String, listener: Callable) -> Callable:
+	if _program == null:
+		push_error("variable storage: can't add a change listener for %s: the program is not set" % variable_name)
+		return Callable()
+	if get_variable_kind(variable_name) == VariableKind.SMART:
+		push_error("variable storage: can't add a change listener for %s: change listeners cannot be added for smart variables" % variable_name)
+		return Callable()
+	if not _value_listeners.has(variable_name):
+		_value_listeners[variable_name] = []
+	var listeners: Array = _value_listeners[variable_name]
+	listeners.append(listener)
+	return func() -> void:
+		listeners.erase(listener)
+
+
+func add_global_change_listener(listener: Callable) -> Callable:
+	_global_value_listeners.append(listener)
+	return func() -> void:
+		_global_value_listeners.erase(listener)
 
 
 ## Returns a subscription id. Automatically unsubscribes when owner is freed.
@@ -197,6 +228,17 @@ func _notify_listeners(variable_name: String, new_value: Variant, old_value: Var
 		if listener.is_valid():
 			listener.call(variable_name, new_value, old_value)
 
+	if _value_listeners.has(variable_name):
+		var value_listeners: Array = _value_listeners[variable_name].duplicate()
+		for listener in value_listeners:
+			if listener.is_valid():
+				listener.call(new_value)
+
+	var global_value_copy := _global_value_listeners.duplicate()
+	for listener in global_value_copy:
+		if listener.is_valid():
+			listener.call(variable_name, new_value)
+
 	variable_changed.emit(variable_name, new_value)
 
 
@@ -221,36 +263,12 @@ static func is_yarn_type_compatible(a: Variant, b: Variant) -> bool:
 	return yarn_type_name(a) == yarn_type_name(b)
 
 
-## Validate that value has the correct type for variable_name.
-## Checks against the currently stored value or the program's declared initial value.
+## Validate that value is a Yarn type (string, number, or bool).
 ## Returns true if the value is acceptable, false if it should be rejected.
 func validate_value_type(variable_name: String, value: Variant) -> bool:
-	# Reject non-Yarn types (arrays, objects, etc.) regardless
-	var type_name := yarn_type_name(value)
-	if type_name == "unknown":
+	if yarn_type_name(value) == "unknown":
 		push_error("variable storage: cannot store %s in Yarn variable '%s' — Yarn variables must be string, number, or bool" % [type_string(typeof(value)), variable_name])
 		return false
-
-	# Find the existing value to check type against
-	var existing: Variant = null
-	var has_existing := false
-
-	var result := try_get_value(variable_name)
-	if result.found:
-		existing = result.value
-		has_existing = true
-	elif _program != null and _program.has_initial_value(variable_name):
-		existing = _program.get_initial_value(variable_name)
-		has_existing = true
-
-	if not has_existing:
-		# New variable with no declared type — allow any Yarn-compatible type
-		return true
-
-	if not is_yarn_type_compatible(existing, value):
-		push_error("variable storage: cannot assign %s value to variable '%s' (expected %s)" % [type_name, variable_name, yarn_type_name(existing)])
-		return false
-
 	return true
 
 
@@ -278,6 +296,62 @@ func get_value(variable_name: String) -> Variant:
 	if not variable_name.begins_with("$Yarn.Internal."):
 		push_warning("variable storage: variable '%s' not found" % variable_name)
 	return null
+
+
+func get_value_or_default(variable_name: String, default_value: Variant = null) -> Variant:
+	var value: Variant = get_value(variable_name)
+	if value == null:
+		return default_value
+	return value
+
+
+func get_enum_value_or_default(variable_name: String, enum_values: Dictionary, default_value: int = 0) -> int:
+	var value: Variant = get_value(variable_name)
+	if value == null:
+		push_error("variable storage: failed to get an enum value for variable %s" % variable_name)
+		return default_value
+
+	var case_value: int
+	if value is String:
+		case_value = crc32(value)
+		if case_value > 2147483647:
+			case_value -= 4294967296
+	elif value is float or value is int:
+		case_value = int(value)
+	else:
+		push_error("variable storage: failed to get an enum value for variable %s: received an unexpected variable type %s" % [variable_name, type_string(typeof(value))])
+		return default_value
+
+	if case_value in enum_values.values():
+		return case_value
+
+	push_error("variable storage: failed to get an enum value for variable %s: %d is not a valid case value" % [variable_name, case_value])
+	return default_value
+
+
+static func crc32(text: String) -> int:
+	if not _crc32_ready:
+		_crc32_mutex.lock()
+		if not _crc32_ready:
+			var built := PackedInt64Array()
+			built.resize(256)
+			for i in range(256):
+				var temp := i
+				for j in range(8):
+					if (temp & 1) == 1:
+						temp = (temp >> 1) ^ 0xedb88320
+					else:
+						temp = temp >> 1
+				built[i] = temp
+			_crc32_table = built
+			_crc32_ready = true
+		_crc32_mutex.unlock()
+	var table: PackedInt64Array = _crc32_table
+	var crc := 0xffffffff
+	for byte in text.to_utf8_buffer():
+		var index := (crc & 0xff) ^ byte
+		crc = (crc >> 8) ^ table[index]
+	return (~crc) & 0xffffffff
 
 
 func get_variable_kind(variable_name: String) -> VariableKind:
@@ -369,3 +443,30 @@ func get_all_variables() -> Dictionary:
 func set_all_variables(variables: Dictionary) -> void:
 	for name in variables:
 		set_value(name, variables[name])
+
+
+func get_all_variables_typed() -> Dictionary:
+	var floats := {}
+	var strings := {}
+	var bools := {}
+	var all := get_all_variables()
+	for var_name in all:
+		var value: Variant = all[var_name]
+		if value is bool:
+			bools[var_name] = value
+		elif value is float or value is int:
+			floats[var_name] = float(value)
+		elif value is String:
+			strings[var_name] = value
+	return {"floats": floats, "strings": strings, "bools": bools}
+
+
+func set_all_variables_typed(floats: Dictionary, strings: Dictionary, bools: Dictionary, clear_first: bool = true) -> void:
+	if clear_first:
+		clear()
+	for var_name in floats:
+		set_value(var_name, floats[var_name])
+	for var_name in strings:
+		set_value(var_name, strings[var_name])
+	for var_name in bools:
+		set_value(var_name, bools[var_name])

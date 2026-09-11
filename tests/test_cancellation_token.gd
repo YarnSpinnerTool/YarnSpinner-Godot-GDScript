@@ -17,6 +17,15 @@ func test_request_next_content():
 	assert_eq(token.cancellation_mode, YarnCancellationToken.CancellationMode.NEXT_CONTENT)
 
 
+func test_next_content_implies_hurry_up():
+	var token := YarnCancellationToken.new()
+	var hurried := [0]
+	token.hurry_up_requested.connect(func(): hurried[0] += 1)
+	token.request_next_content()
+	assert_true(token.is_hurry_up_requested)
+	assert_eq(hurried[0], 1)
+
+
 func test_hurry_up_then_next_content():
 	var token := YarnCancellationToken.new()
 	token.request_hurry_up()

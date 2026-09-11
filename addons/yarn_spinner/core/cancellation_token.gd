@@ -49,10 +49,15 @@ var cancellation_mode: CancellationMode:
 
 
 func request_next_content() -> void:
-	if not is_next_content_requested:
-		is_next_content_requested = true
-		next_content_requested.emit()
-		cancellation_requested.emit(CancellationMode.NEXT_CONTENT)
+	if is_next_content_requested:
+		return
+	var hurry_was_requested := is_hurry_up_requested
+	is_next_content_requested = true
+	is_hurry_up_requested = true
+	next_content_requested.emit()
+	cancellation_requested.emit(CancellationMode.NEXT_CONTENT)
+	if not hurry_was_requested:
+		hurry_up_requested.emit()
 
 
 func request_hurry_up() -> void:

@@ -36,249 +36,609 @@ extends RefCounted
 ##
 ## LIMITATION: a Godot float carries no record of how it was authored, so
 ## trailing zeros in the fraction (e.g. whether a value was written as
-## "1.50" or "1.5") can never be recovered. This implementation treats v
-## as the count of significant fraction digits and derives f from those
-## digits directly, which makes v and w (fraction digits without trailing
-## zeros) identical, and likewise f and t identical. Every rule below that
-## the CLDR spec writes in terms of v/f still behaves correctly for that
-## reason: v/f and w/t only ever disagree over trailing zeros this code
-## cannot see.
+## "1.50" or "1.5") can never be recovered. This implementation derives the
+## fraction operands from the number's shortest round-trip invariant string,
+## as the reference implementation does, which makes v and w (fraction
+## digits without trailing zeros) identical, and likewise f and t identical.
 
 
-## Number of decimal places examined when deriving fraction operands.
-const _FRACTION_PRECISION := 6
-
-## Legacy or alternate language codes mapped to the code CLDR data uses.
-const _LANGUAGE_ALIASES := {
-	"iw": "he",
-	"in": "id",
-	"tl": "fil",
-	"no": "nb",
-}
-
-
-## Returns the CLDR operand set for a non-negative number.
+## Returns the CLDR operand set for a number.
 static func get_operands(value: float) -> Dictionary:
-	var n := absf(value)
-	var i := int(n)
-
-	var fraction_digits := ""
-	var remainder := n - float(i)
-	if remainder > 0.0:
-		var scaled := "%.*f" % [_FRACTION_PRECISION, remainder]
-		var dot_index := scaled.find(".")
-		if dot_index != -1:
-			fraction_digits = scaled.substr(dot_index + 1)
-			while fraction_digits.length() > 0 and fraction_digits.ends_with("0"):
-				fraction_digits = fraction_digits.substr(0, fraction_digits.length() - 1)
-
-	var v := fraction_digits.length()
-	var f := 0 if v == 0 else int(fraction_digits)
-
+	var fraction_text := _invariant_fraction_text(value)
+	var f := _fraction_value(value, fraction_text)
 	return {
-		"n": n,
-		"i": i,
-		"v": v,
+		"n": absf(value),
+		"i": _integer_value(value),
+		"v": fraction_text.length(),
 		"f": f,
 		"t": f,
 	}
 
 
-## Normalises a locale/language code: lowercase, region and script stripped,
-## legacy aliases resolved.
+## Normalises a locale/language code: lowercase, region and script stripped.
 static func normalise_language(language_code: String) -> String:
-	var code := language_code.split("-")[0].split("_")[0].to_lower()
-	return _LANGUAGE_ALIASES.get(code, code)
+	return language_code.split("-")[0].split("_")[0].to_lower()
 
 
 ## Returns the CLDR cardinal plural case ("zero", "one", "two", "few",
 ## "many", or "other") for the given language and number.
 static func get_cardinal_case(language_code: String, value: float) -> String:
-	var language := normalise_language(language_code)
-	var rule: Callable = _cardinal_dispatch().get(language, Callable())
+	var rule := _resolve_rule(_cardinal_dispatch(), language_code)
 	if not rule.is_valid():
-		rule = Callable(YarnCldrPluralRules, "_c_default")
-	var operands := get_operands(value)
-	return rule.call(operands)
+		return "other"
+	return rule.call(get_operands(value))
 
 
 ## Returns the CLDR ordinal plural case ("zero", "one", "two", "few",
-## "many", or "other") for the given language and integer.
-static func get_ordinal_case(language_code: String, value: int) -> String:
-	var language := normalise_language(language_code)
-	var rule: Callable = _ordinal_dispatch().get(language, Callable())
+## "many", or "other") for the given language and number.
+static func get_ordinal_case(language_code: String, value: float) -> String:
+	var rule := _resolve_rule(_ordinal_dispatch(), language_code)
 	if not rule.is_valid():
-		rule = Callable(YarnCldrPluralRules, "_o_default")
-	return rule.call(absi(value))
+		return "other"
+	return rule.call(get_operands(value))
+
+
+static func _resolve_rule(dispatch: Dictionary, language_code: String) -> Callable:
+	var parts := language_code.replace("-", "_").split("_")
+	for index in range(1, parts.size()):
+		parts[index] = parts[index].to_upper()
+	parts[0] = parts[0].to_lower()
+	var full_code := "_".join(parts)
+	if dispatch.has(full_code):
+		return dispatch[full_code]
+	return dispatch.get(normalise_language(language_code), Callable())
+
+
+static func _integer_value(value: float) -> int:
+	if is_nan(value):
+		return 0
+	return int(clampf(value, -2147483648.0, 2147483647.0))
+
+
+static func _shortest_digits(value: float) -> Array:
+	var bytes := PackedByteArray()
+	bytes.resize(8)
+	bytes.encode_double(0, absf(value))
+	var bits := bytes.decode_s64(0)
+	var frac_len := maxi(_fraction_bit_count(bits), _fraction_bit_count(bits - 1))
+	frac_len = maxi(frac_len, _fraction_bit_count(bits + 1))
+	var exact := _scaled_digits(bits, frac_len)
+	var low := _add_digits(exact, _scaled_digits(bits - 1, frac_len))
+	var high := _add_digits(exact, _scaled_digits(bits + 1, frac_len))
+	var inclusive := bits & 1 == 0
+	var candidate := exact
+	for keep in range(1, exact.length()):
+		var drop := exact.length() - keep
+		var rounded := _round_digits(exact, drop)
+		if _round_trips(rounded, low, high, inclusive):
+			candidate = rounded
+			break
+		rounded = _add_digits(rounded, "1" + "0".repeat(drop))
+		if _round_trips(rounded, low, high, inclusive):
+			candidate = rounded
+			break
+	return [candidate.rstrip("0"), candidate.length() - frac_len]
+
+
+static func _decompose(bits: int) -> Array:
+	var biased := (bits >> 52) & 0x7ff
+	var mantissa := bits & 0xfffffffffffff
+	var exponent := -1074
+	if biased != 0:
+		mantissa |= 1 << 52
+		exponent = biased - 1075
+	while mantissa != 0 and mantissa & 1 == 0 and exponent < 0:
+		mantissa >>= 1
+		exponent += 1
+	return [mantissa, exponent]
+
+
+static func _fraction_bit_count(bits: int) -> int:
+	return maxi(0, -int(_decompose(bits)[1]))
+
+
+static func _scaled_digits(bits: int, frac_len: int) -> String:
+	var parts := _decompose(bits)
+	var digits := str(parts[0])
+	var twos: int = parts[1] + frac_len
+	var fives := frac_len
+	while twos > 0:
+		var step := mini(twos, 30)
+		digits = _multiply_digits(digits, 1 << step)
+		twos -= step
+	while fives > 0:
+		var step := mini(fives, 13)
+		digits = _multiply_digits(digits, int(pow(5, step)))
+		fives -= step
+	return digits
+
+
+static func _multiply_digits(digits: String, factor: int) -> String:
+	if digits == "0":
+		return digits
+	var out := PackedByteArray()
+	var carry := 0
+	for index in range(digits.length() - 1, -1, -1):
+		var product := (digits.unicode_at(index) - 48) * factor + carry
+		out.append(48 + product % 10)
+		carry = floori(product / 10.0)
+	while carry > 0:
+		out.append(48 + carry % 10)
+		carry = floori(carry / 10.0)
+	out.reverse()
+	return out.get_string_from_ascii()
+
+
+static func _add_digits(a: String, b: String) -> String:
+	var size := maxi(a.length(), b.length()) + 1
+	var out := PackedByteArray()
+	out.resize(size)
+	var carry := 0
+	for index in range(size):
+		var sum := carry
+		if index < a.length():
+			sum += a.unicode_at(a.length() - 1 - index) - 48
+		if index < b.length():
+			sum += b.unicode_at(b.length() - 1 - index) - 48
+		out[size - 1 - index] = 48 + sum % 10
+		carry = 1 if sum >= 10 else 0
+	var digits := out.get_string_from_ascii().lstrip("0")
+	return "0" if digits.is_empty() else digits
+
+
+static func _compare_digits(a: String, b: String) -> int:
+	if a.length() != b.length():
+		return -1 if a.length() < b.length() else 1
+	if a == b:
+		return 0
+	return -1 if a < b else 1
+
+
+static func _round_digits(exact: String, drop: int) -> String:
+	var kept := exact.substr(0, exact.length() - drop)
+	var rest := exact.substr(exact.length() - drop)
+	var half := "5" + "0".repeat(drop - 1)
+	if rest > half or (rest == half and (kept.unicode_at(kept.length() - 1) - 48) % 2 == 1):
+		kept = _add_digits(kept, "1")
+	return kept + "0".repeat(drop)
+
+
+static func _round_trips(candidate: String, low: String, high: String, inclusive: bool) -> bool:
+	var doubled := _add_digits(candidate, candidate)
+	var against_low := _compare_digits(doubled, low)
+	if against_low < 0 or (against_low == 0 and not inclusive):
+		return false
+	var against_high := _compare_digits(doubled, high)
+	return against_high < 0 or (against_high == 0 and inclusive)
+
+
+static func _invariant_fraction_text(value: float) -> String:
+	if is_nan(value) or is_inf(value) or (absf(value) < 1e17 and value == floorf(value)):
+		return ""
+	var shortest := _shortest_digits(value)
+	var digits: String = shortest[0]
+	var scale: int = shortest[1]
+	if scale > 17 or scale < -3:
+		if digits.length() == 1:
+			return ""
+		var exponent := scale - 1
+		return "%sE%s%02d" % [digits.substr(1), "-" if exponent < 0 else "+", absi(exponent)]
+	if scale <= 0:
+		return "0".repeat(-scale) + digits
+	return digits.substr(scale)
+
+
+static func _fraction_value(value: float, fraction_text: String) -> int:
+	if fraction_text.is_empty():
+		return 0
+	if fraction_text.is_valid_int() and fraction_text.to_int() <= 2147483647:
+		return fraction_text.to_int()
+	var is_float32 := value == YarnNumber.to_f32(value)
+	var shortest := _display_digits(value) if is_float32 else _shortest_digits(value)
+	var digits: String = shortest[0]
+	var scale: int = shortest[1]
+	if scale >= digits.length():
+		return 0
+	return digits.substr(maxi(scale, 0)).to_int()
+
+
+static func _display_digits(value: float) -> Array:
+	var body := YarnNumber.to_display_string(value).trim_prefix("-")
+	var exponent := 0
+	var e_index := body.find("E")
+	if e_index != -1:
+		exponent = body.substr(e_index + 1).trim_prefix("+").to_int()
+		body = body.substr(0, e_index)
+	var point := body.find(".")
+	return [body.replace(".", ""), (body.length() if point == -1 else point) + exponent]
 
 
 # ---------------------------------------------------------------------- #
 # Cardinal rule groups
 # ---------------------------------------------------------------------- #
 
-## Fallback used by every locale with no distinct cardinal forms, and any
-## locale this file doesn't recognise.
-static func _c_default(_o: Dictionary) -> String:
-	return "other"
-
-
-## one: i = 1 and v = 0. The most common CLDR cardinal shape.
-static func _c_one_i1v0(o: Dictionary) -> String:
-	if o.i == 1 and o.v == 0:
-		return "one"
-	return "other"
-
-
-## Danish: one for exactly 1, and also for any decimal value whose integer
-## part is 0 or 1 (so 0.5 and 1.5 both read as "one").
-static func _c_danish(o: Dictionary) -> String:
-	if o.v == 0 and o.i == 1:
-		return "one"
-	if o.v != 0 and (o.i == 0 or o.i == 1):
-		return "one"
-	return "other"
-
-
-## Icelandic: one for integers ending in 1 (not 11), and for every value
-## with a non-zero fraction.
-static func _c_icelandic(o: Dictionary) -> String:
-	if o.t == 0 and int(o.i) % 10 == 1 and int(o.i) % 100 != 11:
-		return "one"
-	if o.t != 0:
-		return "one"
-	return "other"
-
-
-## French: 0 and 1 both read as singular; whole millions get their own form.
-static func _c_french(o: Dictionary) -> String:
-	if o.i == 0 or o.i == 1:
-		return "one"
-	if o.v == 0 and o.i != 0 and int(o.i) % 1000000 == 0:
-		return "many"
-	return "other"
-
-
-## Italian / Spanish: singular only for exactly 1; whole millions get their
-## own form.
-static func _c_it_es(o: Dictionary) -> String:
-	if o.i == 1 and o.v == 0:
-		return "one"
-	if o.v == 0 and o.i != 0 and int(o.i) % 1000000 == 0:
-		return "many"
-	return "other"
-
-
-## Russian / Ukrainian / Belarusian.
-static func _c_russian(o: Dictionary) -> String:
-	if o.v != 0:
-		return "other"
+static func _c_hi(o: Dictionary) -> String:
+	var n: float = o.n
 	var i: int = o.i
-	var mod10 := i % 10
-	var mod100 := i % 100
-	if mod10 == 1 and mod100 != 11:
+	if i == 0 or n == 1.0:
 		return "one"
-	if mod10 >= 2 and mod10 <= 4 and (mod100 < 12 or mod100 > 14):
-		return "few"
-	if mod10 == 0 or (mod10 >= 5 and mod10 <= 9) or (mod100 >= 11 and mod100 <= 14):
-		return "many"
 	return "other"
 
 
-## Polish.
-static func _c_polish(o: Dictionary) -> String:
+static func _c_hy(o: Dictionary) -> String:
 	var i: int = o.i
-	if o.i == 1 and o.v == 0:
+	if i == 0 or i == 1:
 		return "one"
-	if o.v != 0:
-		return "other"
-	var mod10 := i % 10
-	var mod100 := i % 100
-	if mod10 >= 2 and mod10 <= 4 and (mod100 < 12 or mod100 > 14):
-		return "few"
-	if (i != 1 and (mod10 == 0 or mod10 == 1)) or (mod10 >= 5 and mod10 <= 9) or (mod100 >= 12 and mod100 <= 14):
-		return "many"
 	return "other"
 
 
-## Czech / Slovak.
-static func _c_czech_slovak(o: Dictionary) -> String:
-	if o.i == 1 and o.v == 0:
-		return "one"
-	if int(o.i) >= 2 and int(o.i) <= 4 and o.v == 0:
-		return "few"
-	if o.v != 0:
-		return "many"
-	return "other"
-
-
-## Romanian.
-static func _c_romanian(o: Dictionary) -> String:
-	if o.i == 1 and o.v == 0:
-		return "one"
-	var mod100: int = int(o.i) % 100
-	if o.v != 0 or o.i == 0 or (mod100 >= 2 and mod100 <= 19):
-		return "few"
-	return "other"
-
-
-## Bosnian / Croatian / Serbian (and other Serbo-Croatian variants).
-static func _c_bcs(o: Dictionary) -> String:
+static func _c_en(o: Dictionary) -> String:
 	var i: int = o.i
+	var v: int = o.v
+	if i == 1 and v == 0:
+		return "one"
+	return "other"
+
+
+static func _c_si(o: Dictionary) -> String:
+	var n: float = o.n
+	var i: int = o.i
+	var f: int = o.f
+	if n == 0.0 or n == 1.0 or (i == 0 and f == 1):
+		return "one"
+	return "other"
+
+
+static func _c_ak(o: Dictionary) -> String:
+	var n: float = o.n
+	if n >= 0.0 and n <= 1.0:
+		return "one"
+	return "other"
+
+
+static func _c_tzm(o: Dictionary) -> String:
+	var n: float = o.n
+	if (n >= 0.0 and n <= 1.0) or (n >= 11.0 and n <= 99.0):
+		return "one"
+	return "other"
+
+
+static func _c_tr(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 1.0:
+		return "one"
+	return "other"
+
+
+static func _c_da(o: Dictionary) -> String:
+	var n: float = o.n
+	var i: int = o.i
+	var t: int = o.t
+	if n == 1.0 or (t != 0 and i == 0) or i == 1:
+		return "one"
+	return "other"
+
+
+static func _c_is(o: Dictionary) -> String:
+	var i: int = o.i
+	var t: int = o.t
+	var i_mod10 := i % 10
+	var i_mod100 := i % 100
+	var t_mod10 := t % 10
+	var t_mod100 := t % 100
+	if (t == 0 and i_mod10 == 1 and i_mod100 != 11) or (t_mod10 == 1 and t_mod100 != 11):
+		return "one"
+	return "other"
+
+
+static func _c_mk(o: Dictionary) -> String:
+	var i: int = o.i
+	var v: int = o.v
 	var f: int = o.f
 	var i_mod10 := i % 10
 	var i_mod100 := i % 100
 	var f_mod10 := f % 10
 	var f_mod100 := f % 100
-	if (o.v == 0 and i_mod10 == 1 and i_mod100 != 11) or (o.v != 0 and f_mod10 == 1 and f_mod100 != 11):
+	if (v == 0 and i_mod10 == 1 and i_mod100 != 11) or (f_mod10 == 1 and f_mod100 != 11):
 		return "one"
-	if (o.v == 0 and i_mod10 >= 2 and i_mod10 <= 4 and (i_mod100 < 12 or i_mod100 > 14)) \
-		or (o.v != 0 and f_mod10 >= 2 and f_mod10 <= 4 and (f_mod100 < 12 or f_mod100 > 14)):
-		return "few"
 	return "other"
 
 
-## Arabic.
-static func _c_arabic(o: Dictionary) -> String:
+static func _c_fil(o: Dictionary) -> String:
+	var i: int = o.i
+	var v: int = o.v
+	var f: int = o.f
+	var i_mod10 := i % 10
+	var f_mod10 := f % 10
+	if (v == 0 and i == 1) or i == 2 or i == 3 \
+			or (v == 0 and not (i_mod10 == 4 or i_mod10 == 6 or i_mod10 == 9)) \
+			or (v != 0 and not (f_mod10 == 4 or f_mod10 == 6 or f_mod10 == 9)):
+		return "one"
+	return "other"
+
+
+static func _c_lv(o: Dictionary) -> String:
+	var n: float = o.n
+	var v: int = o.v
+	var f: int = o.f
+	var n_mod10 := fmod(n, 10.0)
+	var n_mod100 := fmod(n, 100.0)
+	var f_mod10 := f % 10
+	var f_mod100 := f % 100
+	if n_mod10 == 0.0 or (n_mod100 >= 11.0 and n_mod100 <= 19.0) \
+			or (v == 2 and f_mod100 >= 11 and f_mod100 <= 19):
+		return "zero"
+	if (n_mod10 == 1.0 and n_mod100 != 11.0) or (v == 2 and f_mod10 == 1 and f_mod100 != 11) \
+			or (v != 2 and f_mod10 == 1):
+		return "one"
+	return "other"
+
+
+static func _c_lag(o: Dictionary) -> String:
+	var n: float = o.n
+	var i: int = o.i
+	if n == 0.0:
+		return "zero"
+	if i == 0 or (i == 1 and n != 0.0):
+		return "one"
+	return "other"
+
+
+static func _c_ksh(o: Dictionary) -> String:
 	var n: float = o.n
 	if n == 0.0:
 		return "zero"
 	if n == 1.0:
 		return "one"
+	return "other"
+
+
+static func _c_he(o: Dictionary) -> String:
+	var i: int = o.i
+	var v: int = o.v
+	if (i == 1 and v == 0) or (i == 0 and v != 0):
+		return "one"
+	if i == 2 and v == 0:
+		return "two"
+	return "other"
+
+
+static func _c_se(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 1.0:
+		return "one"
 	if n == 2.0:
 		return "two"
-	if o.v == 0:
-		var mod100: int = int(o.i) % 100
-		if mod100 >= 3 and mod100 <= 10:
-			return "few"
-		if mod100 >= 11 and mod100 <= 99:
-			return "many"
 	return "other"
 
 
-## Hebrew (modern CLDR: only "one", "two", and "other" survive in current
-## data; older revisions also had a "many" case, which is intentionally not
-## reproduced here).
-static func _c_hebrew(o: Dictionary) -> String:
-	if o.i == 1 and o.v == 0:
+static func _c_shi(o: Dictionary) -> String:
+	var n: float = o.n
+	var i: int = o.i
+	if i == 0 or n == 1.0:
 		return "one"
-	if o.i == 2 and o.v == 0:
-		return "two"
+	if n >= 2.0 and n <= 10.0:
+		return "few"
 	return "other"
 
 
-## Welsh.
-static func _c_welsh(o: Dictionary) -> String:
-	match o.n:
-		0.0: return "zero"
-		1.0: return "one"
-		2.0: return "two"
-		3.0: return "few"
-		6.0: return "many"
-		_: return "other"
+static func _c_ro(o: Dictionary) -> String:
+	var n: float = o.n
+	var i: int = o.i
+	var v: int = o.v
+	var n_mod100 := fmod(n, 100.0)
+	if i == 1 and v == 0:
+		return "one"
+	if v != 0 or n == 0.0 or (n != 1.0 and n_mod100 >= 1.0 and n_mod100 <= 19.0):
+		return "few"
+	return "other"
 
 
-## Irish.
-static func _c_irish(o: Dictionary) -> String:
+static func _c_bs(o: Dictionary) -> String:
+	var i: int = o.i
+	var v: int = o.v
+	var f: int = o.f
+	var i_mod10 := i % 10
+	var i_mod100 := i % 100
+	var f_mod10 := f % 10
+	var f_mod100 := f % 100
+	if (v == 0 and i_mod10 == 1 and i_mod100 != 11) or (f_mod10 == 1 and f_mod100 != 11):
+		return "one"
+	if (v == 0 and i_mod10 >= 2 and i_mod10 <= 4 and not (i_mod100 >= 12 and i_mod100 <= 14)) \
+			or (f_mod10 >= 2 and f_mod10 <= 4 and not (f_mod100 >= 12 and f_mod100 <= 14)):
+		return "few"
+	return "other"
+
+
+static func _c_fr(o: Dictionary) -> String:
+	var i: int = o.i
+	var v: int = o.v
+	var i_mod1000000 := i % 1000000
+	if i == 0 or i == 1:
+		return "one"
+	if i != 0 and i_mod1000000 == 0 and v == 0:
+		return "many"
+	return "other"
+
+
+static func _c_pt(o: Dictionary) -> String:
+	var i: int = o.i
+	var v: int = o.v
+	var i_mod1000000 := i % 1000000
+	if i >= 0 and i <= 1:
+		return "one"
+	if i != 0 and i_mod1000000 == 0 and v == 0:
+		return "many"
+	return "other"
+
+
+static func _c_it(o: Dictionary) -> String:
+	var i: int = o.i
+	var v: int = o.v
+	var i_mod1000000 := i % 1000000
+	if i == 1 and v == 0:
+		return "one"
+	if i != 0 and i_mod1000000 == 0 and v == 0:
+		return "many"
+	return "other"
+
+
+static func _c_es(o: Dictionary) -> String:
+	var n: float = o.n
+	var i: int = o.i
+	var v: int = o.v
+	var i_mod1000000 := i % 1000000
+	if n == 1.0:
+		return "one"
+	if i != 0 and i_mod1000000 == 0 and v == 0:
+		return "many"
+	return "other"
+
+
+static func _c_gd(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 1.0 or n == 11.0:
+		return "one"
+	if n == 2.0 or n == 12.0:
+		return "two"
+	if (n >= 3.0 and n <= 10.0) or (n >= 13.0 and n <= 19.0):
+		return "few"
+	return "other"
+
+
+static func _c_sl(o: Dictionary) -> String:
+	var i: int = o.i
+	var v: int = o.v
+	var i_mod100 := i % 100
+	if v == 0 and i_mod100 == 1:
+		return "one"
+	if v == 0 and i_mod100 == 2:
+		return "two"
+	if (v == 0 and i_mod100 >= 3 and i_mod100 <= 4) or v != 0:
+		return "few"
+	return "other"
+
+
+static func _c_dsb(o: Dictionary) -> String:
+	var i: int = o.i
+	var v: int = o.v
+	var f: int = o.f
+	var i_mod100 := i % 100
+	var f_mod100 := f % 100
+	if (v == 0 and i_mod100 == 1) or f_mod100 == 1:
+		return "one"
+	if (v == 0 and i_mod100 == 2) or f_mod100 == 2:
+		return "two"
+	if (v == 0 and i_mod100 >= 3 and i_mod100 <= 4) or (f_mod100 >= 3 and f_mod100 <= 4):
+		return "few"
+	return "other"
+
+
+static func _c_cs(o: Dictionary) -> String:
+	var i: int = o.i
+	var v: int = o.v
+	if i == 1 and v == 0:
+		return "one"
+	if i >= 2 and i <= 4 and v == 0:
+		return "few"
+	if v != 0:
+		return "many"
+	return "other"
+
+
+static func _c_pl(o: Dictionary) -> String:
+	var i: int = o.i
+	var v: int = o.v
+	var i_mod10 := i % 10
+	var i_mod100 := i % 100
+	if i == 1 and v == 0:
+		return "one"
+	if v == 0 and i_mod10 >= 2 and i_mod10 <= 4 and not (i_mod100 >= 12 and i_mod100 <= 14):
+		return "few"
+	if (v == 0 and i != 1 and i_mod10 >= 0 and i_mod10 <= 1) \
+			or (v == 0 and i_mod10 >= 5 and i_mod10 <= 9) \
+			or (v == 0 and i_mod100 >= 12 and i_mod100 <= 14):
+		return "many"
+	return "other"
+
+
+static func _c_be(o: Dictionary) -> String:
+	var n: float = o.n
+	var n_mod10 := fmod(n, 10.0)
+	var n_mod100 := fmod(n, 100.0)
+	if n_mod10 == 1.0 and n_mod100 != 11.0:
+		return "one"
+	if n_mod10 >= 2.0 and n_mod10 <= 4.0 and not (n_mod100 >= 12.0 and n_mod100 <= 14.0):
+		return "few"
+	if n_mod10 == 0.0 or (n_mod10 >= 5.0 and n_mod10 <= 9.0) \
+			or (n_mod100 >= 11.0 and n_mod100 <= 14.0):
+		return "many"
+	return "other"
+
+
+static func _c_lt(o: Dictionary) -> String:
+	var n: float = o.n
+	var f: int = o.f
+	var n_mod10 := fmod(n, 10.0)
+	var n_mod100 := fmod(n, 100.0)
+	if n_mod10 == 1.0 and not (n_mod100 >= 11.0 and n_mod100 <= 19.0):
+		return "one"
+	if n_mod10 >= 2.0 and n_mod10 <= 9.0 and not (n_mod100 >= 11.0 and n_mod100 <= 19.0):
+		return "few"
+	if f != 0:
+		return "many"
+	return "other"
+
+
+static func _c_ru(o: Dictionary) -> String:
+	var i: int = o.i
+	var v: int = o.v
+	var i_mod10 := i % 10
+	var i_mod100 := i % 100
+	if v == 0 and i_mod10 == 1 and i_mod100 != 11:
+		return "one"
+	if v == 0 and i_mod10 >= 2 and i_mod10 <= 4 and not (i_mod100 >= 12 and i_mod100 <= 14):
+		return "few"
+	if (v == 0 and i_mod10 == 0) or (v == 0 and i_mod10 >= 5 and i_mod10 <= 9) \
+			or (v == 0 and i_mod100 >= 11 and i_mod100 <= 14):
+		return "many"
+	return "other"
+
+
+static func _c_br(o: Dictionary) -> String:
+	var n: float = o.n
+	var n_mod10 := fmod(n, 10.0)
+	var n_mod100 := fmod(n, 100.0)
+	var n_mod1000000 := fmod(n, 1000000.0)
+	if n_mod10 == 1.0 and not (n_mod100 == 11.0 or n_mod100 == 71.0 or n_mod100 == 91.0):
+		return "one"
+	if n_mod10 == 2.0 and not (n_mod100 == 12.0 or n_mod100 == 72.0 or n_mod100 == 92.0):
+		return "two"
+	if (n_mod10 >= 3.0 and n_mod10 <= 4.0) \
+			or (n_mod10 == 9.0 and not ((n_mod100 >= 10.0 and n_mod100 <= 19.0) \
+				or (n_mod100 >= 70.0 and n_mod100 <= 79.0) \
+				or (n_mod100 >= 90.0 and n_mod100 <= 99.0))):
+		return "few"
+	if n != 0.0 and n_mod1000000 == 0.0:
+		return "many"
+	return "other"
+
+
+static func _c_mt(o: Dictionary) -> String:
+	var n: float = o.n
+	var n_mod100 := fmod(n, 100.0)
+	if n == 1.0:
+		return "one"
+	if n == 2.0:
+		return "two"
+	if n == 0.0 or (n_mod100 >= 3.0 and n_mod100 <= 10.0):
+		return "few"
+	if n_mod100 >= 11.0 and n_mod100 <= 19.0:
+		return "many"
+	return "other"
+
+
+static func _c_ga(o: Dictionary) -> String:
 	var n: float = o.n
 	if n == 1.0:
 		return "one"
@@ -291,471 +651,439 @@ static func _c_irish(o: Dictionary) -> String:
 	return "other"
 
 
-## Scottish Gaelic.
-static func _c_scottish_gaelic(o: Dictionary) -> String:
-	var n: float = o.n
-	if n == 1.0 or n == 11.0:
-		return "one"
-	if n == 2.0 or n == 12.0:
-		return "two"
-	if (n >= 3.0 and n <= 10.0) or (n >= 13.0 and n <= 19.0):
-		return "few"
-	return "other"
-
-
-## Breton.
-static func _c_breton(o: Dictionary) -> String:
-	if o.v != 0:
-		return "other"
+static func _c_gv(o: Dictionary) -> String:
 	var i: int = o.i
-	var mod10 := i % 10
-	var mod100 := i % 100
-	if mod10 == 1 and mod100 != 11 and mod100 != 71 and mod100 != 91:
+	var v: int = o.v
+	var i_mod10 := i % 10
+	var i_mod100 := i % 100
+	if v == 0 and i_mod10 == 1:
 		return "one"
-	if mod10 == 2 and mod100 != 12 and mod100 != 72 and mod100 != 92:
+	if v == 0 and i_mod10 == 2:
 		return "two"
-	if (mod10 == 3 or mod10 == 4 or mod10 == 9) \
-		and not (mod100 >= 10 and mod100 <= 19) \
-		and not (mod100 >= 70 and mod100 <= 79) \
-		and not (mod100 >= 90 and mod100 <= 99):
+	if (v == 0 and i_mod100 == 0) or i_mod100 == 20 or i_mod100 == 40 or i_mod100 == 60 \
+			or i_mod100 == 80:
 		return "few"
-	if i != 0 and mod100 == 0 and i % 1000000 == 0:
+	if v != 0:
 		return "many"
 	return "other"
 
 
-## Manx.
-static func _c_manx(o: Dictionary) -> String:
-	if o.v == 0 and int(o.i) % 10 == 1:
-		return "one"
-	if o.v == 0 and int(o.i) % 10 == 2:
-		return "two"
-	if o.v == 0:
-		var mod100: int = int(o.i) % 100
-		if mod100 == 0 or mod100 == 20 or mod100 == 40 or mod100 == 60 or mod100 == 80:
-			return "few"
-	if o.v != 0:
-		return "many"
-	return "other"
-
-
-## Maltese.
-static func _c_maltese(o: Dictionary) -> String:
+static func _c_kw(o: Dictionary) -> String:
 	var n: float = o.n
+	var n_mod100 := fmod(n, 100.0)
+	var n_mod1000 := fmod(n, 1000.0)
+	var n_mod100000 := fmod(n, 100000.0)
+	var n_mod1000000 := fmod(n, 1000000.0)
+	if n == 0.0:
+		return "zero"
 	if n == 1.0:
 		return "one"
-	var mod100: int = int(o.i) % 100
-	if n == 0.0 or (mod100 >= 2 and mod100 <= 10):
-		return "few"
-	if mod100 >= 11 and mod100 <= 19:
-		return "many"
-	return "other"
-
-
-## Slovenian.
-static func _c_slovenian(o: Dictionary) -> String:
-	if o.v != 0:
-		return "few"
-	var mod100: int = int(o.i) % 100
-	if mod100 == 1:
-		return "one"
-	if mod100 == 2:
+	if n_mod100 == 2.0 or n_mod100 == 22.0 or n_mod100 == 42.0 or n_mod100 == 62.0 \
+			or n_mod100 == 82.0 \
+			or (n_mod1000 == 0.0 and n_mod100000 >= 1000.0 and n_mod100000 <= 20000.0) \
+			or n_mod100000 == 40000.0 or n_mod100000 == 60000.0 or n_mod100000 == 80000.0 \
+			or (n != 0.0 and n_mod1000000 == 100000.0):
 		return "two"
-	if mod100 == 3 or mod100 == 4:
+	if n_mod100 == 3.0 or n_mod100 == 23.0 or n_mod100 == 43.0 or n_mod100 == 63.0 \
+			or n_mod100 == 83.0:
 		return "few"
-	return "other"
-
-
-## Lithuanian.
-static func _c_lithuanian(o: Dictionary) -> String:
-	if o.f != 0:
+	if (n != 1.0 and n_mod100 == 1.0) or n_mod100 == 21.0 or n_mod100 == 41.0 or n_mod100 == 61.0 \
+			or n_mod100 == 81.0:
 		return "many"
-	var i: int = o.i
-	var mod10 := i % 10
-	var mod100 := i % 100
-	if mod10 == 1 and not (mod100 >= 11 and mod100 <= 19):
-		return "one"
-	if mod10 >= 2 and mod10 <= 9 and not (mod100 >= 11 and mod100 <= 19):
-		return "few"
 	return "other"
 
 
-## Latvian.
-static func _c_latvian(o: Dictionary) -> String:
-	var i: int = o.i
-	var f: int = o.f
-	if o.v == 0:
-		var i_mod10 := i % 10
-		var i_mod100 := i % 100
-		if i_mod10 == 0 or (i_mod100 >= 11 and i_mod100 <= 19):
-			return "zero"
-		if i_mod10 == 1 and i_mod100 != 11:
-			return "one"
-	else:
-		var f_mod100 := f % 100
-		if f_mod100 >= 11 and f_mod100 <= 19:
-			return "zero"
-		var f_mod10 := f % 10
-		if f_mod10 == 1 and f_mod100 != 11:
-			return "one"
-	return "other"
-
-
-## Macedonian.
-static func _c_macedonian(o: Dictionary) -> String:
-	if (o.v == 0 and int(o.i) % 10 == 1) or (o.f % 10 == 1):
-		return "one"
-	return "other"
-
-
-## Filipino.
-static func _c_filipino(o: Dictionary) -> String:
-	if o.v == 0:
-		var i: int = o.i
-		if i == 1 or i == 2 or i == 3:
-			return "one"
-		var mod10 := i % 10
-		if mod10 != 4 and mod10 != 6 and mod10 != 9:
-			return "one"
-	else:
-		var f_mod10: int = o.f % 10
-		if f_mod10 != 4 and f_mod10 != 6 and f_mod10 != 9:
-			return "one"
-	return "other"
-
-
-## Sinhala.
-static func _c_sinhala(o: Dictionary) -> String:
+static func _c_ar(o: Dictionary) -> String:
 	var n: float = o.n
-	if n == 0.0 or n == 1.0:
+	var n_mod100 := fmod(n, 100.0)
+	if n == 0.0:
+		return "zero"
+	if n == 1.0:
 		return "one"
-	if o.i == 0 and o.f == 1:
-		return "one"
+	if n == 2.0:
+		return "two"
+	if n_mod100 >= 3.0 and n_mod100 <= 10.0:
+		return "few"
+	if n_mod100 >= 11.0 and n_mod100 <= 99.0:
+		return "many"
 	return "other"
 
 
-## "Zero or one": common to Hindi-family languages, Amharic, Armenian, and
-## Persian: one for a zero integer part or a value of exactly 1.
-static func _c_zero_or_one(o: Dictionary) -> String:
-	if o.i == 0 or o.n == 1.0:
-		return "one"
-	return "other"
-
-
-## Nepali: one for an integer part of 0 or 1.
-static func _c_nepali(o: Dictionary) -> String:
-	if o.i == 0 or o.i == 1:
-		return "one"
-	return "other"
-
-
-## Cornish. CLDR's Cornish rules also cover several very large-number
-## clauses (multiples of 100,000 and 1,000,000); those are omitted here as
-## unreachable in practice for dialogue text.
-static func _c_cornish(o: Dictionary) -> String:
+static func _c_cy(o: Dictionary) -> String:
 	var n: float = o.n
 	if n == 0.0:
 		return "zero"
 	if n == 1.0:
 		return "one"
-	var mod100: int = int(o.i) % 100
-	if mod100 == 2 or mod100 == 22 or mod100 == 42 or mod100 == 62 or mod100 == 82:
+	if n == 2.0:
 		return "two"
-	if mod100 == 3 or mod100 == 23 or mod100 == 43 or mod100 == 63 or mod100 == 83:
+	if n == 3.0:
 		return "few"
-	if n != 1.0 and (mod100 == 1 or mod100 == 21 or mod100 == 41 or mod100 == 61 or mod100 == 81):
+	if n == 6.0:
 		return "many"
 	return "other"
 
 
 static func _cardinal_dispatch() -> Dictionary:
-	if _cardinal_dispatch_cache.is_empty():
-		var default_group := Callable(YarnCldrPluralRules, "_c_one_i1v0")
-		var no_plural := Callable(YarnCldrPluralRules, "_c_default")
-		var zero_or_one := Callable(YarnCldrPluralRules, "_c_zero_or_one")
+	if _cardinal_dispatch_ready:
+		return _cardinal_dispatch_cache
+	_dispatch_mutex.lock()
+	if not _cardinal_dispatch_ready:
 		var d := {}
-
-		for code in ["en", "de", "nl", "sv", "et", "fi", "eu", "gl", "hu", "tr", "az", "kk",
-			"ky", "uz", "mn", "ka", "ta", "te", "kn", "ml", "sw", "ha", "so", "ur", "pt",
-			"af", "sq", "bg", "el", "eo", "fo", "nb", "nn", "yi", "ca", "sd", "ks", "os",
-			"dv", "ee", "ff", "fy", "gsw", "ku", "lb", "lg", "ps", "rm", "st", "ts", "xh"]:
-			d[code] = default_group
-
-		for code in ["ja", "ko", "zh", "yue", "vi", "th", "id", "ms", "my", "lo", "km", "bo",
-			"ig", "yo", "dz", "wo", "sah"]:
-			d[code] = no_plural
-
-		for code in ["hi", "bn", "gu", "pa", "mr", "fa", "am", "hy"]:
-			d[code] = zero_or_one
-
-		d["da"] = Callable(YarnCldrPluralRules, "_c_danish")
-		d["is"] = Callable(YarnCldrPluralRules, "_c_icelandic")
-		d["fr"] = Callable(YarnCldrPluralRules, "_c_french")
-		d["it"] = Callable(YarnCldrPluralRules, "_c_it_es")
-		d["es"] = Callable(YarnCldrPluralRules, "_c_it_es")
-		d["ru"] = Callable(YarnCldrPluralRules, "_c_russian")
-		d["uk"] = Callable(YarnCldrPluralRules, "_c_russian")
-		d["be"] = Callable(YarnCldrPluralRules, "_c_russian")
-		d["pl"] = Callable(YarnCldrPluralRules, "_c_polish")
-		d["cs"] = Callable(YarnCldrPluralRules, "_c_czech_slovak")
-		d["sk"] = Callable(YarnCldrPluralRules, "_c_czech_slovak")
-		d["ro"] = Callable(YarnCldrPluralRules, "_c_romanian")
-		d["hr"] = Callable(YarnCldrPluralRules, "_c_bcs")
-		d["sr"] = Callable(YarnCldrPluralRules, "_c_bcs")
-		d["bs"] = Callable(YarnCldrPluralRules, "_c_bcs")
-		d["ar"] = Callable(YarnCldrPluralRules, "_c_arabic")
-		d["he"] = Callable(YarnCldrPluralRules, "_c_hebrew")
-		d["cy"] = Callable(YarnCldrPluralRules, "_c_welsh")
-		d["ga"] = Callable(YarnCldrPluralRules, "_c_irish")
-		d["gd"] = Callable(YarnCldrPluralRules, "_c_scottish_gaelic")
-		d["br"] = Callable(YarnCldrPluralRules, "_c_breton")
-		d["gv"] = Callable(YarnCldrPluralRules, "_c_manx")
-		d["kw"] = Callable(YarnCldrPluralRules, "_c_cornish")
-		d["mt"] = Callable(YarnCldrPluralRules, "_c_maltese")
-		d["sl"] = Callable(YarnCldrPluralRules, "_c_slovenian")
-		d["lt"] = Callable(YarnCldrPluralRules, "_c_lithuanian")
-		d["lv"] = Callable(YarnCldrPluralRules, "_c_latvian")
-		d["mk"] = Callable(YarnCldrPluralRules, "_c_macedonian")
-		d["fil"] = Callable(YarnCldrPluralRules, "_c_filipino")
-		d["si"] = Callable(YarnCldrPluralRules, "_c_sinhala")
-		d["ne"] = Callable(YarnCldrPluralRules, "_c_nepali")
-
+		for code in ["am", "as", "bn", "doi", "fa", "gu", "hi", "kn", "pcm", "zu"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_hi")
+		for code in ["ff", "hy", "kab"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_hy")
+		for code in ["ast", "de", "en", "et", "fi", "fy", "gl", "ia", "io", "ji", "lij", "nl",
+			"sc", "scn", "sv", "sw", "ur", "yi"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_en")
+		d["si"] = Callable(YarnCldrPluralRules, "_c_si")
+		for code in ["ak", "bho", "guw", "ln", "mg", "nso", "pa", "ti", "wa"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_ak")
+		d["tzm"] = Callable(YarnCldrPluralRules, "_c_tzm")
+		for code in ["af", "an", "asa", "az", "bal", "bem", "bez", "bg", "brx", "ce", "cgg",
+			"chr", "ckb", "dv", "ee", "el", "eo", "eu", "fo", "fur", "gsw", "ha", "haw", "hu",
+			"jgo", "jmc", "ka", "kaj", "kcg", "kk", "kkj", "kl", "ks", "ksb", "ku", "ky", "lb",
+			"lg", "mas", "mgo", "ml", "mn", "mr", "nah", "nb", "nd", "ne", "nn", "nnh", "no",
+			"nr", "ny", "nyn", "om", "or", "os", "pap", "ps", "rm", "rof", "rwk", "saq", "sd",
+			"sdh", "seh", "sn", "so", "sq", "ss", "ssy", "st", "syr", "ta", "te", "teo", "tig",
+			"tk", "tn", "tr", "ts", "ug", "uz", "ve", "vo", "vun", "wae", "xh", "xog"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_tr")
+		d["da"] = Callable(YarnCldrPluralRules, "_c_da")
+		d["is"] = Callable(YarnCldrPluralRules, "_c_is")
+		d["mk"] = Callable(YarnCldrPluralRules, "_c_mk")
+		for code in ["ceb", "fil", "tl"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_fil")
+		for code in ["lv", "prg"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_lv")
+		d["lag"] = Callable(YarnCldrPluralRules, "_c_lag")
+		d["ksh"] = Callable(YarnCldrPluralRules, "_c_ksh")
+		for code in ["he", "iw"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_he")
+		for code in ["iu", "naq", "sat", "se", "sma", "smi", "smj", "smn", "sms"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_se")
+		d["shi"] = Callable(YarnCldrPluralRules, "_c_shi")
+		for code in ["mo", "ro"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_ro")
+		for code in ["bs", "hr", "sh", "sr"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_bs")
+		d["fr"] = Callable(YarnCldrPluralRules, "_c_fr")
+		d["pt"] = Callable(YarnCldrPluralRules, "_c_pt")
+		for code in ["ca", "it", "pt_PT", "vec"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_it")
+		d["es"] = Callable(YarnCldrPluralRules, "_c_es")
+		d["gd"] = Callable(YarnCldrPluralRules, "_c_gd")
+		d["sl"] = Callable(YarnCldrPluralRules, "_c_sl")
+		for code in ["dsb", "hsb"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_dsb")
+		for code in ["cs", "sk"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_cs")
+		d["pl"] = Callable(YarnCldrPluralRules, "_c_pl")
+		d["be"] = Callable(YarnCldrPluralRules, "_c_be")
+		d["lt"] = Callable(YarnCldrPluralRules, "_c_lt")
+		for code in ["ru", "uk"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_ru")
+		d["br"] = Callable(YarnCldrPluralRules, "_c_br")
+		d["mt"] = Callable(YarnCldrPluralRules, "_c_mt")
+		d["ga"] = Callable(YarnCldrPluralRules, "_c_ga")
+		d["gv"] = Callable(YarnCldrPluralRules, "_c_gv")
+		d["kw"] = Callable(YarnCldrPluralRules, "_c_kw")
+		for code in ["ar", "ars"]:
+			d[code] = Callable(YarnCldrPluralRules, "_c_ar")
+		d["cy"] = Callable(YarnCldrPluralRules, "_c_cy")
 		_cardinal_dispatch_cache = d
+		_cardinal_dispatch_ready = true
+	_dispatch_mutex.unlock()
 	return _cardinal_dispatch_cache
 
 static var _cardinal_dispatch_cache: Dictionary = {}
+static var _cardinal_dispatch_ready := false
+static var _dispatch_mutex: Mutex = Mutex.new()
 
 
 # ---------------------------------------------------------------------- #
 # Ordinal rule groups
 # ---------------------------------------------------------------------- #
 
-## Fallback for every locale with no distinct ordinal forms.
-static func _o_default(_n: int) -> String:
+static func _o_sv(o: Dictionary) -> String:
+	var n: float = o.n
+	var n_mod10 := fmod(n, 10.0)
+	var n_mod100 := fmod(n, 100.0)
+	if n_mod10 == 1.0 or (n_mod10 == 2.0 and not (n_mod100 == 11.0 or n_mod100 == 12.0)):
+		return "one"
 	return "other"
 
 
-## English.
-static func _o_english(n: int) -> String:
-	var mod10 := n % 10
-	var mod100 := n % 100
-	if mod10 == 1 and mod100 != 11:
+static func _o_fr(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 1.0:
 		return "one"
-	if mod10 == 2 and mod100 != 12:
+	return "other"
+
+
+static func _o_hu(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 1.0 or n == 5.0:
+		return "one"
+	return "other"
+
+
+static func _o_ne(o: Dictionary) -> String:
+	var n: float = o.n
+	if n >= 1.0 and n <= 4.0:
+		return "one"
+	return "other"
+
+
+static func _o_be(o: Dictionary) -> String:
+	var n: float = o.n
+	var n_mod10 := fmod(n, 10.0)
+	var n_mod100 := fmod(n, 100.0)
+	if n_mod10 == 2.0 or (n_mod10 == 3.0 and not (n_mod100 == 12.0 or n_mod100 == 13.0)):
+		return "few"
+	return "other"
+
+
+static func _o_uk(o: Dictionary) -> String:
+	var n: float = o.n
+	var n_mod10 := fmod(n, 10.0)
+	var n_mod100 := fmod(n, 100.0)
+	if n_mod10 == 3.0 and n_mod100 != 13.0:
+		return "few"
+	return "other"
+
+
+static func _o_tk(o: Dictionary) -> String:
+	var n: float = o.n
+	var n_mod10 := fmod(n, 10.0)
+	if n_mod10 == 6.0 or n_mod10 == 9.0 or n == 10.0:
+		return "few"
+	return "other"
+
+
+static func _o_kk(o: Dictionary) -> String:
+	var n: float = o.n
+	var n_mod10 := fmod(n, 10.0)
+	if n_mod10 == 6.0 or n_mod10 == 9.0 or (n_mod10 == 0.0 and n != 0.0):
+		return "many"
+	return "other"
+
+
+static func _o_it(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 11.0 or n == 8.0 or n == 80.0 or n == 800.0:
+		return "many"
+	return "other"
+
+
+static func _o_lij(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 11.0 or n == 8.0 or (n >= 80.0 and n <= 89.0) or (n >= 800.0 and n <= 899.0):
+		return "many"
+	return "other"
+
+
+static func _o_ka(o: Dictionary) -> String:
+	var i: int = o.i
+	var i_mod100 := i % 100
+	if i == 1:
+		return "one"
+	if i == 0 or (i_mod100 >= 2 and i_mod100 <= 20) or i_mod100 == 40 or i_mod100 == 60 \
+			or i_mod100 == 80:
+		return "many"
+	return "other"
+
+
+static func _o_sq(o: Dictionary) -> String:
+	var n: float = o.n
+	var n_mod10 := fmod(n, 10.0)
+	var n_mod100 := fmod(n, 100.0)
+	if n == 1.0:
+		return "one"
+	if n_mod10 == 4.0 and n_mod100 != 14.0:
+		return "many"
+	return "other"
+
+
+static func _o_kw(o: Dictionary) -> String:
+	var n: float = o.n
+	var n_mod100 := fmod(n, 100.0)
+	if (n >= 1.0 and n <= 4.0) or (n_mod100 >= 1.0 and n_mod100 <= 4.0) \
+			or (n_mod100 >= 21.0 and n_mod100 <= 24.0) or (n_mod100 >= 41.0 and n_mod100 <= 44.0) \
+			or (n_mod100 >= 61.0 and n_mod100 <= 64.0) or (n_mod100 >= 81.0 and n_mod100 <= 84.0):
+		return "one"
+	if n == 5.0 or n_mod100 == 5.0:
+		return "many"
+	return "other"
+
+
+static func _o_en(o: Dictionary) -> String:
+	var n: float = o.n
+	var n_mod10 := fmod(n, 10.0)
+	var n_mod100 := fmod(n, 100.0)
+	if n_mod10 == 1.0 and n_mod100 != 11.0:
+		return "one"
+	if n_mod10 == 2.0 and n_mod100 != 12.0:
 		return "two"
-	if mod10 == 3 and mod100 != 13:
+	if n_mod10 == 3.0 and n_mod100 != 13.0:
 		return "few"
 	return "other"
 
 
-## French: only "1st" is distinct.
-static func _o_one_only(n: int) -> String:
-	if n == 1:
+static func _o_mr(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 1.0:
 		return "one"
-	return "other"
-
-
-## Italian.
-static func _o_italian(n: int) -> String:
-	if n == 8 or n == 11 or n == 80 or n == 800:
-		return "many"
-	return "other"
-
-
-## Welsh.
-static func _o_welsh(n: int) -> String:
-	match n:
-		0, 7, 8, 9: return "zero"
-		1: return "one"
-		2: return "two"
-		3, 4: return "few"
-		5, 6: return "many"
-		_: return "other"
-
-
-## Scottish Gaelic.
-static func _o_scottish_gaelic(n: int) -> String:
-	if n == 1 or n == 11:
-		return "one"
-	if n == 2 or n == 12:
+	if n == 2.0 or n == 3.0:
 		return "two"
-	if n == 3 or n == 13:
+	if n == 4.0:
 		return "few"
 	return "other"
 
 
-## Catalan.
-static func _o_catalan(n: int) -> String:
-	if n == 1 or n == 3:
+static func _o_gd(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 1.0 or n == 11.0:
 		return "one"
-	if n == 2:
+	if n == 2.0 or n == 12.0:
 		return "two"
-	if n == 4:
+	if n == 3.0 or n == 13.0:
 		return "few"
 	return "other"
 
 
-## Azerbaijani.
-static func _o_azerbaijani(n: int) -> String:
-	var mod10 := n % 10
-	var mod100 := n % 100
-	var mod1000 := n % 1000
-	if mod10 == 1 or mod10 == 2 or mod10 == 5 or mod10 == 7 or mod10 == 8 \
-		or mod100 == 20 or mod100 == 50 or mod100 == 70 or mod100 == 80:
+static func _o_ca(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 1.0 or n == 3.0:
 		return "one"
-	if mod10 == 3 or mod10 == 4 or mod1000 == 100 or mod1000 == 200 or mod1000 == 300 \
-		or mod1000 == 400 or mod1000 == 500 or mod1000 == 600 or mod1000 == 700 \
-		or mod1000 == 800 or mod1000 == 900:
-		return "few"
-	if n == 0 or mod10 == 6 or mod100 == 40 or mod100 == 60 or mod100 == 90:
-		return "many"
-	return "other"
-
-
-## Kazakh.
-static func _o_kazakh(n: int) -> String:
-	var mod10 := n % 10
-	if mod10 == 6 or mod10 == 9 or (mod10 == 0 and n != 0):
-		return "many"
-	return "other"
-
-
-## Georgian.
-static func _o_georgian(n: int) -> String:
-	if n == 1:
-		return "one"
-	var mod100 := n % 100
-	if n == 0 or (mod100 >= 2 and mod100 <= 20) or mod100 == 40 or mod100 == 60 or mod100 == 80:
-		return "many"
-	return "other"
-
-
-## Hungarian.
-static func _o_hungarian(n: int) -> String:
-	if n == 1 or n == 5:
-		return "one"
-	return "other"
-
-
-## Bengali / Assamese.
-static func _o_bengali(n: int) -> String:
-	if n == 1 or n == 5 or n == 7 or n == 8 or n == 9 or n == 10:
-		return "one"
-	if n == 2 or n == 3:
+	if n == 2.0:
 		return "two"
-	if n == 4:
+	if n == 4.0:
 		return "few"
-	if n == 6:
-		return "many"
 	return "other"
 
 
-## Hindi / Gujarati.
-static func _o_hindi(n: int) -> String:
-	if n == 1:
+static func _o_mk(o: Dictionary) -> String:
+	var i: int = o.i
+	var i_mod10 := i % 10
+	var i_mod100 := i % 100
+	if i_mod10 == 1 and i_mod100 != 11:
 		return "one"
-	if n == 2 or n == 3:
+	if i_mod10 == 2 and i_mod100 != 12:
 		return "two"
-	if n == 4:
-		return "few"
-	if n == 6:
+	if i_mod10 == 7 or (i_mod10 == 8 and not (i_mod100 == 17 or i_mod100 == 18)):
 		return "many"
 	return "other"
 
 
-## Marathi.
-static func _o_marathi(n: int) -> String:
-	if n == 1:
+static func _o_az(o: Dictionary) -> String:
+	var i: int = o.i
+	var i_mod10 := i % 10
+	var i_mod100 := i % 100
+	var i_mod1000 := i % 1000
+	if i_mod10 == 1 or i_mod10 == 2 or i_mod10 == 5 or i_mod10 == 7 or i_mod10 == 8 \
+			or i_mod100 == 20 or i_mod100 == 50 or i_mod100 == 70 or i_mod100 == 80:
 		return "one"
-	if n == 2 or n == 3:
+	if i_mod10 == 3 or i_mod10 == 4 or i_mod1000 == 100 or i_mod1000 == 200 or i_mod1000 == 300 \
+			or i_mod1000 == 400 or i_mod1000 == 500 or i_mod1000 == 600 or i_mod1000 == 700 \
+			or i_mod1000 == 800 or i_mod1000 == 900:
+		return "few"
+	if i == 0 or i_mod10 == 6 or i_mod100 == 40 or i_mod100 == 60 or i_mod100 == 90:
+		return "many"
+	return "other"
+
+
+static func _o_hi(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 1.0:
+		return "one"
+	if n == 2.0 or n == 3.0:
 		return "two"
-	if n == 4:
+	if n == 4.0:
 		return "few"
-	return "other"
-
-
-## Nepali.
-static func _o_nepali(n: int) -> String:
-	if n >= 1 and n <= 4:
-		return "one"
-	return "other"
-
-
-## Ukrainian.
-static func _o_ukrainian(n: int) -> String:
-	if n % 10 == 3 and n % 100 != 13:
-		return "few"
-	return "other"
-
-
-## Swedish.
-static func _o_swedish(n: int) -> String:
-	var mod10 := n % 10
-	var mod100 := n % 100
-	if (mod10 == 1 or mod10 == 2) and mod100 != 11 and mod100 != 12:
-		return "one"
-	return "other"
-
-
-## Albanian.
-static func _o_albanian(n: int) -> String:
-	if n == 1:
-		return "one"
-	if n % 10 == 4 and n % 100 != 14:
+	if n == 6.0:
 		return "many"
 	return "other"
 
 
-## Armenian.
-static func _o_armenian(n: int) -> String:
-	if n == 1 or n == 2 or n == 3 or n % 10 == 0:
+static func _o_bn(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 1.0 or n == 5.0 or n == 7.0 or n == 8.0 or n == 9.0 or n == 10.0:
 		return "one"
+	if n == 2.0 or n == 3.0:
+		return "two"
+	if n == 4.0:
+		return "few"
+	if n == 6.0:
+		return "many"
 	return "other"
 
 
-## Turkmen.
-static func _o_turkmen(n: int) -> String:
-	var mod10 := n % 10
-	if mod10 == 6 or mod10 == 9 or n == 10:
+static func _o_or(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 1.0 or n == 5.0 or (n >= 7.0 and n <= 9.0):
+		return "one"
+	if n == 2.0 or n == 3.0:
+		return "two"
+	if n == 4.0:
 		return "few"
+	if n == 6.0:
+		return "many"
 	return "other"
 
 
-## Tajik.
-static func _o_tajik(n: int) -> String:
-	if n % 10 == 6 or (n % 10 == 0 and n != 0):
+static func _o_cy(o: Dictionary) -> String:
+	var n: float = o.n
+	if n == 0.0 or n == 7.0 or n == 8.0 or n == 9.0:
+		return "zero"
+	if n == 1.0:
+		return "one"
+	if n == 2.0:
+		return "two"
+	if n == 3.0 or n == 4.0:
 		return "few"
+	if n == 5.0 or n == 6.0:
+		return "many"
 	return "other"
 
 
 static func _ordinal_dispatch() -> Dictionary:
-	if _ordinal_dispatch_cache.is_empty():
+	if _ordinal_dispatch_ready:
+		return _ordinal_dispatch_cache
+	_dispatch_mutex.lock()
+	if not _ordinal_dispatch_ready:
 		var d := {}
-		d["en"] = Callable(YarnCldrPluralRules, "_o_english")
-		d["fr"] = Callable(YarnCldrPluralRules, "_o_one_only")
-		d["fil"] = Callable(YarnCldrPluralRules, "_o_one_only")
-		d["it"] = Callable(YarnCldrPluralRules, "_o_italian")
-		d["cy"] = Callable(YarnCldrPluralRules, "_o_welsh")
-		d["ga"] = Callable(YarnCldrPluralRules, "_o_one_only")
-		d["gd"] = Callable(YarnCldrPluralRules, "_o_scottish_gaelic")
-		d["ca"] = Callable(YarnCldrPluralRules, "_o_catalan")
-		d["az"] = Callable(YarnCldrPluralRules, "_o_azerbaijani")
-		d["kk"] = Callable(YarnCldrPluralRules, "_o_kazakh")
-		d["ka"] = Callable(YarnCldrPluralRules, "_o_georgian")
-		d["hu"] = Callable(YarnCldrPluralRules, "_o_hungarian")
-		d["bn"] = Callable(YarnCldrPluralRules, "_o_bengali")
-		d["as"] = Callable(YarnCldrPluralRules, "_o_bengali")
-		d["hi"] = Callable(YarnCldrPluralRules, "_o_hindi")
-		d["gu"] = Callable(YarnCldrPluralRules, "_o_hindi")
-		d["mr"] = Callable(YarnCldrPluralRules, "_o_marathi")
-		d["ne"] = Callable(YarnCldrPluralRules, "_o_nepali")
-		d["uk"] = Callable(YarnCldrPluralRules, "_o_ukrainian")
-		d["sv"] = Callable(YarnCldrPluralRules, "_o_swedish")
-		d["sq"] = Callable(YarnCldrPluralRules, "_o_albanian")
-		d["hy"] = Callable(YarnCldrPluralRules, "_o_armenian")
-		d["tk"] = Callable(YarnCldrPluralRules, "_o_turkmen")
-		d["tg"] = Callable(YarnCldrPluralRules, "_o_tajik")
+		d["sv"] = Callable(YarnCldrPluralRules, "_o_sv")
+		for code in ["bal", "fil", "fr", "ga", "hy", "lo", "mo", "ms", "ro", "tl", "vi"]:
+			d[code] = Callable(YarnCldrPluralRules, "_o_fr")
+		d["hu"] = Callable(YarnCldrPluralRules, "_o_hu")
+		d["ne"] = Callable(YarnCldrPluralRules, "_o_ne")
+		d["be"] = Callable(YarnCldrPluralRules, "_o_be")
+		d["uk"] = Callable(YarnCldrPluralRules, "_o_uk")
+		d["tk"] = Callable(YarnCldrPluralRules, "_o_tk")
+		d["kk"] = Callable(YarnCldrPluralRules, "_o_kk")
+		for code in ["it", "sc", "scn", "vec"]:
+			d[code] = Callable(YarnCldrPluralRules, "_o_it")
+		d["lij"] = Callable(YarnCldrPluralRules, "_o_lij")
+		d["ka"] = Callable(YarnCldrPluralRules, "_o_ka")
+		d["sq"] = Callable(YarnCldrPluralRules, "_o_sq")
+		d["kw"] = Callable(YarnCldrPluralRules, "_o_kw")
+		d["en"] = Callable(YarnCldrPluralRules, "_o_en")
+		d["mr"] = Callable(YarnCldrPluralRules, "_o_mr")
+		d["gd"] = Callable(YarnCldrPluralRules, "_o_gd")
+		d["ca"] = Callable(YarnCldrPluralRules, "_o_ca")
+		d["mk"] = Callable(YarnCldrPluralRules, "_o_mk")
+		d["az"] = Callable(YarnCldrPluralRules, "_o_az")
+		for code in ["gu", "hi"]:
+			d[code] = Callable(YarnCldrPluralRules, "_o_hi")
+		for code in ["as", "bn"]:
+			d[code] = Callable(YarnCldrPluralRules, "_o_bn")
+		d["or"] = Callable(YarnCldrPluralRules, "_o_or")
+		d["cy"] = Callable(YarnCldrPluralRules, "_o_cy")
 		_ordinal_dispatch_cache = d
+		_ordinal_dispatch_ready = true
+	_dispatch_mutex.unlock()
 	return _ordinal_dispatch_cache
 
 static var _ordinal_dispatch_cache: Dictionary = {}
+static var _ordinal_dispatch_ready := false

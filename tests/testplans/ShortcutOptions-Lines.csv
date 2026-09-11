@@ -1,0 +1,50 @@
+id,text,file,node,lineNumber
+line:0145ef99,Option 1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,10
+line:9775e8ee,This line should appear.,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,12
+line:2d24e177,Sub Option 1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,13
+line:bb14e600,This line should also appear.,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,15
+line:1881829e,Sub Option 2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,17
+line:8eb185e9,Sub Option 3,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,18
+line:34e08c70,Option 2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,19
+line:a2d08b07,This line should not appear.,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,20
+line:33cd3497,Option 3,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,21
+line:a5fd33e0,This line should not appear.,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,22
+line:b3315e9a,Bea: line text,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,26
+line:250159ed,option1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,27
+line:9f505074,option2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,28
+line:09605703,Bea: line text2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,29
+line:aaf5339d,Bea: indented line text,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,32
+line:3cc534ea,indented option1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,33
+line:86943d73,indented option2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,34
+line:10a43a04,Bea: indented line text2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,35
+line:81b98594,Bea: line text,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,38
+line:178982e3,indented option1 following unindented line,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,39
+line:706273b1,indented option2 following unindented line,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,40
+line:e65274c6,option2.1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,41
+line:5c037d5f,option2.2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,42
+line:ca337a28,option2.3,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,43
+line:69a61eb6,option2.4,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,44
+line:ff9619c1,A,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,47
+line:45c71058,B,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,48
+line:0e8a7ce,Option A,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,53
+line:0405c66,Option B,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,54
+line:0e8a7cd,Option A,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,57
+line:0405c67,Option B,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,58
+line:a7636fdf,Option1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,62
+line:1d326646,Option2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,64
+line:8b026131,Option A,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,67
+line:289705af,Option B,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,68
+line:bea702d8,Line after fallthrough option block 1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,69
+line:04f60b41,Option A,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,71
+line:92c60c36,Option A1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,72
+line:03dbb3a6,Option A2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,73
+line:95ebb4d1,Line inside Option A fallthrough block 2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,74
+line:f6c529e7,Option B,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,75
+line:60f52e90,Line after fallthrough option block 2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,76
+line:daa42709,Option A,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,78
+line:4c94207e,Option A1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,79
+line:ef0144e0,Option A2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,80
+line:79314397,Option B,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,81
+line:c3604a0e,Option B1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,82
+line:55504d79,Option B2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,83
+line:c44df2e9,Line after fallthrough option block 3,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/ShortcutOptions.yarn,Start,84

@@ -139,54 +139,6 @@ class ShakeActionHandler extends YarnActionMarkupHandler:
 
 
 # =============================================================================
-# WAVE EFFECT HANDLER
-# =============================================================================
-## wave effect for [wave] markup. requires shader or custom rendering
-## for per-character animation; stub for api compatibility.
-class WaveActionHandler extends YarnActionMarkupHandler:
-	## wave amplitude in pixels
-	var amplitude: float = 2.0
-
-	## wave speed
-	var speed: float = 5.0
-
-
-	func on_character_will_appear(
-		character_index: int,
-		line: Variant,
-		cancellation_token: Variant = null
-	) -> Signal:
-		return Signal()
-
-
-# =============================================================================
-# COLOR PULSE HANDLER
-# =============================================================================
-## colour pulse for [pulse] markup. requires shader or custom bbcode
-## for proper per-character pulsing; stub for api compatibility.
-class ColorPulseActionHandler extends YarnActionMarkupHandler:
-	var label: RichTextLabel
-	var color_a: Color = Color.WHITE
-	var color_b: Color = Color.YELLOW
-	## cycles per second
-	var speed: float = 3.0
-
-
-	func _init(target_label: RichTextLabel, from_color: Color = Color.WHITE, to_color: Color = Color.YELLOW) -> void:
-		label = target_label
-		color_a = from_color
-		color_b = to_color
-
-
-	func on_character_will_appear(
-		character_index: int,
-		line: Variant,
-		cancellation_token: Variant = null
-	) -> Signal:
-		return Signal()
-
-
-# =============================================================================
 # CONTINUE BUTTON HANDLER
 # =============================================================================
 ## controls a "continue" button during line presentation.

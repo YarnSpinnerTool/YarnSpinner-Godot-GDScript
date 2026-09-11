@@ -1,0 +1,32 @@
+id,text,file,node,lineNumber
+line:c37623bc,Here's a line with a hashtag,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,3
+line:554624cb,Here's a line with an escaped hashtag #hashtag,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,4
+line:ef172d52,Here's a line with an expression {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,6
+line:79272a25,Here's a line with an escaped expression {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,7
+line:dab24ebb,Here's a line with an escaped command <<foo>>,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,12
+line:4c8249cc,Here's a line with a comment,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,14
+line:f6d34055,Here's a line with an escaped comment // wow,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,15
+line:60e34722,Here's a line with an escaped backslash \,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,17
+line:f1fef8b2,Here's some TMP-style styling with a color code: <color=#fff>wow</color>,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,19
+line:67ceffc5,Here's a url: http://github.com/YarnSpinnerTool,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,21
+line:1c5e11ef,Here's some markup: [a]hello[/a],/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,25
+line:8a6e1698,Here's some escaped markup: \[a\]hello\[/a\],/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,26
+line:303f1f01,Here's an option with a hashtag,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,28
+line:a60f1876,Here's an option with an escaped hashtag #hashtag,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,29
+line:059a7ce8,Here's an option with an expression {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,30
+line:93aa7b9f,Here's an option with an escaped expression {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,31
+line:29fb7206,Here's an option with a condition,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,32
+line:bfcb7571,Here's an option with an escaped condition <<if true>>,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,33
+line:2ed6cae1,Here's an option with a comment,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,34
+line:b8e6cd96,Here's an option with an escaped comment // wow,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,35
+line:df0d3cc4,Here's an option with an escaped backslash \,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,36
+line:493d3bb3,Here's some TMP-style styling with a color code: <color=#fff>wow</color>,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,37
+line:f36c322a,Here's a url: http://github.com/YarnSpinnerTool,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,38
+line:655c355d,Here's some markup: [a]hello[/a],/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,39
+line:c6c951c3,Here's some escaped markup: \[a\]hello\[/a\],/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,40
+line:50f956b4,<<escaped command>>,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,43
+line:eaa85f2d,{0} escaped line with interpolation,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,44
+line:7c98585a,// escaped comment,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,45
+line:ed85e7ca,\[a]escaped markup\[/a],/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,46
+line:7bb5e0bd,Character: Here is a line with a character,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,48
+line:9e3c27dd,Character\: Here is a line without a character,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Escaping.yarn,Start,49

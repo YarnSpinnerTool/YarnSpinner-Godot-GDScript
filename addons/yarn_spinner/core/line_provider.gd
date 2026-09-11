@@ -17,16 +17,45 @@
 # ======================================================================== #
 
 class_name YarnLineProvider
-extends RefCounted
+extends Resource
 ## Provides localised line content for yarn dialogue.
 ## Handles text lookup, substitution, and markup parsing.
 
+const INVALID_LINE_ID := "<missing>"
+const INVALID_LINE_TEXT := "!! ERROR: Missing line!"
 
 var godot_localisation: YarnGodotLocalisation
 var _program: YarnProgram
 
 ## Maps shadow line IDs to the (line:-prefixed) IDs of the lines they shadow.
 var _shadow_lines: Dictionary[String, String] = {}
+
+var _line_parser: YarnLineParser
+var _markup_parser: YarnMarkupParser
+
+@export var text_locale_code: String = "":
+	set(value):
+		text_locale_code = value
+		if godot_localisation != null:
+			godot_localisation.text_locale_code = value
+
+@export var asset_locale_code: String = "":
+	set(value):
+		asset_locale_code = value
+		if godot_localisation != null:
+			godot_localisation.asset_locale_code = value
+
+@export var use_fallback: bool = true:
+	set(value):
+		use_fallback = value
+		if godot_localisation != null:
+			godot_localisation.use_fallback = value
+
+@export var fallback_locale_code: String = "":
+	set(value):
+		fallback_locale_code = value
+		if godot_localisation != null:
+			godot_localisation.fallback_locale_code = value
 
 ## Legacy accessor; prefer get_current_locale()/set_current_locale().
 var locale: String:
@@ -38,6 +67,15 @@ var locale: String:
 
 func _init() -> void:
 	godot_localisation = YarnGodotLocalisation.new()
+	godot_localisation.text_locale_code = text_locale_code
+	godot_localisation.asset_locale_code = asset_locale_code
+	godot_localisation.use_fallback = use_fallback
+	godot_localisation.fallback_locale_code = fallback_locale_code
+	_line_parser = YarnLineParser.new()
+	var builtin_replacer := YarnBuiltInMarkupReplacer.new()
+	_line_parser.register_marker_processor("select", builtin_replacer)
+	_line_parser.register_marker_processor("plural", builtin_replacer)
+	_line_parser.register_marker_processor("ordinal", builtin_replacer)
 
 
 func set_program(program: YarnProgram) -> void:
@@ -57,6 +95,10 @@ func set_current_locale(locale_code: String) -> void:
 	get_localisation().set_current_locale(locale_code)
 
 
+func get_asset_locale() -> String:
+	return get_localisation().get_asset_locale()
+
+
 func get_available_locales() -> PackedStringArray:
 	return get_localisation().get_available_locales()
 
@@ -67,21 +109,55 @@ func has_locale(locale_code: String) -> bool:
 
 ## Main entry point for line processing. Fetches localised text,
 ## applies substitutions, and parses markup.
-func get_localised_line(line: YarnLine) -> void:
-	if _program != null and _program.line_metadata.has(line.line_id):
-		line.metadata = _program.line_metadata[line.line_id]
+func get_localised_line(line: YarnLine) -> bool:
+	line.metadata = _get_metadata(line.line_id)
 
 	# A shadow line displays another line's content: swap in the source ID
 	# before any lookup, so text and assets both come from the source line.
 	var source_id := _resolve_source_line_id(line.line_id)
+	line.locale_code = get_current_locale()
+
+	if not get_localisation().has_localised_text(source_id):
+		push_warning("line provider: localisation %s does not contain an entry for line %s" % [get_current_locale(), line.line_id])
+		line.line_id = INVALID_LINE_ID
+		line.raw_text = INVALID_LINE_TEXT
+		line.substitutions = []
+		line.metadata = PackedStringArray()
+		line.set_markup_result(YarnMarkupParseResult.new(INVALID_LINE_TEXT))
+		return false
 
 	line.raw_text = _get_string(source_id)
-	if line.raw_text.is_empty():
-		push_warning("line provider: no text found for line '%s' in locale '%s'" % [line.line_id, get_current_locale()])
-		line.raw_text = line.line_id
-	line.locale_code = get_current_locale()
-	line.apply_substitutions()
-	line.parse_markup()
+	line.set_markup_result(parse_markup(YarnLineParser.expand_substitutions(line.raw_text, line.substitutions), line.locale_code))
+	return true
+
+
+func get_localised_option(option: YarnOption) -> bool:
+	option.metadata = _get_metadata(option.line_id)
+
+	var source_id := _resolve_source_line_id(option.line_id)
+	option.locale_code = get_current_locale()
+
+	if not get_localisation().has_localised_text(source_id):
+		push_warning("line provider: localisation %s does not contain an entry for line %s" % [get_current_locale(), option.line_id])
+		option.raw_text = INVALID_LINE_TEXT
+		option.substitutions = []
+		option.metadata = PackedStringArray()
+		option.set_markup_result(YarnMarkupParseResult.new(INVALID_LINE_TEXT))
+		return false
+
+	option.raw_text = _get_string(source_id)
+	option.set_markup_result(parse_markup(YarnLineParser.expand_substitutions(option.raw_text, option.substitutions), option.locale_code))
+	return true
+
+
+func parse_markup(text: String, locale_code: String) -> YarnMarkupParseResult:
+	return _line_parser.parse_string(text, locale_code, true)
+
+
+func _get_metadata(line_id: String) -> PackedStringArray:
+	if _program == null or not _program.line_metadata.has(line_id):
+		return PackedStringArray()
+	return PackedStringArray(_program.line_metadata[line_id])
 
 
 ## Returns the ID of the line this line shadows (with its "line:" prefix),
@@ -111,24 +187,12 @@ func _resolve_source_line_id(line_id: String) -> String:
 	return line_id if source.is_empty() else source
 
 
-func get_localised_option(option: YarnOption) -> void:
-	option.raw_text = _get_string(_resolve_source_line_id(option.line_id))
-	option.locale_code = get_current_locale()
-	option.apply_substitutions()
+func resolve_source_line_id(line_id: String) -> String:
+	return _resolve_source_line_id(line_id)
 
 
-## Checks localisation system, then falls back to program string table.
 func _get_string(line_id: String) -> String:
-	var loc := get_localisation()
-	var text := loc.get_localised_text(line_id)
-
-	if not text.is_empty():
-		return text
-
-	if _program != null and _program.has_string(line_id):
-		return _program.get_string(line_id)
-
-	return ""
+	return get_localisation().get_localised_text(line_id)
 
 
 func register_shadow_line(line_id: String, shadow_id: String) -> void:
@@ -183,9 +247,6 @@ func add_to_translation_server(locale_code: String) -> void:
 		YarnGodotLocalisation.add_translation_to_server(_program, locale_code, godot_localisation.translation_prefix)
 
 
-var _markup_parser: YarnMarkupParser
-
-
 func get_markup_parser() -> YarnMarkupParser:
 	if _markup_parser == null:
 		_markup_parser = YarnMarkupParser.new()
@@ -193,11 +254,11 @@ func get_markup_parser() -> YarnMarkupParser:
 
 
 func register_marker_processor(attribute_name: String, processor: YarnAttributeMarkerProcessor) -> void:
-	get_markup_parser().register_marker_processor(attribute_name, processor)
+	_line_parser.register_marker_processor(attribute_name, processor)
 
 
 func deregister_marker_processor(attribute_name: String) -> void:
-	get_markup_parser().deregister_marker_processor(attribute_name)
+	_line_parser.deregister_marker_processor(attribute_name)
 
 
 func register_bbcode_processor(processor: YarnMarkupAttributeProcessor) -> void:

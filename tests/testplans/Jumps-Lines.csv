@@ -1,0 +1,6 @@
+id,text,file,node,lineNumber
+line:4bfa139d,Start,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Jumps.yarn,Start,3
+line:ddca14ea,Error! This line should not be seen.,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Jumps.yarn,Start,6
+line:36f9dbff,NodeNameDestination,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Jumps.yarn,NodeNameDestination,10
+line:36066d82,NodeNameExpression,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Jumps.yarn,NodeNameConstantExpression,16
+line:f5525444,NodeNameVariableExpression,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Jumps.yarn,NodeNameVariableExpression,23

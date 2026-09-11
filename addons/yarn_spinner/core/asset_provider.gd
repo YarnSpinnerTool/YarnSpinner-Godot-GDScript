@@ -97,10 +97,7 @@ func get_asset(line_id: String) -> Resource:
 	if not _assets.has(line_id):
 		return null
 
-	var path: String = _assets[line_id]
-
-	if not path.begins_with("res://") and not path.begins_with("user://"):
-		path = base_path + path
+	var path := _get_registered_path(line_id)
 
 	if ResourceLoader.exists(path):
 		var resource := ResourceLoader.load(path)
@@ -187,12 +184,32 @@ func _sanitise_line_id(line_id: String) -> String:
 	return line_id.replace(":", "_").replace("/", "_").replace("\\", "_")
 
 
+func _get_line_id_variants(line_id: String) -> Array[String]:
+	var variants: Array[String] = []
+	if line_id.begins_with("line:"):
+		variants.append(line_id.substr(5))
+	var safe_id := _sanitise_line_id(line_id)
+	if safe_id not in variants:
+		variants.append(safe_id)
+	if line_id not in variants:
+		variants.append(line_id)
+	return variants
+
+
+func _get_registered_path(line_id: String) -> String:
+	var path: String = _assets[line_id]
+	if not path.begins_with("res://") and not path.begins_with("user://") and not path.begins_with("uid://"):
+		path = base_path.path_join(path)
+	return path
+
+
 func preload_assets(line_ids: PackedStringArray) -> void:
+	if not _pending_loads.is_empty():
+		poll_threaded_loads()
+
 	for line_id in line_ids:
 		if _assets.has(line_id) and not _cache.has(line_id):
-			var path: String = _assets[line_id]
-			if not path.begins_with("res://") and not path.begins_with("user://"):
-				path = base_path + path
+			var path := _get_registered_path(line_id)
 
 			if use_threaded_loading and ResourceLoader.exists(path):
 				_start_threaded_load(line_id, path, "_cache")
@@ -222,11 +239,15 @@ func preload_assets(line_ids: PackedStringArray) -> void:
 func _start_threaded_load(line_id: String, path: String, cache_name: String) -> void:
 	var load_key := "%s:%s" % [cache_name, line_id]
 	if _pending_loads.has(load_key):
-		return  # already loading
+		if not _pending_loads[load_key].get("discard", false):
+			return  # already loading
+		var discarded_path: String = _pending_loads[load_key].path
+		_pending_loads.erase(load_key)
+		ResourceLoader.load_threaded_get(discarded_path)
 
 	var err := ResourceLoader.load_threaded_request(path)
 	if err == OK:
-		_pending_loads[load_key] = {"path": path, "cache": cache_name, "line_id": line_id}
+		_pending_loads[load_key] = {"path": path, "cache": cache_name, "line_id": line_id, "discard": false}
 
 
 func poll_threaded_loads() -> void:
@@ -238,7 +259,7 @@ func poll_threaded_loads() -> void:
 
 		if status == ResourceLoader.THREAD_LOAD_LOADED:
 			var resource := ResourceLoader.load_threaded_get(info.path)
-			if resource != null:
+			if resource != null and not info.discard and _fits_cache(resource, info.cache):
 				_add_to_cache(info.line_id, resource, info.cache)
 			completed.append(load_key)
 		elif status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
@@ -248,21 +269,32 @@ func poll_threaded_loads() -> void:
 		_pending_loads.erase(key)
 
 
+func _fits_cache(resource: Resource, cache_name: String) -> bool:
+	match cache_name:
+		"_cache":
+			return true
+		"_audio_cache":
+			return resource is AudioStream
+		"_image_cache":
+			return resource is Texture2D
+	return false
+
+
 func _find_audio_path(line_id: String) -> String:
-	var filename := _sanitise_line_id(line_id)
-	for ext in audio_extensions:
-		var path := audio_base_path.path_join(filename + ext)
-		if ResourceLoader.exists(path):
-			return path
+	for variant in _get_line_id_variants(line_id):
+		for ext in audio_extensions:
+			var path := audio_base_path.path_join(variant + ext)
+			if ResourceLoader.exists(path):
+				return path
 	return ""
 
 
 func _find_image_path(line_id: String) -> String:
-	var filename := _sanitise_line_id(line_id)
-	for ext in image_extensions:
-		var path := image_base_path.path_join(filename + ext)
-		if ResourceLoader.exists(path):
-			return path
+	for variant in _get_line_id_variants(line_id):
+		for ext in image_extensions:
+			var path := image_base_path.path_join(variant + ext)
+			if ResourceLoader.exists(path):
+				return path
 	return ""
 
 
@@ -278,7 +310,7 @@ func _add_to_cache(line_id: String, resource: Resource, cache_name: String) -> v
 		_:
 			return
 
-	if max_cache_size > 0:
+	if max_cache_size > 0 and not cache.has(line_id):
 		var total_size := _cache.size() + _audio_cache.size() + _image_cache.size()
 		while total_size >= max_cache_size and not _cache_access_order.is_empty():
 			var oldest: Variant = _cache_access_order.pop_front()
@@ -295,21 +327,27 @@ func _add_to_cache(line_id: String, resource: Resource, cache_name: String) -> v
 	_cache_access_order.append(line_id)
 
 
+func _discard_pending_loads() -> void:
+	for load_key in _pending_loads:
+		_pending_loads[load_key].discard = true
+	poll_threaded_loads()
+
+
 func clear_cache() -> void:
+	_discard_pending_loads()
 	_cache.clear()
 	_audio_cache.clear()
 	_image_cache.clear()
 	_cache_access_order.clear()
-	_pending_loads.clear()
 
 
 func clear() -> void:
+	_discard_pending_loads()
 	_assets.clear()
 	_cache.clear()
 	_audio_cache.clear()
 	_image_cache.clear()
 	_cache_access_order.clear()
-	_pending_loads.clear()
 
 
 func get_cache_stats() -> Dictionary:

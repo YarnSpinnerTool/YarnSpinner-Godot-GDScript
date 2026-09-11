@@ -1,0 +1,5 @@
+id,text,file,node,lineNumber
+line:91773a7a,"Player: One pie, please.",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/SmartVariables.yarn,Start,12
+line:07473d0d,PieMaker: Certainly!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/SmartVariables.yarn,Start,13
+line:bd163494,Player: Can I have a pie?,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/SmartVariables.yarn,Start,15
+line:2b2633e3,PieMaker: You can't afford one!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/SmartVariables.yarn,Start,16

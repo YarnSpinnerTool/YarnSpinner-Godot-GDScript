@@ -1,0 +1,12 @@
+id,text,file,node,lineNumber
+line:b818ba37,Number: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/InlineExpressions.yarn,Start,11
+line:2e28bd40,Expression: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/InlineExpressions.yarn,Start,12
+line:9479b4d9,String: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/InlineExpressions.yarn,Start,13
+line:0249b3ae,Bool: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/InlineExpressions.yarn,Start,14
+line:a1dcd730,Variable: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/InlineExpressions.yarn,Start,15
+line:37ecd047,{0} is great!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/InlineExpressions.yarn,Start,18
+line:8dbdd9de,Option Number: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/InlineExpressions.yarn,Start,21
+line:1b8ddea9,Option Expression: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/InlineExpressions.yarn,Start,22
+line:8a906139,Option String: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/InlineExpressions.yarn,Start,23
+line:1ca0664e,Option Bool: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/InlineExpressions.yarn,Start,24
+line:c66f4d28,Option Variable: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/InlineExpressions.yarn,Start,25

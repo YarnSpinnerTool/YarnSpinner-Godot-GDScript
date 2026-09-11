@@ -37,7 +37,8 @@ func test_no_substitutions_leaves_placeholders():
 func test_character_name_colon_syntax():
 	var line := _make_line("Alice: Hello there!")
 	assert_eq(line.character_name, "Alice")
-	assert_eq(line.text, "Hello there!")
+	assert_eq(line.text, "Alice: Hello there!")
+	assert_eq(line.text_without_character_name, "Hello there!")
 
 
 func test_character_name_explicit_markup():
@@ -55,7 +56,7 @@ func test_lazy_computation_only_once():
 	var line := _make_line("Alice: Hello!")
 	var _first := line.text
 	line.raw_text = "Bob: Different!"
-	assert_eq(line.text, "Hello!")
+	assert_eq(line.text_without_character_name, "Hello!")
 	assert_eq(line.character_name, "Alice")
 
 
@@ -64,7 +65,7 @@ func test_invalidate_recomputes():
 	var _first := line.text
 	line.raw_text = "Bob: Different!"
 	line.invalidate()
-	assert_eq(line.text, "Different!")
+	assert_eq(line.text_without_character_name, "Different!")
 	assert_eq(line.character_name, "Bob")
 
 

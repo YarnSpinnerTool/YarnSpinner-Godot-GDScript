@@ -98,6 +98,10 @@ static func _parse_program(reader: ProtobufReader) -> YarnProgram:
 			_:
 				reader.skip_field(tag.wire_type)
 
+	if reader.has_error:
+		push_error("yarn program parser: the compiled program is truncated or corrupt")
+		return null
+
 	return program
 
 
@@ -115,6 +119,10 @@ static func _parse_map_entry_string_node(reader: ProtobufReader) -> Dictionary:
 				value = _parse_node(reader)
 			_:
 				reader.skip_field(tag.wire_type)
+
+	if value == null:
+		value = YarnNode.new()
+		value.node_name = key
 
 	return {"key": key, "value": value}
 
@@ -148,11 +156,9 @@ static func _parse_node(reader: ProtobufReader) -> YarnNode:
 				node.node_name = reader.read_string()
 			NODE_HEADERS:
 				var header := _parse_header(reader)
-				node.headers[header.key] = header.value
+				node.add_header(header.key, header.value)
 			NODE_INSTRUCTIONS:
-				var inst := _parse_instruction(reader)
-				if inst != null:
-					node.instructions.append(inst)
+				node.instructions.append(_parse_instruction(reader))
 			_:
 				reader.skip_field(tag.wire_type)
 
@@ -232,6 +238,10 @@ static func _parse_instruction(reader: ProtobufReader) -> YarnInstruction:
 				inst = _parse_select_saliency_instruction(reader)
 			_:
 				reader.skip_field(tag.wire_type)
+
+	if inst == null:
+		inst = YarnInstruction.new()
+		inst.opcode = YarnInstruction.OpCode.UNKNOWN
 
 	return inst
 

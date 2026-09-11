@@ -1,0 +1,6 @@
+id,text,file,node,lineNumber
+line:ddfb27f1,"Guard: Halt , traveller!",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupsWithImplicitDeclarations.yarn,Start,5
+line:4bcb2086,"Player: Why, hello there!",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupsWithImplicitDeclarations.yarn,Start,6
+line:f19a291f,"Guard: Ah, my friend! You may pass.",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupsWithImplicitDeclarations.yarn,Start,7
+line:67aa2e68,"Guard: Halt, scum!",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupsWithImplicitDeclarations.yarn,Start,14
+line:c43f4af6,Guard: None shall pass this point!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroupsWithImplicitDeclarations.yarn,Start,15

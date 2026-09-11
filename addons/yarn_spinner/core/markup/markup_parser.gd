@@ -21,6 +21,9 @@ extends RefCounted
 ## parses yarn spinner markup and transforms it using registered processors.
 ## uses YarnLineParser internally with a backwards-compatible API.
 
+const BBCODE_TAG_START := "\uE000"
+const BBCODE_TAG_END := "\uE001"
+
 var _line_parser: YarnLineParser
 var _processors: Array[YarnMarkupAttributeProcessor] = []
 var _character_processor: YarnCharacterMarkupProcessor
@@ -54,6 +57,44 @@ func _init() -> void:
 	# [link="..."]text[/link] becomes [url=...]text[/url] — clickable when the
 	# RichTextLabel handles meta_clicked.
 	_processors.append(_LinkProcessor.new())
+
+
+static func bbcode_tag(tag: String) -> String:
+	return BBCODE_TAG_START + tag + BBCODE_TAG_END
+
+
+static func brackets_to_tags(bbcode: String) -> String:
+	return bbcode.replace("[", BBCODE_TAG_START).replace("]", BBCODE_TAG_END)
+
+
+static func escape_text(text: String) -> String:
+	var output := ""
+	for character in text:
+		match character:
+			"[":
+				output += "[lb]"
+			"]":
+				output += "[rb]"
+			BBCODE_TAG_START:
+				output += "["
+			BBCODE_TAG_END:
+				output += "]"
+			_:
+				output += character
+	return output
+
+
+static func strip_bbcode_tags(text: String) -> String:
+	var output := ""
+	var in_tag := false
+	for character in text:
+		if character == BBCODE_TAG_START:
+			in_tag = true
+		elif character == BBCODE_TAG_END:
+			in_tag = false
+		elif not in_tag:
+			output += character
+	return output
 
 
 func register_processor(processor: YarnMarkupAttributeProcessor) -> void:
@@ -90,10 +131,8 @@ func parse_to_result(text: String, add_implicit_character: bool = true) -> YarnM
 ##   - text: the processed text with BBCode
 ##   - character_name: extracted character name (empty if none)
 ##   - attributes: array of parsed attribute info
-## supports escaping: \[ and \] for literal brackets, \\ for literal backslash
+## supports escaping: \[ and \] for literal brackets
 func parse(text: String) -> Dictionary:
-	_character_processor.reset()
-
 	var result := {
 		"text": "",
 		"character_name": "",
@@ -101,109 +140,13 @@ func parse(text: String) -> Dictionary:
 	}
 
 	var parse_result := _line_parser.parse_string(text, locale_code, true)
+	result.character_name = parse_result.get_character_name()
 
-	# convert attributes to BBCode and build output
-	var output := ""
-	var last_pos := 0
+	var display_result := parse_result.without_character_name()
+	result.text = convert_to_bbcode(display_result)
 
-	# sort attributes by position
-	var sorted_attrs: Array = parse_result.attributes.duplicate()
+	var sorted_attrs: Array = display_result.attributes.duplicate()
 	sorted_attrs.sort_custom(func(a, b): return a.position < b.position)
-
-	# track open tags for BBCode conversion
-	var open_tags: Array = []
-
-	# process the plain text and insert BBCode tags
-	var plain_text := parse_result.text
-
-	# first, extract character name and strip prefix from text
-	for attr in sorted_attrs:
-		if attr.name == YarnLineParser.CHARACTER_ATTRIBUTE:
-			var name_prop: YarnMarkupValue = attr.try_get_property("name")
-			if name_prop != null:
-				result.character_name = name_prop.string_value
-			else:
-				result.character_name = parse_result.text_for_attribute(attr).strip_edges().trim_suffix(":")
-			_character_processor.character_name = result.character_name
-			# remove the "Name: " prefix from parsed text
-			if attr.length > 0:
-				parse_result = parse_result.delete_range(attr)
-				plain_text = parse_result.text
-				# re-sort since positions shifted
-				sorted_attrs = parse_result.attributes.duplicate()
-				sorted_attrs.sort_custom(func(a, b): return a.position < b.position)
-			break
-
-	# for BBCode conversion, we process attributes and convert them
-	# this is a simplified approach - for full BBCode, use the processors
-	output = plain_text
-
-	# apply BBCode processors to known attributes
-	var bbcode_output := ""
-	var current_pos := 0
-	var attr_stack: Array = []
-
-	# build a list of events (opens and closes)
-	var events: Array = []
-	for attr in sorted_attrs:
-		if attr.name == YarnLineParser.CHARACTER_ATTRIBUTE:
-			continue  # skip character attribute in BBCode output
-
-		events.append({"type": "open", "pos": attr.position, "attr": attr})
-		events.append({"type": "close", "pos": attr.position + attr.length, "attr": attr})
-
-	events.sort_custom(func(a, b):
-		if a.pos != b.pos:
-			return a.pos < b.pos
-		# closes before opens at same position
-		return a.type == "close")
-
-	for event in events:
-		# add text before this event
-		if event.pos > current_pos:
-			bbcode_output += plain_text.substr(current_pos, event.pos - current_pos)
-			current_pos = event.pos
-
-		if event.type == "open":
-			var processor := _find_processor(event.attr.name)
-			if processor != null:
-				# convert attribute properties to dict for processor
-				var props: Dictionary = {}
-				for key in event.attr.properties:
-					var val: Variant = event.attr.properties[key]
-					if val is YarnMarkupValue:
-						props[key] = val.to_string_value()
-					else:
-						props[key] = str(val)
-
-				# get value from first property or name property
-				var attr_value := ""
-				if event.attr.properties.has(event.attr.name):
-					var v: Variant = event.attr.properties[event.attr.name]
-					if v is YarnMarkupValue:
-						attr_value = v.to_string_value()
-					else:
-						attr_value = str(v)
-
-				bbcode_output += processor.process_open(attr_value, props)
-				attr_stack.append({"attr": event.attr, "processor": processor})
-		else:
-			# find and close the matching open tag
-			for i in range(attr_stack.size() - 1, -1, -1):
-				if attr_stack[i].attr == event.attr:
-					bbcode_output += attr_stack[i].processor.process_close()
-					attr_stack.remove_at(i)
-					break
-
-	# add remaining text
-	if current_pos < plain_text.length():
-		bbcode_output += plain_text.substr(current_pos)
-
-	# close any remaining open tags
-	for i in range(attr_stack.size() - 1, -1, -1):
-		bbcode_output += attr_stack[i].processor.process_close()
-
-	result.text = bbcode_output if not bbcode_output.is_empty() else plain_text
 
 	# convert attributes to legacy format
 	for attr in sorted_attrs:
@@ -225,10 +168,95 @@ func parse(text: String) -> Dictionary:
 				break
 		result.attributes.append(legacy_attr)
 
-	if result.character_name.is_empty():
-		result.character_name = _character_processor.character_name
-
 	return result
+
+
+func convert_to_bbcode(parse_result: YarnMarkupParseResult) -> String:
+	_character_processor.reset()
+
+	var plain_text := parse_result.text
+	var events: Array[Dictionary] = []
+	var order := 0
+	for attr in parse_result.attributes:
+		if attr.name == YarnLineParser.CHARACTER_ATTRIBUTE or attr.length <= 0:
+			continue
+		if _find_processor(attr.name) == null:
+			continue
+		events.append({"open": true, "pos": attr.position, "attr": attr, "order": order})
+		events.append({"open": false, "pos": attr.position + attr.length, "attr": attr, "order": order})
+		order += 1
+
+	events.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if a.pos != b.pos:
+			return a.pos < b.pos
+		if a.open != b.open:
+			return not a.open
+		if a.open:
+			if a.attr.length != b.attr.length:
+				return a.attr.length > b.attr.length
+			return a.order < b.order
+		return a.order > b.order)
+
+	var output := ""
+	var current_pos := 0
+	var stack: Array[Dictionary] = []
+
+	for event in events:
+		if event.pos > current_pos:
+			output += escape_text(plain_text.substr(current_pos, event.pos - current_pos))
+			current_pos = event.pos
+
+		if event.open:
+			var processor := _find_processor(event.attr.name)
+			output += processor.process_open(_attribute_value(event.attr), _attribute_properties(event.attr))
+			stack.append({"attr": event.attr, "processor": processor})
+			continue
+
+		var index := -1
+		for i in range(stack.size() - 1, -1, -1):
+			if stack[i].attr == event.attr:
+				index = i
+				break
+		if index == -1:
+			continue
+
+		var reopen: Array[Dictionary] = []
+		for i in range(stack.size() - 1, index, -1):
+			output += stack[i].processor.process_close()
+			reopen.push_front(stack[i])
+		output += stack[index].processor.process_close()
+		stack.resize(index)
+		for entry in reopen:
+			output += entry.processor.process_open(_attribute_value(entry.attr), _attribute_properties(entry.attr))
+			stack.append(entry)
+
+	if current_pos < plain_text.length():
+		output += escape_text(plain_text.substr(current_pos))
+
+	for i in range(stack.size() - 1, -1, -1):
+		output += stack[i].processor.process_close()
+
+	return output
+
+
+func _attribute_value(attr: YarnMarkupAttribute) -> String:
+	if attr.properties.has(attr.name):
+		var value: Variant = attr.properties[attr.name]
+		if value is YarnMarkupValue:
+			return value.to_string_value()
+		return str(value)
+	return ""
+
+
+func _attribute_properties(attr: YarnMarkupAttribute) -> Dictionary:
+	var props: Dictionary = {}
+	for key in attr.properties:
+		var value: Variant = attr.properties[key]
+		if value is YarnMarkupValue:
+			props[key] = value.to_string_value()
+		else:
+			props[key] = str(value)
+	return props
 
 
 ## find a processor that handles the given attribute

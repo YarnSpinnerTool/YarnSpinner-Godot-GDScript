@@ -71,6 +71,13 @@ func test_unterminated_quote():
 	assert_eq(parts[1], "hello world")
 
 
+func test_unicode_whitespace_separates_arguments():
+	var parts := YarnCommandParser.parse("cmd\u00A0x\u2003y\u3000z")
+	assert_eq(parts.size(), 4)
+	assert_eq(parts[1], "x")
+	assert_eq(parts[3], "z")
+
+
 func test_leading_trailing_whitespace():
 	var parts := YarnCommandParser.parse("  wait 2  ")
 	assert_eq(parts.size(), 2)

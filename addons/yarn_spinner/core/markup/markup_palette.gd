@@ -139,20 +139,20 @@ func palette_for_marker(marker_name: String) -> Dictionary:
 
 			# closing tags are prepended so they nest properly
 			if item.custom_color:
-				front += "[color=#%s]" % item.color.to_html(false)
-				back = "[/color]" + back
+				front += YarnMarkupParser.bbcode_tag("color=#%s" % item.color.to_html(true))
+				back = YarnMarkupParser.bbcode_tag("/color") + back
 			if item.boldened:
-				front += "[b]"
-				back = "[/b]" + back
+				front += YarnMarkupParser.bbcode_tag("b")
+				back = YarnMarkupParser.bbcode_tag("/b") + back
 			if item.italicised:
-				front += "[i]"
-				back = "[/i]" + back
+				front += YarnMarkupParser.bbcode_tag("i")
+				back = YarnMarkupParser.bbcode_tag("/i") + back
 			if item.underlined:
-				front += "[u]"
-				back = "[/u]" + back
+				front += YarnMarkupParser.bbcode_tag("u")
+				back = YarnMarkupParser.bbcode_tag("/u") + back
 			if item.strikedthrough:
-				front += "[s]"
-				back = "[/s]" + back
+				front += YarnMarkupParser.bbcode_tag("s")
+				back = YarnMarkupParser.bbcode_tag("/s") + back
 
 			return {
 				"found": true,
@@ -168,8 +168,8 @@ func palette_for_marker(marker_name: String) -> Dictionary:
 			return {
 				"found": true,
 				"marker": item.marker,
-				"start": item.start,
-				"end": item.end,
+				"start": YarnMarkupParser.brackets_to_tags(item.start),
+				"end": YarnMarkupParser.brackets_to_tags(item.end),
 				"marker_offset": item.marker_offset,
 				"total_visible_character_count": item.total_visible_character_count
 			}

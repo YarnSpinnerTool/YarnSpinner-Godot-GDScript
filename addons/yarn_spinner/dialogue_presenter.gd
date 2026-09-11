@@ -49,6 +49,8 @@ extends Node
 ## Set automatically when the presenter is added to a runner.
 var dialogue_runner: YarnDialogueRunner
 
+var typewriter: YarnTypewriter
+
 ## Serial of the most recent fade; an older fade bails out once a newer one
 ## starts, so two fades never fight over the same modulate alpha.
 var _fade_serial := 0

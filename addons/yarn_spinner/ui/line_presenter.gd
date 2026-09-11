@@ -28,7 +28,8 @@ extends YarnDialoguePresenter
 enum TypewriterMode {
 	INSTANT,  ## show all text immediately
 	LETTER,   ## reveal one character at a time
-	WORD      ## reveal one word at a time
+	WORD,     ## reveal one word at a time
+	CUSTOM,
 }
 
 ## emitted when a line starts displaying
@@ -48,10 +49,12 @@ signal continue_requested()
 @export var character_label: Label
 ## hidden when no character name
 @export var character_container: Control
+@export var show_character_name_in_line: bool = true
 ## shown when line is fully revealed
 @export var continue_indicator: Control
 
 @export var typewriter_mode: TypewriterMode = TypewriterMode.LETTER
+@export var custom_typewriter: YarnTypewriter
 ## Justify (fill-align) the body text, matching themes that set the line text to
 ## justified. Off by default so ordinary left-aligned presenters are unchanged.
 @export var justify_text: bool = false
@@ -70,7 +73,6 @@ signal continue_requested()
 ## Advance on any left click while a line is showing (never while options
 ## are up). Turn off if your game has clickable UI during dialogue.
 @export var click_anywhere_to_continue: bool = true
-@export var hurry_action: String = "ui_accept"
 @export var use_markup: bool = true
 
 ## display-time event handlers, invoked as each character is revealed.
@@ -81,17 +83,15 @@ signal continue_requested()
 
 var _is_displaying: bool = false
 var _is_fully_revealed: bool = false
-var _hurrying: bool = false
 var _current_line: YarnLine
 var _current_token: YarnCancellationToken
 var _markup_parser: YarnMarkupParser
 var _pause_processor: YarnPauseEventProcessor
-## the handler list in effect for the current line (pause handler first).
-var _active_handlers: Array = []
 ## bumped whenever the current line changes or dialogue starts/ends, so a
 ## superseded line's coroutines can tell they are stale after an await.
 var _line_generation := 0
-signal _line_complete
+var _hovering_meta: bool = false
+var _marker_processors: Dictionary = {}
 
 
 func _ready() -> void:
@@ -104,6 +104,8 @@ func _ready() -> void:
 				push_warning("YarnLinePresenter: No RichTextLabel found, BBCode markup will not work")
 	if character_label == null:
 		character_label = _find_child_by_name_contains("character", "Label") as Label
+	if character_container == null and character_label != null:
+		character_container = character_label
 	if continue_indicator == null:
 		continue_indicator = _find_child_by_name_contains("continue", "Control") as Control
 		if continue_indicator == null:
@@ -111,6 +113,10 @@ func _ready() -> void:
 
 	if continue_indicator != null:
 		continue_indicator.visible = false
+
+	if text_label != null:
+		text_label.meta_hover_started.connect(_on_meta_hover_started)
+		text_label.meta_hover_ended.connect(_on_meta_hover_ended)
 
 	# A pause handler is always present so that [pause] markup works, matching
 	# Unity's LinePresenter which prepends a PauseEventProcessor.
@@ -158,7 +164,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not _can_take_advance_input():
 		return
 
-	if event.is_action_pressed(continue_action):
+	if not continue_action.is_empty() and InputMap.has_action(continue_action) and event.is_action_pressed(continue_action):
 		_advance_or_hurry()
 		get_viewport().set_input_as_handled()
 
@@ -167,6 +173,8 @@ func _input(event: InputEvent) -> void:
 	if not click_anywhere_to_continue:
 		return
 	if not _can_take_advance_input():
+		return
+	if _hovering_meta:
 		return
 
 	if event is InputEventMouseButton:
@@ -178,17 +186,30 @@ func _input(event: InputEvent) -> void:
 func _can_take_advance_input() -> bool:
 	if not _is_displaying:
 		return false
+	if dialogue_runner == null:
+		return false
+	if dialogue_runner.has_line_advancer():
+		return false
 	# Don't consume input when options are showing — let buttons handle it
-	if dialogue_runner != null and dialogue_runner.are_options_active():
+	if dialogue_runner.are_options_active():
 		return false
 	return true
 
 
 func _advance_or_hurry() -> void:
+	continue_requested.emit()
 	if _is_fully_revealed:
-		_complete_line()
+		dialogue_runner.request_next_content()
 	else:
-		_hurry()
+		dialogue_runner.request_hurry_up()
+
+
+func _on_meta_hover_started(_meta: Variant) -> void:
+	_hovering_meta = true
+
+
+func _on_meta_hover_ended(_meta: Variant) -> void:
+	_hovering_meta = false
 
 
 func on_dialogue_started() -> void:
@@ -196,9 +217,9 @@ func on_dialogue_started() -> void:
 	_set_presenter_visible(false)
 	_is_displaying = false
 	_is_fully_revealed = false
-	_hurrying = false
 	_current_line = null
 	_current_token = null
+	_apply_marker_processors()
 
 
 func on_dialogue_completed() -> void:
@@ -209,261 +230,185 @@ func on_dialogue_completed() -> void:
 
 
 func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
+	if text_label == null:
+		push_error("line presenter: no text label is set, skipping line %s (\"%s\")" % [line.line_id, line.raw_text])
+		return
+
 	_line_generation += 1
+	var generation := _line_generation
 	_current_line = line
 	_current_token = token
 	_is_displaying = true
 	_is_fully_revealed = false
-	_hurrying = false
 
-	_set_presenter_visible(true)
+	var markup := _choose_markup(line)
+	var display_text := _to_display_text(markup)
 
-	if character_label != null:
-		character_label.text = line.character_name
-	if character_container != null:
-		character_container.visible = not line.character_name.is_empty()
-
-	var display_text: String
-	if use_markup:
-		if _markup_parser == null:
-			_markup_parser = YarnMarkupParser.new()
-		display_text = line.get_bbcode_text(_markup_parser)
-	else:
-		display_text = line.get_plain_text()
-
-	if text_label != null:
-		if justify_text:
-			display_text = "[fill]%s[/fill]" % display_text
-		text_label.text = display_text
-		# Lay out the whole line before revealing any of it, so word wrap is
-		# precalculated and words never jump between lines mid-typewriter
-		# (matches TMP's maxVisibleCharacters behaviour).
-		text_label.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING
-		text_label.visible_characters = 0
+	var active_typewriter := _build_typewriter()
+	typewriter = active_typewriter
+	active_typewriter.prepare_for_content(markup, display_text)
 
 	# Unity's continue arrow is visible for the whole line, not just once the
 	# text has fully revealed, so match that here.
 	if continue_indicator != null:
 		continue_indicator.visible = true
 
-	# Build the handler list for this line and let each one prepare. This is
-	# the GDScript equivalent of the typewriter's PrepareForContent step.
-	_active_handlers = _build_handlers()
-	for handler in _active_handlers:
-		if handler.has_method("on_prepare_for_line"):
-			handler.on_prepare_for_line(line, text_label)
-
+	var item := _get_presenter_canvas_item()
+	_set_presenter_visible(true)
 	line_started.emit(line)
 
-	# Run the typewriter as a detached coroutine; it emits _line_complete
-	# once the line has been fully read and dismissed. run_line holds the
-	# line open by awaiting that: the presenter contract, return = done.
-	_run_typewriter()
+	var hurried := func() -> bool:
+		return token != null and token.is_hurry_up_requested
 
-	# The token is the dismissal channel: when next content is requested,
-	# the line completes, revealed or not.
-	if token != null:
-		token.next_content_requested.connect(_dismiss_line, CONNECT_ONE_SHOT)
-		if token.is_next_content_requested:
-			_dismiss_line()
+	if use_fade_effect:
+		await _fade_presenter_alpha(0.0, 1.0, fade_up_duration, hurried)
+	elif item != null:
+		item.modulate.a = 1.0
+	if generation != _line_generation:
+		return
 
-	if _is_displaying:
-		await _line_complete
+	await active_typewriter.run_typewriter(markup, display_text, token)
+	if generation != _line_generation:
+		return
 
-	if token != null and token.next_content_requested.is_connected(_dismiss_line):
-		token.next_content_requested.disconnect(_dismiss_line)
+	_is_fully_revealed = true
+	line_finished.emit(line)
+
+	if auto_advance:
+		await _wait_for_auto_advance(token)
+	elif token != null:
+		await token.wait_for_next_content()
+	if generation != _line_generation:
+		return
+
+	_is_displaying = false
+	_is_fully_revealed = false
+	active_typewriter.content_will_dismiss()
+
+	if use_fade_effect:
+		await _fade_presenter_alpha(1.0, 0.0, fade_down_duration, hurried)
+	elif item != null:
+		item.modulate.a = 0.0
+	if generation != _line_generation:
+		return
+
+	active_typewriter.content_did_dismiss()
+
+	if continue_indicator != null:
+		continue_indicator.visible = false
+
+	_set_presenter_visible(false)
+	if item != null:
+		item.modulate.a = 1.0
+	_current_line = null
+	_current_token = null
+	line_dismissed.emit(line)
 
 
-func _build_handlers() -> Array:
+func _choose_markup(line: YarnLine) -> YarnMarkupParseResult:
+	if character_label == null:
+		if show_character_name_in_line:
+			return line.get_markup_result()
+		return line.get_markup_result_without_character_name()
+
+	var name := line.character_name
+	if character_container != null:
+		if name.strip_edges().is_empty():
+			character_container.visible = false
+		else:
+			character_container.visible = true
+			character_label.text = name
+	else:
+		character_label.text = name
+
+	return line.get_markup_result_without_character_name()
+
+
+func _to_display_text(markup: YarnMarkupParseResult) -> String:
+	var display_text: String
+	if use_markup:
+		display_text = _get_markup_parser().convert_to_bbcode(markup)
+	else:
+		display_text = YarnMarkupParser.escape_text(YarnMarkupParser.strip_bbcode_tags(markup.text))
+	if justify_text:
+		display_text = "[fill]%s[/fill]" % display_text
+	return display_text
+
+
+func _get_markup_parser() -> YarnMarkupParser:
+	if dialogue_runner != null and dialogue_runner.get_line_provider() != null:
+		return dialogue_runner.get_line_provider().get_markup_parser()
+	if _markup_parser == null:
+		_markup_parser = YarnMarkupParser.new()
+	return _markup_parser
+
+
+func _build_typewriter() -> YarnTypewriter:
 	var handlers: Array = []
 	if _pause_processor != null:
 		handlers.append(_pause_processor)
 	for handler in event_handlers:
 		if handler != null:
 			handlers.append(handler)
-	return handlers
+
+	var result: YarnTypewriter
+	match typewriter_mode:
+		TypewriterMode.INSTANT:
+			result = YarnTypewriter.InstantTypewriter.new()
+		TypewriterMode.LETTER:
+			var letter := YarnTypewriter.LetterTypewriter.new()
+			letter.characters_per_second = characters_per_second
+			result = letter
+		TypewriterMode.WORD:
+			var word := YarnTypewriter.WordTypewriter.new()
+			word.words_per_second = words_per_second
+			result = word
+		TypewriterMode.CUSTOM:
+			if custom_typewriter == null:
+				push_warning("line presenter: typewriter mode is set to custom but there is no typewriter set")
+				result = YarnTypewriter.InstantTypewriter.new()
+			else:
+				result = custom_typewriter
+				for handler in handlers:
+					if handler not in result.action_markup_handlers:
+						result.action_markup_handlers.append(handler)
+				result.text_element = text_label
+				return result
+
+	result.action_markup_handlers = handlers
+	result.text_element = text_label
+	return result
+
+
+func _wait_for_auto_advance(token: YarnCancellationToken) -> void:
+	if not is_inside_tree():
+		return
+	var tree := get_tree()
+	var remaining := auto_advance_delay
+	while remaining > 0.0:
+		if token != null and token.is_next_content_requested:
+			return
+		await tree.process_frame
+		if not is_inside_tree():
+			return
+		if not can_process():
+			continue
+		remaining -= get_process_delta_time()
 
 
 ## Registers a custom replacement-marker processor so that markup like
 ## [code][marker_name]...[/marker_name][/code] is transformed when this presenter
-## renders a line. The presenter parses with its own markup parser, so register
-## here (not just on the line provider) for the change to be visible. The Godot
-## equivalent of registering a ReplacementMarkupHandler in Unity.
+## renders a line. The Godot equivalent of registering a ReplacementMarkupHandler
+## in Unity.
 func register_marker_processor(marker_name: String, processor: YarnAttributeMarkerProcessor) -> void:
-	if _markup_parser == null:
-		_markup_parser = YarnMarkupParser.new()
-	_markup_parser.register_marker_processor(marker_name, processor)
+	_marker_processors[marker_name] = processor
+	_apply_marker_processors()
 
 
-## reveals the line one unit at a time, invoking each event handler as every
-## character appears. mirrors Unity's Letter/Word/Instant typewriters.
-func _run_typewriter() -> void:
-	var label := text_label
-	var handlers := _active_handlers
-	var line := _current_line
-	var generation := _line_generation
-
-	if use_fade_effect:
-		await _fade_presenter_alpha(0.0, 1.0, fade_up_duration, _is_cancelled)
-		if generation != _line_generation or not _is_displaying:
-			return
-
-	for handler in handlers:
-		if handler.has_method("on_line_display_begin"):
-			handler.on_line_display_begin(line, label)
-
-	var visible_count := 0
-	if label != null:
-		visible_count = label.get_total_character_count()
-
-	var seconds_per_unit := 0.0
-	var word_boundaries := PackedInt32Array()
-	match typewriter_mode:
-		TypewriterMode.LETTER:
-			if characters_per_second > 0:
-				seconds_per_unit = 1.0 / characters_per_second
-		TypewriterMode.WORD:
-			if words_per_second > 0:
-				seconds_per_unit = 1.0 / words_per_second
-			word_boundaries = _calculate_word_boundaries(line.get_plain_text())
-
-	# Start with a full time budget so the first unit appears immediately.
-	var accumulated := seconds_per_unit
-	var next_boundary := 0
-
-	for i in visible_count:
-		if generation != _line_generation or not _is_displaying:
-			return  # replaced, dismissed, or dialogue stopped mid-reveal
-
-		# Is this character a timing gate? Letter mode gates on every
-		# character; word mode only on word boundaries.
-		var gate := false
-		if typewriter_mode == TypewriterMode.LETTER:
-			gate = true
-		elif typewriter_mode == TypewriterMode.WORD:
-			if next_boundary < word_boundaries.size() and i == word_boundaries[next_boundary]:
-				gate = true
-				next_boundary += 1
-
-		if gate and seconds_per_unit > 0.0:
-			while not _is_cancelled() and accumulated < seconds_per_unit:
-				if not is_inside_tree():
-					return
-				var before := Time.get_ticks_usec()
-				await get_tree().process_frame
-				if generation != _line_generation or not _is_displaying:
-					return
-				if not can_process():
-					continue  # paused: the reveal clock stops too
-				accumulated += float(Time.get_ticks_usec() - before) / 1_000_000.0
-			accumulated -= seconds_per_unit
-
-		# Let each handler react to this character, awaiting any signal it
-		# returns (e.g. a pause, an emotion change, a walk). When hurrying we
-		# still fire the handler for its side effect but skip the wait.
-		for handler in handlers:
-			if handler.has_method("on_character_will_appear"):
-				var result: Variant = handler.on_character_will_appear(i, line, _current_token)
-				if result is Signal and not (result as Signal).is_null() and not _is_cancelled():
-					await result
-					if generation != _line_generation or not _is_displaying:
-						return
-
-		if label != null:
-			label.visible_characters = i + 1
-
-	if label != null:
-		label.visible_characters = -1
-
-	for handler in handlers:
-		if handler.has_method("on_line_display_complete"):
-			handler.on_line_display_complete()
-
-	_on_typewriter_complete(generation)
-
-
-## returns the character index just past the end of each word, used as the
-## word-mode timing gates (matches Unity's word.lastCharacterIndex + 1).
-func _calculate_word_boundaries(text: String) -> PackedInt32Array:
-	var boundaries := PackedInt32Array()
-	var in_word := false
-	for i in text.length():
-		var c := text[i]
-		var is_space := c == " " or c == "\t" or c == "\n"
-		if is_space and in_word:
-			boundaries.append(i)
-			in_word = false
-		elif not is_space:
-			in_word = true
-	if in_word:
-		boundaries.append(text.length())
-	return boundaries
-
-
-func _on_typewriter_complete(generation: int) -> void:
-	if generation != _line_generation or not _is_displaying:
+func _apply_marker_processors() -> void:
+	if dialogue_runner == null or dialogue_runner.get_line_provider() == null:
 		return
-	_is_fully_revealed = true
-	line_finished.emit(_current_line)
-
-	if auto_advance and is_inside_tree():
-		await YarnAsync.wait(self, auto_advance_delay)
-		if generation != _line_generation:
-			return
-		if is_inside_tree() and _is_displaying and _is_fully_revealed:
-			_complete_line()
-
-
-func _complete_line() -> void:
-	if not _is_displaying:
-		return
-	_is_displaying = false
-	_is_fully_revealed = false
-	var generation := _line_generation
-	var dismissed_line := _current_line
-
-	for handler in _active_handlers:
-		if handler.has_method("on_line_will_dismiss"):
-			handler.on_line_will_dismiss()
-
-	_current_line = null
-	_current_token = null
-
-	if use_fade_effect:
-		await _fade_presenter_alpha(1.0, 0.0, fade_down_duration)
-		if generation != _line_generation:
-			return
-
-	if continue_indicator != null:
-		continue_indicator.visible = false
-
-	_set_presenter_visible(false)
-	var item := _get_presenter_canvas_item()
-	if item != null:
-		item.modulate.a = 1.0
-	line_dismissed.emit(dismissed_line)
-	_line_complete.emit()
-
-
-func _is_cancelled() -> bool:
-	if _hurrying:
-		return true
-	if _current_token != null and _current_token.is_cancelled:
-		return true
-	return false
-
-
-## Local hurry, from this presenter's own input: skip the typewriter but
-## keep the line up. Runner-driven hurry arrives through the token, which
-## the typewriter already watches.
-func _hurry() -> void:
-	_hurrying = true
-	if _current_token != null:
-		_current_token.request_hurry_up()
-
-
-## Token-driven dismissal: next content was requested, so this line ends
-## now, revealed or not. Two-stage hurry-then-advance is YarnLineAdvancer's
-## job; this presenter's own input still offers single-press hurry.
-func _dismiss_line() -> void:
-	_complete_line()
+	var provider := dialogue_runner.get_line_provider()
+	for marker_name in _marker_processors:
+		provider.deregister_marker_processor(marker_name)
+		provider.register_marker_processor(marker_name, _marker_processors[marker_name])

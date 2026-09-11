@@ -45,6 +45,7 @@ signal _line_complete
 signal _option_selected(index: int)
 var _markup_parser: YarnMarkupParser
 var _stored_options: Array[YarnOption] = []
+var _last_choice: int = -1
 
 
 # -- public methods (call from visual scripts) --
@@ -62,6 +63,7 @@ func choose_option(index: int) -> void:
 		push_error("YarnSignalPresenter: invalid option index %d (have %d options)" % [index, _stored_options.size()])
 		return
 	is_waiting_for_choice = false
+	_last_choice = index
 	_option_selected.emit(index)
 
 
@@ -91,26 +93,54 @@ func is_option_available(index: int) -> bool:
 
 # -- presenter overrides --
 
-func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> void:
+func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
 	current_line_data = _build_line_dict(line)
 	current_options_data = []
 	is_waiting_for_proceed = true
 	is_waiting_for_choice = false
 
 	line_received.emit(current_line_data)
-	await _line_complete
+
+	if token != null:
+		token.next_content_requested.connect(proceed, CONNECT_ONE_SHOT)
+		if token.is_next_content_requested:
+			proceed()
+
+	if is_waiting_for_proceed:
+		await _line_complete
+
+	if token != null and token.next_content_requested.is_connected(proceed):
+		token.next_content_requested.disconnect(proceed)
 
 
-func run_options(options: Array[YarnOption], _token: YarnCancellationToken = null) -> int:
+func run_options(options: Array[YarnOption], token: YarnCancellationToken = null) -> int:
 	_stored_options = options
 	current_options_data = _build_options_array(options)
 	current_line_data = {}
 	is_waiting_for_proceed = false
 	is_waiting_for_choice = true
+	_last_choice = -1
 
 	options_received.emit(current_options_data)
 
-	var selected: int = await _option_selected
+	var wind_down := func() -> void:
+		if is_waiting_for_choice:
+			is_waiting_for_choice = false
+			_last_choice = -1
+			_option_selected.emit(-1)
+
+	if token != null:
+		token.next_content_requested.connect(wind_down, CONNECT_ONE_SHOT)
+		if token.is_next_content_requested:
+			wind_down.call()
+
+	var selected := _last_choice
+	if is_waiting_for_choice:
+		selected = await _option_selected
+
+	if token != null and token.next_content_requested.is_connected(wind_down):
+		token.next_content_requested.disconnect(wind_down)
+
 	return selected
 
 

@@ -36,7 +36,11 @@ signal dialogue_complete_handler()
 ## Emitted before lines are shown so assets can be pre-loaded.
 signal prepare_for_lines_handler(line_ids: PackedStringArray)
 
-var program: YarnProgram
+var program: YarnProgram:
+	set(value):
+		program = value
+		_reset_state()
+
 var variable_storage: YarnVariableStorage
 var _library: YarnLibrary
 var verbose_logging: bool = false
@@ -61,9 +65,9 @@ const VISITING_VARIABLE_PREFIX := "$Yarn.Internal.Visiting."
 static func generate_visit_variable_name(node_name: String) -> String:
 	return VISITING_VARIABLE_PREFIX + node_name
 
-var max_instructions_per_step: int = 10000
+var max_instructions_per_step: int = 0
 var _instruction_count: int = 0
-var max_call_stack_depth: int = 100
+var max_call_stack_depth: int = 0
 ## Prevents re-entrant calls to continue_dialogue from signal handlers.
 var _is_continuing: bool = false
 
@@ -74,6 +78,10 @@ func set_library(library: YarnLibrary) -> void:
 
 func set_saliency_strategy(strategy: YarnSaliencyStrategy) -> void:
 	saliency_strategy = strategy
+
+
+func is_continuing() -> bool:
+	return _is_continuing
 
 
 func has_error() -> bool:
@@ -97,22 +105,34 @@ func is_waiting_for_input() -> bool:
 	return current_state == ExecutionState.WAITING_FOR_INPUT
 
 
+func unload_all() -> void:
+	program = null
+	_set_stopped()
+
+
 func set_node(node_name: String) -> bool:
-	if program == null:
-		push_error("virtual machine: no program loaded")
+	if program == null or program.nodes.is_empty():
+		_fail("cannot load node '%s': no nodes have been loaded" % node_name)
 		return false
 
 	if not program.has_node(node_name):
-		push_error("virtual machine: node '%s' not found" % node_name)
+		_set_stopped()
+		_fail("no node named '%s' has been loaded" % node_name)
 		return false
 
+	_load_node(node_name, true)
+	return true
+
+
+func _load_node(node_name: String, clear_state: bool) -> void:
 	_current_node = program.get_node(node_name)
+
+	if clear_state:
+		_reset_state()
+		_has_error = false
+		last_error = ""
+
 	_instruction_pointer = 0
-	_stack.clear()
-	_pending_options.clear()
-	_call_stack.clear()
-	_has_error = false
-	current_state = ExecutionState.RUNNING
 
 	if verbose_logging:
 		print("VM: Loading node '%s' with %d instructions:" % [node_name, _current_node.instructions.size()])
@@ -131,54 +151,55 @@ func set_node(node_name: String) -> bool:
 			print("  [%d] %s%s" % [i, opcode_name, extra])
 
 	node_start_handler.emit(node_name)
-
-	var line_ids := _collect_line_ids(_current_node)
-	if not line_ids.is_empty():
-		prepare_for_lines_handler.emit(line_ids)
-
-	return true
+	prepare_for_lines_handler.emit(_collect_line_ids(_current_node))
 
 
 func continue_dialogue() -> void:
 	if _is_continuing:
+		if current_state == ExecutionState.SUSPENDED:
+			current_state = ExecutionState.RUNNING
 		return
 
 	if _has_error:
 		push_error("virtual machine: cannot continue after error")
 		return
 
-	if current_state == ExecutionState.STOPPED:
-		push_error("virtual machine: cannot continue, dialogue is stopped")
+	if _current_node == null:
+		push_error("virtual machine: cannot continue running dialogue, no node has been selected")
 		return
 
 	if current_state == ExecutionState.WAITING_FOR_INPUT:
-		push_error("virtual machine: cannot continue, waiting for option selection")
+		push_error("virtual machine: cannot continue running dialogue, still waiting on option selection")
+		return
+
+	if _library == null:
+		push_error("virtual machine: cannot continue running dialogue, no library has been set")
 		return
 
 	_is_continuing = true
 	current_state = ExecutionState.RUNNING
 	_instruction_count = 0
 
-	while current_state == ExecutionState.RUNNING and not _has_error:
-		_instruction_count += 1
-		if _instruction_count > max_instructions_per_step:
-			push_error("virtual machine: exceeded maximum instructions per step (%d) - possible infinite loop" % max_instructions_per_step)
-			_has_error = true
-			last_error = "exceeded maximum instructions - possible infinite loop"
-			current_state = ExecutionState.STOPPED
+	while _current_node != null and current_state == ExecutionState.RUNNING and not _has_error:
+		if max_instructions_per_step > 0:
+			_instruction_count += 1
+			if _instruction_count > max_instructions_per_step:
+				_fail("exceeded maximum instructions per step (%d) - possible infinite loop" % max_instructions_per_step)
+				break
+
+		if _instruction_pointer < 0 or _instruction_pointer >= _current_node.instructions.size():
+			_fail("instruction pointer out of bounds (%d) in node '%s'" % [_instruction_pointer, _current_node.node_name])
 			break
 
-		if _current_node == null:
-			push_error("virtual machine: no current node")
-			_has_error = true
-			current_state = ExecutionState.STOPPED
-			break
-		if _instruction_pointer < 0 or _instruction_pointer >= _current_node.instructions.size():
-			push_error("virtual machine: instruction pointer out of bounds (%d)" % _instruction_pointer)
-			_has_error = true
-			current_state = ExecutionState.STOPPED
-			break
 		_execute_next_instruction()
+
+		if _has_error:
+			break
+
+		if _current_node != null and _instruction_pointer >= _current_node.instructions.size():
+			_return_from_node(_current_node)
+			_set_stopped()
+			dialogue_complete_handler.emit()
 
 	_is_continuing = false
 
@@ -190,28 +211,24 @@ const NO_OPTION_SELECTED := -1
 ## sequence that the compiler emits after SHOW_OPTIONS.
 func set_selected_option(option_index: int) -> void:
 	if current_state != ExecutionState.WAITING_FOR_INPUT:
-		push_error("virtual machine: not waiting for option selection")
+		push_error("virtual machine: set_selected_option was called, but dialogue wasn't waiting for a selection")
 		return
 
 	if option_index == NO_OPTION_SELECTED:
-		# No option selected - push false so JUMP_IF_FALSE skips to fallthrough
 		if verbose_logging:
 			print("VM: set_selected_option: no option selected, pushing false for fallthrough")
 		_push(false)
-		_pending_options.clear()
-		current_state = ExecutionState.RUNNING
-		return
+	else:
+		if option_index < 0 or option_index >= _pending_options.size():
+			push_error("virtual machine: %d is not a valid option ID (expected a number between 0 and %d)" % [option_index, _pending_options.size() - 1])
+			return
 
-	if option_index < 0 or option_index >= _pending_options.size():
-		push_error("virtual machine: invalid option index %d" % option_index)
-		return
+		var selected := _pending_options[option_index]
+		if verbose_logging:
+			print("VM: set_selected_option index=%d line_id=%s dest=%d" % [option_index, selected.line_id, selected.destination])
 
-	var selected := _pending_options[option_index]
-	if verbose_logging:
-		print("VM: set_selected_option index=%d line_id=%s dest=%d" % [option_index, selected.line_id, selected.destination])
-
-	_push(selected.destination)
-	_push(true)
+		_push(selected.destination)
+		_push(true)
 
 	_pending_options.clear()
 	current_state = ExecutionState.RUNNING
@@ -225,11 +242,9 @@ func signal_content_complete() -> void:
 
 
 func stop() -> void:
-	current_state = ExecutionState.STOPPED
+	_set_stopped()
 	_is_continuing = false
-	_stack.clear()
-	_pending_options.clear()
-	_call_stack.clear()
+	dialogue_complete_handler.emit()
 
 
 func has_visited_node(node_name: String) -> bool:
@@ -257,25 +272,60 @@ func reset_visit_tracking() -> void:
 # NODE HEADER ACCESS
 # =============================================================================
 
-func get_header_value(node_name: String, header_name: String) -> String:
+func _get_node_for_headers(node_name: String) -> YarnNode:
 	if program == null:
-		return ""
+		push_error("virtual machine: can't get headers for node '%s', because no program is set" % node_name)
+		return null
+	if program.nodes.is_empty():
+		push_error("virtual machine: can't get headers for node '%s', because the program contains no nodes" % node_name)
+		return null
 	var node := program.get_node(node_name)
 	if node == null:
+		push_error("virtual machine: can't get headers for node '%s': no node with this name was found" % node_name)
+	return node
+
+
+func get_header_value(node_name: String, header_name: String) -> String:
+	var node := _get_node_for_headers(node_name)
+	if node == null:
 		return ""
-	return node.headers.get(header_name, "")
+	return node.get_header(header_name)
+
+
+func has_header(node_name: String, header_name: String) -> bool:
+	if program == null:
+		return false
+	var node := program.get_node(node_name)
+	if node == null:
+		return false
+	return node.has_header(header_name)
 
 
 func get_headers(node_name: String) -> Dictionary:
-	if program == null:
-		return {}
-	var node := program.get_node(node_name)
+	var node := _get_node_for_headers(node_name)
 	if node == null:
 		return {}
-	return node.headers.duplicate()
+	var result := {}
+	for header in node.get_all_headers():
+		if not result.has(header["key"]):
+			result[header["key"]] = header["value"]
+	return result
+
+
+func get_all_headers(node_name: String) -> Array[Dictionary]:
+	var node := _get_node_for_headers(node_name)
+	if node == null:
+		return []
+	return node.get_all_headers()
 
 
 func get_string_id_for_node(node_name: String) -> String:
+	if program == null or program.nodes.is_empty():
+		push_error("virtual machine: no nodes are loaded")
+		return ""
+	if not program.has_node(node_name):
+		push_error("virtual machine: no node named '%s'" % node_name)
+		return ""
 	return "line:%s" % node_name
 
 
@@ -291,39 +341,40 @@ func get_all_node_names() -> PackedStringArray:
 
 func is_node_group(node_name: String) -> bool:
 	if program == null:
+		push_error("virtual machine: can't determine if '%s' is a node group, because no program has been set" % node_name)
 		return false
 	var node := program.get_node(node_name)
 	if node == null:
 		return false
-	return node.headers.has(NODE_GROUP_HUB_HEADER)
+	return node.has_header(NODE_GROUP_HUB_HEADER)
 
 
 func has_salient_content(node_group_name: String) -> bool:
-	var options := get_saliency_options_for_node_group(node_group_name)
-	if options.is_empty():
+	if program == null or not program.has_node(node_group_name):
+		push_error("virtual machine: '%s' is not a valid node name" % node_group_name)
 		return false
-	if saliency_strategy == null:
-		return true
+	var options := get_saliency_options_for_node_group(node_group_name)
 	var typed_options: Array[Dictionary] = []
 	typed_options.assign(options)
 	var context := {
 		"vm": self,
 		"variable_storage": variable_storage
 	}
-	var selected_index := saliency_strategy.select_candidate(typed_options, context)
-	return selected_index >= 0
+	var selected_index := get_effective_saliency_strategy().select_candidate(typed_options, context)
+	return selected_index >= 0 and selected_index < typed_options.size()
 
 
 func get_saliency_options_for_node_group(node_group_name: String) -> Array:
 	if program == null:
+		push_error("virtual machine: '%s' is not a valid node name" % node_group_name)
 		return []
 
 	var node := program.get_node(node_group_name)
 	if node == null:
+		push_error("virtual machine: '%s' is not a valid node name" % node_group_name)
 		return []
 
-	# Non-hub nodes get wrapped as a single saliency candidate.
-	if not node.headers.has(NODE_GROUP_HUB_HEADER):
+	if not node.has_header(NODE_GROUP_HUB_HEADER):
 		return [{
 			"content_id": node_group_name,
 			"complexity": 0,
@@ -337,32 +388,10 @@ func get_saliency_options_for_node_group(node_group_name: String) -> Array:
 		node_group_name, program, variable_storage, _library)
 
 
-func _build_saliency_candidate_from_instruction(instruction: YarnInstruction, parent_node: YarnNode) -> Dictionary:
-	var content_id_str: String = str(instruction.destination)
-	var candidate := {
-		"content_id": content_id_str,
-		"complexity": instruction.float_value if instruction.float_value != 0.0 else -1,
-		"conditions_passed": 0,
-		"conditions_failed": 0,
-		"destination": instruction.destination,
-		"content_type": YarnSaliencyStrategy.ContentType.NODE,
-	}
-
-	if parent_node.headers.has(SALIENCY_VARIABLES_HEADER):
-		var condition_vars: String = parent_node.headers[SALIENCY_VARIABLES_HEADER]
-		var var_names := condition_vars.split(";", false)
-		for var_name in var_names:
-			var_name = var_name.strip_edges()
-			if var_name.is_empty():
-				continue
-			var value: Variant = YarnSmartVariableVM._evaluate_smart_or_stored(
-				var_name, variable_storage, _library, program)
-			if value != null and _is_truthy(value):
-				candidate.conditions_passed += 1
-			else:
-				candidate.conditions_failed += 1
-
-	return candidate
+func get_effective_saliency_strategy() -> YarnSaliencyStrategy:
+	if saliency_strategy == null:
+		saliency_strategy = YarnSaliencyStrategy.YarnRandomBestLeastRecentlyViewedSaliencyStrategy.new()
+	return saliency_strategy
 
 
 func _collect_line_ids(node: YarnNode) -> PackedStringArray:
@@ -376,19 +405,6 @@ func _collect_line_ids(node: YarnNode) -> PackedStringArray:
 
 
 func _execute_next_instruction() -> void:
-	if _current_node == null:
-		current_state = ExecutionState.STOPPED
-		dialogue_complete_handler.emit()
-		return
-
-	if _instruction_pointer >= _current_node.instructions.size():
-		# The compiler always emits RETURN which handles call stack unwinding;
-		# a bare IP overflow here does NOT unwind.
-		_return_from_node(_current_node)
-		current_state = ExecutionState.STOPPED
-		dialogue_complete_handler.emit()
-		return
-
 	var instruction := _current_node.instructions[_instruction_pointer]
 	var debug_ip := _instruction_pointer
 	_instruction_pointer += 1
@@ -405,16 +421,10 @@ func _execute_next_instruction() -> void:
 			var dest: Variant = _peek()
 			if _has_error:
 				return
-			if dest is float:
-				dest = int(dest)
-			elif dest is int:
-				pass  # already int
-			else:
-				push_error("virtual machine: PEEK_AND_JUMP expected number, got %s" % type_string(typeof(dest)))
-				_has_error = true
-				current_state = ExecutionState.STOPPED
+			if not (dest is float or dest is int):
+				_fail("PEEK_AND_JUMP expected a number, got %s" % type_string(typeof(dest)))
 				return
-			_instruction_pointer = dest
+			_instruction_pointer = YarnNumber.to_int32(float(dest))
 
 		YarnInstruction.OpCode.RUN_LINE:
 			_execute_run_line(instruction)
@@ -441,7 +451,7 @@ func _execute_next_instruction() -> void:
 			var value: Variant = _peek()
 			if _has_error:
 				return
-			if not _is_truthy(value):
+			if not _value_to_bool(value):
 				_instruction_pointer = instruction.destination
 
 		YarnInstruction.OpCode.POP:
@@ -452,83 +462,65 @@ func _execute_next_instruction() -> void:
 
 		YarnInstruction.OpCode.PUSH_VARIABLE:
 			if variable_storage == null:
-				push_error("virtual machine: no variable storage set")
-				_has_error = true
-				current_state = ExecutionState.STOPPED
+				_fail("no variable storage set")
 				return
 			var value: Variant = variable_storage.get_value(instruction.variable_name)
-			# Fall back to Program.InitialValues if not in storage.
 			if value == null and program != null:
 				value = program.get_initial_value(instruction.variable_name)
 			if value == null:
-				# A missing variable can't be papered over with null: the
-				# next instruction would consume it and send the story down
-				# a branch nobody wrote.
-				push_error("virtual machine: variable '%s' not found - stopping dialogue" % instruction.variable_name)
-				_has_error = true
-				current_state = ExecutionState.STOPPED
+				_fail("variable storage returned a null value for variable '%s'" % instruction.variable_name)
 				return
 			_push(value)
 
 		YarnInstruction.OpCode.STORE_VARIABLE:
 			if variable_storage == null:
-				push_error("virtual machine: no variable storage set")
-				_has_error = true
-				current_state = ExecutionState.STOPPED
+				_fail("no variable storage set")
 				return
 			var value: Variant = _peek()
 			if _has_error:
 				return
-			variable_storage.set_value(instruction.variable_name, value)
+			if value is float or value is int:
+				variable_storage.set_value(instruction.variable_name, YarnNumber.to_f32(float(value)))
+			elif value is String or value is bool:
+				variable_storage.set_value(instruction.variable_name, value)
+			else:
+				_fail("invalid Yarn value type %s" % type_string(typeof(value)))
 
 		YarnInstruction.OpCode.STOP:
 			_return_from_node(_current_node)
 
 			while not _call_stack.is_empty():
 				var return_point: Dictionary = _call_stack.pop_back()
-				_return_from_node(return_point.node)
+				_return_from_node(program.get_node(return_point.node_name))
 
-			current_state = ExecutionState.STOPPED
 			dialogue_complete_handler.emit()
+			_set_stopped()
 
 		YarnInstruction.OpCode.RUN_NODE:
-			_execute_run_node(instruction.node_name, false)
+			_execute_jump_to_node(instruction.node_name, false)
 
 		YarnInstruction.OpCode.PEEK_AND_RUN_NODE:
-			var node_name: Variant = _peek()
-			if _has_error:
-				return
-			if not node_name is String:
-				push_error("virtual machine: PEEK_AND_RUN_NODE expected string, got %s" % type_string(typeof(node_name)))
-				_has_error = true
-				current_state = ExecutionState.STOPPED
-				return
-			_execute_run_node(node_name, false)
+			_execute_jump_to_node("", false, true)
 
 		YarnInstruction.OpCode.DETOUR_TO_NODE:
-			_execute_run_node(instruction.node_name, true)
+			_execute_jump_to_node(instruction.node_name, true)
 
 		YarnInstruction.OpCode.PEEK_AND_DETOUR_TO_NODE:
-			var node_name: Variant = _peek()
-			if _has_error:
-				return
-			if not node_name is String:
-				push_error("virtual machine: PEEK_AND_DETOUR_TO_NODE expected string, got %s" % type_string(typeof(node_name)))
-				_has_error = true
-				current_state = ExecutionState.STOPPED
-				return
-			_execute_run_node(node_name, true)
+			_execute_jump_to_node("", true, true)
 
 		YarnInstruction.OpCode.RETURN:
 			_return_from_node(_current_node)
-			if not _call_stack.is_empty():
-				var return_point: Dictionary = _call_stack.pop_back()
-				_current_node = return_point.node
-				_instruction_pointer = return_point.ip
-				_execute_set_node_signals(_current_node)
-			else:
-				current_state = ExecutionState.STOPPED
+			if _call_stack.is_empty():
 				dialogue_complete_handler.emit()
+				_set_stopped()
+			else:
+				var return_point: Dictionary = _call_stack.pop_back()
+				if not program.has_node(return_point.node_name):
+					_set_stopped()
+					_fail("no node named '%s' has been loaded" % return_point.node_name)
+					return
+				_load_node(return_point.node_name, false)
+				_instruction_pointer = return_point.ip
 
 		YarnInstruction.OpCode.ADD_SALIENCY_CANDIDATE:
 			_execute_add_saliency_candidate(instruction)
@@ -539,15 +531,16 @@ func _execute_next_instruction() -> void:
 		YarnInstruction.OpCode.SELECT_SALIENCY_CANDIDATE:
 			_execute_select_saliency_candidate()
 
+		_:
+			_fail("instruction %d in node '%s' is not a supported instruction" % [debug_ip, _current_node.node_name])
+
 
 func _execute_run_line(instruction: YarnInstruction) -> void:
 	var line := YarnLine.new()
 	line.line_id = instruction.line_id
 
 	if instruction.substitution_count > _stack.size():
-		push_error("virtual machine: not enough values on stack for line substitutions (need %d, have %d)" % [instruction.substitution_count, _stack.size()])
-		_has_error = true
-		current_state = ExecutionState.STOPPED
+		_fail("not enough values on stack for line substitutions (need %d, have %d)" % [instruction.substitution_count, _stack.size()])
 		return
 
 	var subs: Array[String] = []
@@ -566,12 +559,9 @@ func _execute_run_command(instruction: YarnInstruction) -> void:
 	var text := instruction.command_text
 
 	if instruction.substitution_count > _stack.size():
-		push_error("virtual machine: not enough values on stack for command substitutions (need %d, have %d)" % [instruction.substitution_count, _stack.size()])
-		_has_error = true
-		current_state = ExecutionState.STOPPED
+		_fail("not enough values on stack for command substitutions (need %d, have %d)" % [instruction.substitution_count, _stack.size()])
 		return
 
-	# Position-based replacement handles edge cases where markers overlap.
 	var replacements: Array[Dictionary] = []
 	for i in range(instruction.substitution_count - 1, -1, -1):
 		var value: Variant = _pop()
@@ -582,7 +572,6 @@ func _execute_run_command(instruction: YarnInstruction) -> void:
 		if pos != -1:
 			replacements.append({"pos": pos, "len": marker.length(), "value": _value_to_string(value)})
 
-	# Apply from end to start so earlier positions remain valid.
 	replacements.sort_custom(func(a, b): return a.pos > b.pos)
 	for r in replacements:
 		text = text.substr(0, r.pos) + r.value + text.substr(r.pos + r.len)
@@ -597,9 +586,7 @@ func _execute_add_option(instruction: YarnInstruction) -> void:
 		pops_needed += 1
 
 	if pops_needed > _stack.size():
-		push_error("virtual machine: not enough values on stack for option (need %d, have %d)" % [pops_needed, _stack.size()])
-		_has_error = true
-		current_state = ExecutionState.STOPPED
+		_fail("not enough values on stack for option (need %d, have %d)" % [pops_needed, _stack.size()])
 		return
 
 	var option := YarnOption.new()
@@ -609,7 +596,7 @@ func _execute_add_option(instruction: YarnInstruction) -> void:
 
 	var subs: Array[String] = []
 	for i in range(instruction.substitution_count):
-		var value = _pop()
+		var value: Variant = _pop()
 		if _has_error:
 			return
 		subs.push_front(_value_to_string(value))
@@ -619,7 +606,7 @@ func _execute_add_option(instruction: YarnInstruction) -> void:
 		var condition_value: Variant = _pop()
 		if _has_error:
 			return
-		option.is_available = _is_truthy(condition_value)
+		option.is_available = _value_to_bool(condition_value)
 	else:
 		option.is_available = true
 
@@ -630,7 +617,7 @@ func _execute_add_option(instruction: YarnInstruction) -> void:
 
 func _execute_show_options() -> void:
 	if _pending_options.is_empty():
-		current_state = ExecutionState.STOPPED
+		_set_stopped()
 		dialogue_complete_handler.emit()
 		return
 
@@ -641,85 +628,56 @@ func _execute_show_options() -> void:
 func _execute_call_function(instruction: YarnInstruction) -> void:
 	var func_name := instruction.function_name
 
-	# A missing library or unknown function can't be skipped: the compiler
-	# emitted this call expecting its result on the stack, so carrying on
-	# would leave every later instruction reading the wrong values.
 	if _library == null:
-		push_error("virtual machine: no library set for function call '%s' - stopping dialogue" % func_name)
-		_has_error = true
-		current_state = ExecutionState.STOPPED
+		_fail("no library set for function call '%s'" % func_name)
 		return
 	if not _library.has_function(func_name):
-		# The library logs the detailed registration advice; this error is
-		# about why execution stops.
-		_library.call_function(func_name, _stack, self)
-		push_error("virtual machine: unknown function '%s' - stopping dialogue" % func_name)
-		_has_error = true
-		current_state = ExecutionState.STOPPED
+		_fail("function '%s' is not present in the library" % func_name)
 		return
 
 	var result: Variant = _library.call_function(func_name, _stack, self)
-	if result == YarnLibrary.FUNCTION_ERROR:
+	if YarnLibrary.is_function_error(result):
 		var message := _library.take_function_error()
-		push_error("virtual machine: function '%s' failed (%s) - stopping dialogue" % [func_name, message])
-		_has_error = true
-		last_error = message
-		current_state = ExecutionState.STOPPED
+		_fail("function '%s' failed: %s" % [func_name, message])
 		return
-	if result != null:
-		_push(result)
+	_push(result)
 
 
-func _execute_run_node(node_name: String, is_detour: bool) -> void:
-	if not program.has_node(node_name):
-		push_error("virtual machine: node '%s' not found" % node_name)
-		_has_error = true
-		last_error = "node '%s' not found" % node_name
-		current_state = ExecutionState.STOPPED
-		dialogue_complete_handler.emit()
-		return
-
+func _execute_jump_to_node(node_name: String, is_detour: bool, peek_name: bool = false) -> void:
 	if is_detour:
-		# Detours preserve the current node; execution returns here after the detour completes.
-		if _call_stack.size() >= max_call_stack_depth:
-			push_error("virtual machine: exceeded maximum call stack depth (%d) - possible infinite recursion" % max_call_stack_depth)
-			_has_error = true
-			last_error = "exceeded maximum call stack depth - possible infinite recursion"
-			current_state = ExecutionState.STOPPED
-			dialogue_complete_handler.emit()
+		if max_call_stack_depth > 0 and _call_stack.size() >= max_call_stack_depth:
+			_fail("exceeded maximum call stack depth (%d) - possible infinite recursion" % max_call_stack_depth)
 			return
-
 		_call_stack.push_back({
-			"node": _current_node,
-			"ip": _instruction_pointer
+			"node_name": _current_node.node_name,
+			"ip": _instruction_pointer,
 		})
 	else:
 		_return_from_node(_current_node)
 
 		while not _call_stack.is_empty():
 			var return_point: Dictionary = _call_stack.pop_back()
-			_return_from_node(return_point.node)
+			_return_from_node(program.get_node(return_point.node_name))
 
-		# Clear before setting new node so ResetState order is correct.
-		_stack.clear()
-		_pending_options.clear()
+	if peek_name:
+		var peeked: Variant = _peek()
+		if _has_error:
+			return
+		node_name = _value_to_string(peeked)
 
-	_current_node = program.get_node(node_name)
-	_instruction_pointer = 0
+	if not program.has_node(node_name):
+		_set_stopped()
+		_fail("no node named '%s' has been loaded" % node_name)
+		return
 
-	node_start_handler.emit(node_name)
-
-	var line_ids := _collect_line_ids(_current_node)
-	if not line_ids.is_empty():
-		prepare_for_lines_handler.emit(line_ids)
+	_load_node(node_name, not is_detour)
 
 
 func _execute_add_saliency_candidate(instruction: YarnInstruction) -> void:
 	var condition_value: Variant = _pop()
 	if _has_error:
 		return
-	# All candidates are added regardless of condition; the strategy uses pass/fail counts.
-	var condition_passed := _is_truthy(condition_value)
+	var condition_passed := _value_to_bool(condition_value)
 	_saliency_candidates.append({
 		"content_id": instruction.content_id,
 		"complexity": instruction.complexity_score,
@@ -732,34 +690,31 @@ func _execute_add_saliency_candidate(instruction: YarnInstruction) -> void:
 
 func _execute_add_saliency_from_node(instruction: YarnInstruction) -> void:
 	var node_name := instruction.node_name
+	if program == null:
+		_fail("failed to add saliency candidate from node '%s': no program is loaded" % node_name)
+		return
 	if not program.has_node(node_name):
+		_fail("failed to add saliency candidate from node '%s': no node with this name is loaded" % node_name)
 		return
 
 	var node := program.get_node(node_name)
 
-	var complexity := 0
-	var complexity_header := node.get_header(SALIENCY_COMPLEXITY_HEADER)
-	if not complexity_header.is_empty():
-		complexity = int(complexity_header)
-	elif node.has_header("when"):
-		# fallback: use when clause hash as complexity
-		complexity = node.get_header("when").hash()
-
 	var conditions_passed := 0
 	var conditions_failed := 0
-	var saliency_vars := node.get_header(SALIENCY_VARIABLES_HEADER)
-	if not saliency_vars.is_empty():
-		var var_names := saliency_vars.split(";")
-		for var_name in var_names:
-			var_name = var_name.strip_edges()
-			if var_name.is_empty():
-				continue
-			var value: Variant = YarnSmartVariableVM._evaluate_smart_or_stored(
-				var_name, variable_storage, _library, program)
-			if _is_truthy(value):
-				conditions_passed += 1
-			else:
-				conditions_failed += 1
+	for var_name in node.get_header(SALIENCY_VARIABLES_HEADER).split(";", false):
+		var evaluation := YarnSmartVariableVM.try_evaluate_named(var_name, program, variable_storage, _library)
+		if evaluation.has("error"):
+			_fail("failed to add saliency candidate from node '%s': %s" % [node_name, evaluation.error])
+			return
+		if evaluation.found and _value_to_bool(evaluation.value):
+			conditions_passed += 1
+		else:
+			conditions_failed += 1
+
+	var complexity := -1
+	var complexity_header := node.get_header(SALIENCY_COMPLEXITY_HEADER)
+	if complexity_header.is_valid_int():
+		complexity = complexity_header.to_int()
 
 	_saliency_candidates.append({
 		"content_id": node_name,
@@ -773,36 +728,27 @@ func _execute_add_saliency_from_node(instruction: YarnInstruction) -> void:
 
 
 func _execute_select_saliency_candidate() -> void:
-	if _saliency_candidates.is_empty():
-		_push(false)
-		return
-
 	var context := {
 		"vm": self,
 		"variable_storage": variable_storage
 	}
 
-	var selected_index := -1
+	var strategy := get_effective_saliency_strategy()
+	var selected_index := strategy.select_candidate(_saliency_candidates, context)
 
-	if saliency_strategy != null:
-		selected_index = saliency_strategy.select_candidate(_saliency_candidates, context)
-	else:
-		# Fallback: first valid candidate (FirstSaliencyStrategy behavior).
-		for i in range(_saliency_candidates.size()):
-			if _saliency_candidates[i].get("conditions_failed", 0) == 0:
-				selected_index = i
-				break
+	if selected_index >= _saliency_candidates.size():
+		var candidate_count := _saliency_candidates.size()
+		_saliency_candidates.clear()
+		_fail("content saliency strategy did not return a valid selection (index %d of %d candidates)" % [selected_index, candidate_count])
+		return
 
-	if selected_index < 0 or selected_index >= _saliency_candidates.size():
+	if selected_index < 0:
 		_saliency_candidates.clear()
 		_push(false)
 		return
 
 	var best_candidate: Dictionary = _saliency_candidates[selected_index]
-
-	if saliency_strategy != null:
-		saliency_strategy.on_candidate_selected(best_candidate, context)
-
+	strategy.on_candidate_selected(best_candidate, context)
 	_saliency_candidates.clear()
 
 	_push(best_candidate.destination)
@@ -810,6 +756,8 @@ func _execute_select_saliency_candidate() -> void:
 
 
 func _push(value: Variant) -> void:
+	if value is int:
+		value = float(value)
 	if value is float:
 		value = YarnNumber.to_f32(value)
 	_stack.push_back(value)
@@ -817,31 +765,44 @@ func _push(value: Variant) -> void:
 
 func _pop() -> Variant:
 	if _stack.is_empty():
-		if _current_node != null and _instruction_pointer > 0:
+		if _current_node != null and _instruction_pointer > 0 and _instruction_pointer - 1 < _current_node.instructions.size():
 			var prev_ip := _instruction_pointer - 1
-			if prev_ip < _current_node.instructions.size():
-				var inst := _current_node.instructions[prev_ip]
-				push_error("virtual machine: stack underflow at instruction %d (opcode %s) in node '%s'" % [prev_ip, inst.opcode, _current_node.node_name])
-			else:
-				push_error("virtual machine: stack underflow")
+			var inst := _current_node.instructions[prev_ip]
+			_fail("stack underflow at instruction %d (opcode %s) in node '%s'" % [prev_ip, inst.opcode, _current_node.node_name])
 		else:
-			push_error("virtual machine: stack underflow")
-		_has_error = true
-		current_state = ExecutionState.STOPPED
+			_fail("stack underflow")
 		return null
 	return _stack.pop_back()
 
 
 func _peek() -> Variant:
 	if _stack.is_empty():
-		push_error("virtual machine: stack underflow on peek")
-		_has_error = true
-		current_state = ExecutionState.STOPPED
+		_fail("stack underflow on peek")
 		return null
 	return _stack.back()
 
 
-func _is_truthy(value: Variant) -> bool:
+func _fail(message: String) -> void:
+	push_error("virtual machine: %s" % message)
+	_has_error = true
+	last_error = message
+	current_state = ExecutionState.STOPPED
+
+
+func _reset_state() -> void:
+	_stack.clear()
+	_pending_options.clear()
+	_call_stack.clear()
+	_instruction_pointer = 0
+
+
+func _set_stopped() -> void:
+	current_state = ExecutionState.STOPPED
+	_reset_state()
+	_current_node = null
+
+
+static func _value_to_bool(value: Variant) -> bool:
 	if value == null:
 		return false
 	if value is bool:
@@ -849,41 +810,32 @@ func _is_truthy(value: Variant) -> bool:
 	if value is float or value is int:
 		return value != 0
 	if value is String:
-		return not value.is_empty()
+		return value.strip_edges().to_lower() == "true"
 	return true
 
 
-func _value_to_string(value: Variant) -> String:
+static func _value_to_string(value: Variant) -> String:
 	if value == null:
 		return ""
 	if value is bool:
-		return "true" if value else "false"
-	if value is float:
-		return YarnNumber.to_display_string(value)
+		return "True" if value else "False"
+	if value is float or value is int:
+		return YarnNumber.to_display_string(float(value))
 	return str(value)
 
 
-## Re-fires lifecycle signals when returning to a node after a detour (clearState=false).
-func _execute_set_node_signals(node: YarnNode) -> void:
-	if node == null:
-		return
-	node_start_handler.emit(node.node_name)
-	var line_ids := _collect_line_ids(node)
-	if not line_ids.is_empty():
-		prepare_for_lines_handler.emit(line_ids)
-
-
-## Emits node_complete and increments the tracking variable if one exists.
 func _return_from_node(node: YarnNode) -> void:
 	if node == null:
 		return
 
-	var node_name := node.node_name
+	node_complete_handler.emit(node.node_name)
 
-	node_complete_handler.emit(node_name)
+	if not node.has_header(TRACKING_VARIABLE_HEADER) or variable_storage == null:
+		return
 
 	var tracking_var := node.get_header(TRACKING_VARIABLE_HEADER)
-	if not tracking_var.is_empty() and variable_storage != null:
-		var raw_value: Variant = variable_storage.get_value(tracking_var)
-		var current_value: float = float(raw_value) if raw_value != null else 0.0
-		variable_storage.set_value(tracking_var, current_value + 1.0)
+	var raw_value: Variant = variable_storage.get_value(tracking_var)
+	if raw_value is float or raw_value is int:
+		variable_storage.set_value(tracking_var, YarnNumber.to_f32(float(raw_value) + 1.0))
+	else:
+		push_error("virtual machine: failed to get the tracking variable for node '%s'" % node.node_name)

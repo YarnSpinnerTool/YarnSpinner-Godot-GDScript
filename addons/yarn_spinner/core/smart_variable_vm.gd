@@ -23,7 +23,7 @@ extends RefCounted
 
 ## Returns {found: bool, value: Variant}.
 static func try_evaluate(node: YarnNode, variable_storage: YarnVariableStorage, library: YarnLibrary) -> Dictionary:
-	if node == null or node.instructions.is_empty():
+	if node == null:
 		return {found = false, value = null}
 
 	var stack: Array = []
@@ -31,61 +31,88 @@ static func try_evaluate(node: YarnNode, variable_storage: YarnVariableStorage, 
 
 	while ip < node.instructions.size():
 		var instruction: YarnInstruction = node.instructions[ip]
-		ip += 1
 
 		match instruction.opcode:
 			YarnInstruction.OpCode.PUSH_STRING:
 				stack.push_back(instruction.string_value)
 
 			YarnInstruction.OpCode.PUSH_FLOAT:
-				stack.push_back(instruction.float_value)
+				stack.push_back(YarnNumber.to_f32(instruction.float_value))
 
 			YarnInstruction.OpCode.PUSH_BOOL:
 				stack.push_back(instruction.bool_value)
 
-			YarnInstruction.OpCode.PUSH_VARIABLE:
-				if variable_storage == null:
-					return {found = false, value = null}
-				var value: Variant = variable_storage.get_value(instruction.variable_name)
-				stack.push_back(value)
+			YarnInstruction.OpCode.POP:
+				if stack.is_empty():
+					return _error(node, "stack underflow")
+				stack.pop_back()
 
 			YarnInstruction.OpCode.CALL_FUNC:
 				if library == null:
-					return {found = false, value = null}
+					return _error(node, "no library is available")
+				if not library.has_function(instruction.function_name):
+					return _error(node, "function '%s' is not present in the library" % instruction.function_name)
 				var result: Variant = library.call_function(instruction.function_name, stack, null)
-				if result == YarnLibrary.FUNCTION_ERROR:
-					library.take_function_error()
-					return {found = false, value = null}
-				if result != null:
-					stack.push_back(result)
+				if YarnLibrary.is_function_error(result):
+					return _error(node, library.take_function_error())
+				if result is int:
+					result = float(result)
+				if result is float:
+					result = YarnNumber.to_f32(result)
+				stack.push_back(result)
 
-			YarnInstruction.OpCode.POP:
-				if stack.is_empty():
-					return {found = false, value = null}
-				stack.pop_back()
+			YarnInstruction.OpCode.PUSH_VARIABLE:
+				var value: Variant = null
+				if variable_storage != null:
+					value = variable_storage.get_value(instruction.variable_name)
+				if value == null:
+					return _error(node, "failed to fetch any value for %s when evaluating a smart variable" % instruction.variable_name)
+				stack.push_back(value)
 
 			YarnInstruction.OpCode.JUMP_IF_FALSE:
 				if stack.is_empty():
-					return {found = false, value = null}
-				var value: Variant = stack.back()
-				if not _is_truthy(value):
+					return _error(node, "stack underflow")
+				if not _is_truthy(stack.back()):
 					ip = instruction.destination
+					continue
 
 			YarnInstruction.OpCode.STOP:
 				break
 
 			_:
-				# unsupported opcode for smart variable evaluation
-				return {found = false, value = null}
+				return _error(node, "invalid opcode %s when evaluating a smart variable" % str(instruction.opcode))
 
-	if stack.size() != 1:
-		# A well-formed smart variable node leaves exactly one value: its
-		# result. Anything else means the expression bytecode is corrupt,
-		# and returning whatever happens to be on top would hide that.
-		push_error("smart variable vm: expected exactly 1 value on the stack after evaluation, found %d" % stack.size())
+		ip += 1
+
+	if stack.is_empty():
+		return _error(node, "stack did not contain a value after evaluation")
+
+	var calculated: Variant = stack.pop_back()
+
+	if not stack.is_empty():
+		return _error(node, "stack had %d dangling value(s)" % stack.size())
+
+	return {found = true, value = calculated}
+
+
+static func try_evaluate_named(
+	variable_name: String,
+	program: YarnProgram,
+	variable_storage: YarnVariableStorage,
+	library: YarnLibrary
+) -> Dictionary:
+	if program == null:
+		return {found = false, value = null, error = "no program is loaded"}
+	if variable_name.is_empty():
+		return {found = false, value = null, error = "smart variable name cannot be empty"}
+	var node := program.get_node(variable_name)
+	if node == null:
 		return {found = false, value = null}
+	return try_evaluate(node, variable_storage, library)
 
-	return {found = true, value = stack.back()}
+
+static func _error(node: YarnNode, message: String) -> Dictionary:
+	return {found = false, value = null, error = "error when evaluating smart variable %s: %s" % [node.node_name, message]}
 
 
 ## Evaluates condition variables for a node group via smart variable bytecode.
@@ -94,31 +121,43 @@ static func get_saliency_options_for_node_group(
 	program: YarnProgram,
 	variable_storage: YarnVariableStorage,
 	library: YarnLibrary
-) -> Array:
+) -> Array[Dictionary]:
+	var result := try_get_saliency_options_for_node_group(group_name, program, variable_storage, library)
+	var error: String = result.error
+	if not error.is_empty():
+		push_error("smart variable vm: %s" % error)
+	return result.options
+
+
+static func try_get_saliency_options_for_node_group(
+	group_name: String,
+	program: YarnProgram,
+	variable_storage: YarnVariableStorage,
+	library: YarnLibrary
+) -> Dictionary:
+	var candidates: Array[Dictionary] = []
+
 	if program == null:
-		return []
+		return {"options": candidates, "error": "can't get saliency options for '%s', because no program is loaded" % group_name}
 
 	var node := program.get_node(group_name)
 	if node == null:
-		return []
+		return {"options": candidates, "error": "error getting available content for node group %s: not a valid node group name" % group_name}
 
-	if not node.headers.has("$Yarn.Internal.NodeGroupHub"):
-		return []
+	if not node.has_header(YarnProgram.NODE_GROUP_HUB_HEADER):
+		return {"options": candidates, "error": ""}
 
-	# Every node tagged
-	# with this group's NodeGroup header is a candidate. The hub node itself
-	# carries no candidate instructions, so we enumerate the program's nodes
-	# rather than scanning the hub. Each candidate's saliency-condition
-	# variables are evaluated to count passing/failing conditions; the saliency
-	# strategy is responsible for discarding the failing ones.
-	var candidates: Array[Dictionary] = []
 	for member_name in program.nodes:
 		var member: YarnNode = program.nodes[member_name]
-		if member.headers.get("$Yarn.Internal.NodeGroup", "") != group_name:
+		if member.get_header(YarnProgram.NODE_GROUP_HEADER) != group_name:
 			continue
-		candidates.append(_build_member_candidate(member_name, member, variable_storage, library, program))
+		var candidate := _build_member_candidate(member_name, member, variable_storage, library, program)
+		if candidate.has("error"):
+			var no_candidates: Array[Dictionary] = []
+			return {"options": no_candidates, "error": candidate.error}
+		candidates.append(candidate)
 
-	return candidates
+	return {"options": candidates, "error": ""}
 
 
 static func _build_member_candidate(
@@ -131,53 +170,30 @@ static func _build_member_candidate(
 	var passing := 0
 	var failing := 0
 
-	var saliency_vars_header: String = member.headers.get("$Yarn.Internal.ContentSaliencyVariables", "")
-	if not saliency_vars_header.is_empty():
-		for var_name in saliency_vars_header.split(";", false):
-			var_name = var_name.strip_edges()
-			if var_name.is_empty():
-				continue
-			var value: Variant = _evaluate_smart_or_stored(var_name, variable_storage, library, program)
-			if value != null and _is_truthy(value):
-				passing += 1
-			else:
-				failing += 1
+	for var_name in member.get_header("$Yarn.Internal.ContentSaliencyVariables").split(";", false):
+		var evaluation := try_evaluate_named(var_name, program, variable_storage, library)
+		if evaluation.has("error"):
+			return {"error": evaluation.error}
+		elif not evaluation.found:
+			return {"error": "failed to evaluate saliency condition smart variable %s: variable not found in program" % var_name}
+		elif _is_truthy(evaluation.value):
+			passing += 1
+		else:
+			failing += 1
 
-	# Complexity score defaults to -1 when the header is absent, as in Unity.
 	var complexity := -1
-	var complexity_header: String = member.headers.get("$Yarn.Internal.ContentSaliencyComplexity", "")
+	var complexity_header := member.get_header("$Yarn.Internal.ContentSaliencyComplexity")
 	if complexity_header.is_valid_int():
 		complexity = complexity_header.to_int()
 
 	return {
-		"content_id": member_name,
+		"content_id": member.node_name if not member.node_name.is_empty() else member_name,
 		"complexity": complexity,
 		"conditions_passed": passing,
 		"conditions_failed": failing,
 		"destination": 0,
 		"content_type": YarnSaliencyStrategy.ContentType.NODE,
 	}
-
-
-## Tries smart variable nodes first, then falls back to storage.
-static func _evaluate_smart_or_stored(
-	variable_name: String,
-	variable_storage: YarnVariableStorage,
-	library: YarnLibrary,
-	program: YarnProgram
-) -> Variant:
-	if program != null:
-		var smart_nodes := program.get_smart_variable_nodes()
-		for smart_node in smart_nodes:
-			if smart_node.node_name == variable_name:
-				var result := try_evaluate(smart_node, variable_storage, library)
-				if result.found:
-					return result.value
-
-	if variable_storage != null:
-		return variable_storage.get_value(variable_name)
-
-	return null
 
 
 static func _is_truthy(value: Variant) -> bool:
@@ -188,5 +204,5 @@ static func _is_truthy(value: Variant) -> bool:
 	if value is float or value is int:
 		return value != 0
 	if value is String:
-		return not value.is_empty()
+		return value.strip_edges().to_lower() == "true"
 	return true

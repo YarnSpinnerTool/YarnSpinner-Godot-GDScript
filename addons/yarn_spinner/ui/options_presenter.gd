@@ -82,12 +82,14 @@ const LASTLINE_MARKUP := "lastline"
 
 var _is_showing_options: bool = false
 var _current_options: Array[YarnOption] = []
+var _current_token: YarnCancellationToken
 var _option_buttons: Array[Control] = []
 var _button_pool: Array[Control] = []
 var _max_pool_size: int = 10
 var _selected_index: int = -1
 var _last_seen_line: YarnLine = null
 var _button_callbacks: Dictionary = {}
+var _markup_parser: YarnMarkupParser
 signal _selection_made(index: int)
 
 
@@ -97,6 +99,10 @@ func _ready() -> void:
 			if child is Container:
 				options_container = child
 				break
+	if last_line_container == null and last_line_text != null:
+		last_line_container = last_line_text
+	if last_line_character_name_container == null and last_line_character_name_text != null:
+		last_line_character_name_container = last_line_character_name_text
 
 
 func run_line(line: YarnLine, _token: YarnCancellationToken = null) -> void:
@@ -151,6 +157,7 @@ func run_options(options: Array[YarnOption], token: YarnCancellationToken = null
 		return -1
 
 	_current_options = options
+	_current_token = token
 	_is_showing_options = true
 	_selected_index = -1
 
@@ -184,14 +191,24 @@ func run_options(options: Array[YarnOption], token: YarnCancellationToken = null
 		token.next_content_requested.connect(on_wind_down, CONNECT_ONE_SHOT)
 
 	if use_fade_effect:
-		await _fade_presenter_alpha(0.0, 1.0, fade_up_duration)
+		await _fade_presenter_alpha(0.0, 1.0, fade_up_duration, _hurry_check(token))
 
 	var result: int = await _wait_for_selection()
 
 	if token != null and token.next_content_requested.is_connected(on_wind_down):
 		token.next_content_requested.disconnect(on_wind_down)
 
+	_current_token = null
+
+	if token != null and token.is_next_content_requested:
+		return -1
+
 	return result
+
+
+static func _hurry_check(token: YarnCancellationToken) -> Callable:
+	return func() -> bool:
+		return token != null and token.is_hurry_up_requested
 
 
 # ---------------------------------------------------------------------------
@@ -203,35 +220,46 @@ func _show_last_line() -> void:
 		_hide_last_line()
 		return
 
-	var line_text := _last_seen_line.text
+	var markup := _last_seen_line.get_markup_result()
 	var char_name := _last_seen_line.character_name
 
 	# Show character name separately if we have a nameplate
 	if last_line_character_name_container != null:
-		if char_name.is_empty():
+		if char_name.strip_edges().is_empty():
 			last_line_character_name_container.visible = false
 		else:
+			markup = _last_seen_line.get_markup_result_without_character_name()
 			last_line_character_name_container.visible = true
 			if last_line_character_name_text != null:
 				_set_label_text(last_line_character_name_text, char_name)
-			# Use text without character prefix when showing name separately
-			line_text = _last_seen_line.text_without_character_name
 	else:
-		# No nameplate — use text without character prefix
-		line_text = _last_seen_line.text_without_character_name
+		markup = _last_seen_line.get_markup_result_without_character_name()
 
 	# Handle [lastline] markup — show text AFTER the marker with "..." prefix
 	# (matching Unity: truncates everything before the marker)
-	var lastline_attr := _last_seen_line.try_get_attribute(LASTLINE_MARKUP)
-	if lastline_attr != null and lastline_attr.position >= 0 and lastline_attr.position <= line_text.length():
-		line_text = "..." + line_text.substr(lastline_attr.position).strip_edges()
+	var prefix := ""
+	var lastline_attr := markup.try_get_attribute_with_name(LASTLINE_MARKUP)
+	if lastline_attr != null and lastline_attr.position <= markup.text.length():
+		markup = markup.delete_range(YarnMarkupAttribute.new(0, 0, lastline_attr.position, "", []))
+		prefix = "..."
 
 	# Show the line text
 	if last_line_text != null:
-		_set_label_text(last_line_text, line_text)
+		if last_line_text is RichTextLabel:
+			(last_line_text as RichTextLabel).text = prefix + _get_markup_parser().convert_to_bbcode(markup)
+		else:
+			_set_label_text(last_line_text, prefix + YarnMarkupParser.strip_bbcode_tags(markup.text))
 
 	if last_line_container != null:
 		last_line_container.visible = true
+
+
+func _get_markup_parser() -> YarnMarkupParser:
+	if dialogue_runner != null and dialogue_runner.get_line_provider() != null:
+		return dialogue_runner.get_line_provider().get_markup_parser()
+	if _markup_parser == null:
+		_markup_parser = YarnMarkupParser.new()
+	return _markup_parser
 
 
 func _hide_last_line() -> void:
@@ -243,7 +271,7 @@ func _hide_last_line() -> void:
 
 func _set_label_text(control: Control, value: String) -> void:
 	if control is RichTextLabel:
-		control.text = value
+		control.text = YarnMarkupParser.escape_text(value)
 	elif control is Label:
 		control.text = value
 	elif control.has_method("set_text"):
@@ -346,7 +374,7 @@ func _create_option_buttons() -> void:
 			opt_item.option_selected.connect(item_callback)
 		elif item is Button:
 			var button := item as Button
-			button.text = option.text_without_character_name
+			button.text = YarnMarkupParser.strip_bbcode_tags(option.text_without_character_name)
 			# Only apply default styling when no custom button scene is set.
 			# When using a custom scene, respect its existing theme/size.
 			if option_button_scene == null:
@@ -384,7 +412,7 @@ func _select_option(index: int) -> void:
 	_is_showing_options = false
 
 	if use_fade_effect:
-		await _fade_presenter_alpha(1.0, 0.0, fade_down_duration)
+		await _fade_presenter_alpha(1.0, 0.0, fade_down_duration, _hurry_check(_current_token))
 
 	_set_presenter_visible(false)
 	var item := _get_presenter_canvas_item()

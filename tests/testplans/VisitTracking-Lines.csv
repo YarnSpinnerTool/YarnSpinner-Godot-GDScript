@@ -1,0 +1,18 @@
+id,text,file,node,lineNumber
+line:5ac9d7b9,beginning,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,Start,3
+line:ccf9d0ce,entered End,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,Start,14
+line:76a8d957,did we visit ImplicitTrack? {0}!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,Start,16
+line:e098de20,did we visit NoTrack? {0}!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,Start,17
+line:430dbabe,did we visit Track? {0}!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,Start,18
+line:d53dbdc9,did we visit NodeGroupImplicitTrack? {0}!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,Start,19
+line:6f6cb450,did we visit NodeGroupNoTrack? {0}!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,Start,20
+line:f95cb327,did we visit NodeGroupTrack? {0}!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,Start,21
+line:68410cb7,did we visit NodeGroupWithSubtitle.ABC123? {0}!,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,Start,22
+line:fe710bc0,done,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,Start,24
+line:57f42007,entered ImplicitTrack,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,ImplicitTrack,29
+line:e4c059b8,entered NoTrack,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,NoTrack,35
+line:4be9e864,entered Track,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,Track,41
+line:8d45ea6b,entered NodeGroupImplicitTrack,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,NodeGroupImplicitTrack,47
+line:9e8900bc,entered NodeGroupTrack,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,NodeGroupTrack,53
+line:a5f0440a,entered NodeGroupNoTrack,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,NodeGroupNoTrack,59
+line:5f1223b2,entered NodeGroupWithSubtitle.ABC123,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitTracking.yarn,NodeGroupWithSubtitle,65

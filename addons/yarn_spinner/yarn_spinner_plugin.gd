@@ -27,6 +27,7 @@ const YarnMainScreen := preload("res://addons/yarn_spinner/editor/yarn_main_scre
 const YarnInspectorPlugin := preload("res://addons/yarn_spinner/editor/yarn_inspector_plugin.gd")
 const YarnVariableInspectorPlugin := preload("res://addons/yarn_spinner/editor/yarn_variable_inspector_plugin.gd")
 const YarnProjectInspectorPlugin := preload("res://addons/yarn_spinner/editor/yarn_project_inspector_plugin.gd")
+const YarnActionExportPlugin := preload("res://addons/yarn_spinner/editor/yarn_action_export_plugin.gd")
 
 const MAIN_SCREEN_NAME := "Yarn Spinner"
 const PLUGIN_ICON_PATH := "res://addons/yarn_spinner/icons/yarn_script.svg"
@@ -40,6 +41,7 @@ var _main_screen: Control
 var _inspector_plugin: EditorInspectorPlugin
 var _variable_inspector_plugin: EditorInspectorPlugin
 var _project_inspector_plugin: EditorInspectorPlugin
+var _action_export_plugin: EditorExportPlugin
 var _ysls_regenerate_timer: Timer
 var _ysls_needs_regenerate: bool = false
 var _reimport_timer: Timer
@@ -73,6 +75,9 @@ func _enter_tree() -> void:
 
 	_project_inspector_plugin = YarnProjectInspectorPlugin.new()
 	add_inspector_plugin(_project_inspector_plugin)
+
+	_action_export_plugin = YarnActionExportPlugin.new()
+	add_export_plugin(_action_export_plugin)
 
 	_main_screen = YarnMainScreen.new()
 	EditorInterface.get_editor_main_screen().add_child(_main_screen)
@@ -134,6 +139,10 @@ func _exit_tree() -> void:
 	if _project_inspector_plugin:
 		remove_inspector_plugin(_project_inspector_plugin)
 		_project_inspector_plugin = null
+
+	if _action_export_plugin:
+		remove_export_plugin(_action_export_plugin)
+		_action_export_plugin = null
 
 	if _variable_inspector_plugin:
 		remove_inspector_plugin(_variable_inspector_plugin)

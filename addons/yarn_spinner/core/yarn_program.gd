@@ -40,6 +40,17 @@ func get_node_names() -> PackedStringArray:
 	return PackedStringArray(nodes.keys())
 
 
+func get_line_ids_for_node(node_name: String) -> PackedStringArray:
+	var ids := PackedStringArray()
+	var node := get_node(node_name)
+	if node == null:
+		return ids
+	for instruction in node.instructions:
+		if instruction.opcode == YarnInstruction.OpCode.RUN_LINE or instruction.opcode == YarnInstruction.OpCode.ADD_OPTION:
+			ids.append(instruction.line_id)
+	return ids
+
+
 func get_initial_value(variable_name: String) -> Variant:
 	return initial_values.get(variable_name)
 

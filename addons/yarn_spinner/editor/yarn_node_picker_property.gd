@@ -22,6 +22,8 @@ extends EditorProperty
 
 const _YarnProgramParser := preload("res://addons/yarn_spinner/core/yarn_program_parser.gd")
 
+static var _names_cache: Dictionary = {}
+
 var _option_button: OptionButton
 var _updating: bool = false
 
@@ -87,13 +89,28 @@ func _get_node_names() -> PackedStringArray:
 	if bytes.is_empty():
 		return PackedStringArray()
 
+	var cache_key := (project_variant as Resource).get_instance_id()
+	var bytes_hash := hash(bytes)
+	var cached: Dictionary = _names_cache.get(cache_key, {})
+	if cached.get("hash", 0) == bytes_hash and cached.get("size", -1) == bytes.size():
+		return cached["names"]
+
 	var program: YarnProgram = _YarnProgramParser.parse_from_bytes(bytes)
 	if program == null:
 		return PackedStringArray()
 
-	var all_names := program.get_node_names()
+	var filtered := filter_node_names(program)
+	_names_cache[cache_key] = {"hash": bytes_hash, "size": bytes.size(), "names": filtered}
+	return filtered
+
+
+static func filter_node_names(program: YarnProgram) -> PackedStringArray:
 	var filtered: PackedStringArray = []
-	for node_name in all_names:
-		if not node_name.begins_with("$"):
-			filtered.append(node_name)
+	for node_name in program.get_node_names():
+		if node_name.begins_with("$"):
+			continue
+		var node := program.get_node(node_name)
+		if node != null and node.headers.has(YarnProgram.NODE_GROUP_HEADER):
+			continue
+		filtered.append(node_name)
 	return filtered

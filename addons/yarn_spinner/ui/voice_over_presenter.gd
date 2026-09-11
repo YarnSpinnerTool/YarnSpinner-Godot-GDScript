@@ -38,17 +38,15 @@ signal voice_finished(line: YarnLine)
 ## seconds after audio finishes before signaling completion
 @export var wait_time_after_complete: float = 0.0
 ## seconds; 0 = instant stop
-@export var fade_out_time_on_interrupt: float = 0.0
+@export var fade_out_time_on_interrupt: float = 0.05
 ## When the voice over finishes, ask the runner to end the line.
 @export var end_line_when_voice_complete: bool = true
 
 var _is_playing: bool = false
-var _fade_tween: Tween
 var _current_line: YarnLine
 ## bumped whenever the current line changes or dialogue ends, so a superseded
 ## line's wait timers can tell they are stale after an await.
 var _line_generation := 0
-signal _voice_complete
 
 
 func _ready() -> void:
@@ -77,31 +75,18 @@ func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
 			_request_line_end.call_deferred(line)
 		return
 
-	_is_playing = true
-
-	if wait_time_before_start > 0.0 and is_inside_tree():
-		await YarnAsync.wait(self, wait_time_before_start)
-		if generation != _line_generation or not _is_playing:
-			return
-		if token != null and token.is_next_content_requested:
-			# The line was skipped during the pre-play delay.
-			_is_playing = false
+	if wait_time_before_start > 0.0:
+		await _wait_unless_next_content(wait_time_before_start, token, generation)
+		if generation != _line_generation:
 			return
 
-	_play_audio(audio)
-	voice_started.emit(line, audio)
+	if not is_inside_tree():
+		return
 
 	if wait_for_audio:
-		# Hold the line open until playback finishes, or until next content
-		# is requested (a skip), which stops the audio via _skip_voice.
-		if token != null:
-			token.next_content_requested.connect(_skip_voice, CONNECT_ONE_SHOT)
-			if token.is_next_content_requested:
-				_skip_voice()
-		if _is_playing:
-			await _voice_complete
-		if token != null and token.next_content_requested.is_connected(_skip_voice):
-			token.next_content_requested.disconnect(_skip_voice)
+		await _play_line_audio(line, audio, token, generation)
+	else:
+		_play_line_audio(line, audio, token, generation)
 
 
 func on_dialogue_completed() -> void:
@@ -110,15 +95,76 @@ func on_dialogue_completed() -> void:
 	_is_playing = false
 
 
-## Token-driven skip: next content was requested while the voice was
-## playing, so stop the audio and settle the line. Hurry-up deliberately
-## does nothing to voice over.
-func _skip_voice() -> void:
-	if _is_playing:
-		_is_playing = false
-		_stop_audio_with_fade()
-		_voice_complete.emit()
-		voice_finished.emit(_current_line)
+func _play_line_audio(line: YarnLine, audio: AudioStream, token: YarnCancellationToken, generation: int) -> void:
+	var player := _play_audio(audio)
+	if player == null:
+		return
+	_is_playing = true
+	voice_started.emit(line, audio)
+
+	var tree := get_tree()
+	while not _is_player_stopped(player) and not _is_next_content_requested(token):
+		await tree.process_frame
+		if generation != _line_generation or not is_inside_tree():
+			return
+
+	if _is_next_content_requested(token) and not _is_player_stopped(player):
+		var start_volume: float = player.get(&"volume_linear")
+		if fade_out_time_on_interrupt > 0.0:
+			var elapsed := 0.0
+			var last_ticks := Time.get_ticks_usec()
+			while elapsed < fade_out_time_on_interrupt:
+				await tree.process_frame
+				if generation != _line_generation or not is_inside_tree() or not is_instance_valid(player):
+					return
+				var now := Time.get_ticks_usec()
+				if can_process():
+					elapsed += (now - last_ticks) / 1000000.0
+				last_ticks = now
+				player.set(&"volume_linear", lerpf(start_volume, 0.0, clampf(elapsed / fade_out_time_on_interrupt, 0.0, 1.0)))
+		player.call(&"stop")
+		player.set(&"volume_linear", start_volume)
+	else:
+		player.call(&"stop")
+
+	_is_playing = false
+	voice_finished.emit(line)
+
+	if not _is_next_content_requested(token) and wait_time_after_complete > 0.0:
+		await _wait_unless_next_content(wait_time_after_complete, token, generation)
+		if generation != _line_generation:
+			return
+
+	if end_line_when_voice_complete:
+		# Route through the line's source so wrapper presenters (e.g. the
+		# Interruption add-on) can intercept; falls back to the runner.
+		_request_line_end(line)
+
+
+func _wait_unless_next_content(seconds: float, token: YarnCancellationToken, generation: int) -> void:
+	if not is_inside_tree():
+		return
+	var tree := get_tree()
+	var remaining := seconds
+	while remaining > 0.0 and not _is_next_content_requested(token):
+		await tree.process_frame
+		if generation != _line_generation or not is_inside_tree():
+			return
+		if not can_process():
+			continue
+		remaining -= get_process_delta_time()
+
+
+func _is_next_content_requested(token: YarnCancellationToken) -> bool:
+	return token != null and token.is_next_content_requested
+
+
+func _is_player_stopped(player: Node) -> bool:
+	if not is_instance_valid(player) or not player.is_inside_tree():
+		return true
+	if not player.can_process() or player.get(&"stream_paused"):
+		return false
+	return not player.get(&"playing")
 
 
 func _load_audio_for_line(line: YarnLine) -> AudioStream:
@@ -152,99 +198,32 @@ func _get_audio_path(line_id: String) -> String:
 	return audio_base_path.path_join(filename + audio_extension)
 
 
-func _play_audio(audio: AudioStream) -> void:
+func _play_audio(audio: AudioStream) -> Node:
 	if audio_player != null:
 		audio_player.stream = audio
 		audio_player.volume_db = volume_db
-		if not audio_player.finished.is_connected(_on_audio_finished):
-			audio_player.finished.connect(_on_audio_finished)
 		audio_player.play()
+		return audio_player
 	elif audio_player_2d != null:
 		audio_player_2d.stream = audio
 		audio_player_2d.volume_db = volume_db
-		if not audio_player_2d.finished.is_connected(_on_audio_finished):
-			audio_player_2d.finished.connect(_on_audio_finished)
 		audio_player_2d.play()
+		return audio_player_2d
 	elif audio_player_3d != null:
 		audio_player_3d.stream = audio
 		audio_player_3d.volume_db = volume_db
-		if not audio_player_3d.finished.is_connected(_on_audio_finished):
-			audio_player_3d.finished.connect(_on_audio_finished)
 		audio_player_3d.play()
-
-
-func _stop_audio_immediate() -> void:
-	_kill_fade_tween()
-	if audio_player != null and audio_player.playing:
-		audio_player.stop()
-		audio_player.volume_db = volume_db
-	if audio_player_2d != null and audio_player_2d.playing:
-		audio_player_2d.stop()
-		audio_player_2d.volume_db = volume_db
-	if audio_player_3d != null and audio_player_3d.playing:
-		audio_player_3d.stop()
-		audio_player_3d.volume_db = volume_db
-
-
-func _stop_audio_with_fade() -> void:
-	if fade_out_time_on_interrupt <= 0.0:
-		_stop_audio_immediate()
-		return
-
-	_kill_fade_tween()
-
-	var active_player: Node = _get_active_player()
-	if active_player == null:
-		return
-
-	_fade_tween = create_tween()
-	_fade_tween.tween_property(active_player, "volume_db", -80.0, fade_out_time_on_interrupt)
-	_fade_tween.finished.connect(func():
-		_stop_audio_immediate()
-	, CONNECT_ONE_SHOT)
-
-
-func _get_active_player() -> Node:
-	if audio_player != null and audio_player.playing:
-		return audio_player
-	if audio_player_2d != null and audio_player_2d.playing:
-		return audio_player_2d
-	if audio_player_3d != null and audio_player_3d.playing:
 		return audio_player_3d
 	return null
 
 
-func _kill_fade_tween() -> void:
-	if _fade_tween != null and _fade_tween.is_valid():
-		_fade_tween.kill()
-		_fade_tween = null
-
-
-func _on_audio_finished() -> void:
-	if not _is_playing:
-		return
-
-	_is_playing = false
-	var generation := _line_generation
-
-	if wait_time_after_complete > 0.0 and is_inside_tree():
-		await YarnAsync.wait(self, wait_time_after_complete)
-		if generation != _line_generation:
-			return
-
-	voice_finished.emit(_current_line)
-	_voice_complete.emit()
-
-	if end_line_when_voice_complete:
-		# Route through the line's source so wrapper presenters (e.g. the
-		# Interruption add-on) can intercept; falls back to the runner.
-		_request_line_end(_current_line)
-
-
-func _exit_tree() -> void:
-	if audio_player != null and audio_player.finished.is_connected(_on_audio_finished):
-		audio_player.finished.disconnect(_on_audio_finished)
-	if audio_player_2d != null and audio_player_2d.finished.is_connected(_on_audio_finished):
-		audio_player_2d.finished.disconnect(_on_audio_finished)
-	if audio_player_3d != null and audio_player_3d.finished.is_connected(_on_audio_finished):
-		audio_player_3d.finished.disconnect(_on_audio_finished)
+func _stop_audio_immediate() -> void:
+	if audio_player != null:
+		audio_player.stop()
+		audio_player.volume_db = volume_db
+	if audio_player_2d != null:
+		audio_player_2d.stop()
+		audio_player_2d.volume_db = volume_db
+	if audio_player_3d != null:
+		audio_player_3d.stop()
+		audio_player_3d.volume_db = volume_db

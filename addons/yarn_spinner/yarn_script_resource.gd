@@ -27,26 +27,31 @@ extends Resource
 @export var node_names: PackedStringArray = PackedStringArray()
 
 
+static var _title_regex: RegEx
+
+
 func get_node_content(node_name: String) -> String:
+	if _title_regex == null:
+		_title_regex = RegEx.create_from_string("^[ \\t]*title[ \\t]*:[ \\t]*([^\\s/]+)[ \\t]*(?://.*)?$")
 	var lines := content.split("\n")
 	var in_target_node := false
-	var in_header := false
+	var in_header := true
 	var result := ""
 
 	for line in lines:
 		var stripped := line.strip_edges()
-		if stripped == "---":
-			in_header = true
-		elif stripped == "===":
+		if in_header:
+			if stripped.begins_with("---"):
+				in_header = false
+			else:
+				var title_match := _title_regex.search(line.trim_suffix("\r"))
+				if title_match and title_match.get_string(1) == node_name:
+					in_target_node = true
+		elif stripped.begins_with("==="):
 			if in_target_node:
 				return result
-			in_header = false
-			in_target_node = false
-		elif in_header and stripped.begins_with("title:"):
-			var name := stripped.substr(6).strip_edges()
-			if name == node_name:
-				in_target_node = true
-		elif in_target_node and not in_header:
+			in_header = true
+		elif in_target_node:
 			result += line + "\n"
 
 	return result

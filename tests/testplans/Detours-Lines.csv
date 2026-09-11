@@ -1,0 +1,12 @@
+id,text,file,node,lineNumber
+line:07910980,Line 1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours.yarn,Start,3
+line:91a10ef7,Line 5,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours.yarn,Start,5
+line:b9eaeb4e,Line 2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours.yarn,Node2,10
+line:2fdaec39,Line 4,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours.yarn,Node2,12
+line:cd7e93be,Line 3,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours.yarn,Node3,16
+line:5b4e94c9,Error: should not be seen,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours.yarn,Node3,21
+line:f1326f83,VisitCountTest: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours.yarn,VisitCountTest,26
+line:670268f4,Error: We should not see this,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours.yarn,VisitCountTest,28
+line:af3f5554,VisitCountTest: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours.yarn,VisitCountTest2,33
+line:783e493a,VisitCountTest: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours.yarn,VisitCountTest3,40
+line:19e5e662,VisitCountTest2: {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours.yarn,VisitCountTest3,41

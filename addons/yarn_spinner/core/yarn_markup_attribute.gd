@@ -39,6 +39,9 @@ func _init(pos: int = 0, src_pos: int = 0, len: int = 0, attr_name: String = "",
 	name = attr_name
 	for prop in props:
 		if prop is YarnMarkupProperty:
+			if properties.has(prop.name):
+				push_error("An item with the same key has already been added. Key: %s" % prop.name)
+				continue
 			properties[prop.name] = prop.value
 			if value.is_empty():
 				value = prop.value.to_string_value()

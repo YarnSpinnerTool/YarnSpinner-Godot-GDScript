@@ -52,95 +52,92 @@ static func filter_valid_candidates(candidates: Array[Dictionary]) -> Array[Dict
 
 static func get_candidate_index(candidates: Array[Dictionary], candidate: Dictionary) -> int:
 	for i in range(candidates.size()):
+		if candidates[i] == candidate:
+			return i
+	for i in range(candidates.size()):
 		if candidates[i].get("content_id", "") == candidate.get("content_id", ""):
 			return i
 	return -1
+
+
+static func valid_candidate_indices(candidates: Array[Dictionary]) -> PackedInt32Array:
+	var indices := PackedInt32Array()
+	for i in range(candidates.size()):
+		if candidates[i].get("conditions_failed", 0) == 0:
+			indices.append(i)
+	return indices
+
+
+static func get_view_count(context: Dictionary, content_id: String) -> int:
+	var variable_storage: Variant = context.get("variable_storage")
+	if variable_storage == null or content_id.is_empty():
+		return 0
+	var raw_count: Variant = variable_storage.get_value(get_view_count_key(content_id))
+	if raw_count is float or raw_count is int:
+		return int(raw_count)
+	return 0
+
+
+static func increment_view_count(context: Dictionary, candidate: Dictionary) -> void:
+	var variable_storage: Variant = context.get("variable_storage")
+	if variable_storage == null:
+		return
+	var content_id: String = candidate.get("content_id", "")
+	if content_id.is_empty():
+		push_error("saliency strategy: content has an empty content_id")
+		return
+	var count := get_view_count(context, content_id) + 1
+	variable_storage.set_value(get_view_count_key(content_id), float(count))
 
 
 ## Always returns the first non-failing item.
 class YarnFirstSaliencyStrategy extends YarnSaliencyStrategy:
 
 	func select_candidate(candidates: Array[Dictionary], context: Dictionary) -> int:
-		var valid := YarnSaliencyStrategy.filter_valid_candidates(candidates)
+		var valid := YarnSaliencyStrategy.valid_candidate_indices(candidates)
 		if valid.is_empty():
 			return -1
-		return YarnSaliencyStrategy.get_candidate_index(candidates, valid[0])
+		return valid[0]
 
 
 ## Returns the highest-complexity non-failing item.
 class YarnBestSaliencyStrategy extends YarnSaliencyStrategy:
 
 	func select_candidate(candidates: Array[Dictionary], context: Dictionary) -> int:
-		var valid := YarnSaliencyStrategy.filter_valid_candidates(candidates)
-		if valid.is_empty():
-			return -1
-
-		valid.sort_custom(func(a, b):
-			return a.get("complexity", 0) > b.get("complexity", 0))
-
-		return YarnSaliencyStrategy.get_candidate_index(candidates, valid[0])
+		var best := -1
+		for index in YarnSaliencyStrategy.valid_candidate_indices(candidates):
+			if best == -1 or candidates[index].get("complexity", 0) > candidates[best].get("complexity", 0):
+				best = index
+		return best
 
 
 ## Returns a random non-failing item. GDScript-only convenience strategy.
 class YarnRandomSaliencyStrategy extends YarnSaliencyStrategy:
 
 	func select_candidate(candidates: Array[Dictionary], context: Dictionary) -> int:
-		var valid := YarnSaliencyStrategy.filter_valid_candidates(candidates)
+		var valid := YarnSaliencyStrategy.valid_candidate_indices(candidates)
 		if valid.is_empty():
 			return -1
-
-		var selected: Dictionary = valid[randi_range(0, valid.size() - 1)]
-		return YarnSaliencyStrategy.get_candidate_index(candidates, selected)
+		return valid[randi_range(0, valid.size() - 1)]
 
 
 ## Returns the best of the least-recently viewed items.
 class YarnBestLeastRecentlyViewedSaliencyStrategy extends YarnSaliencyStrategy:
 
 	func on_candidate_selected(candidate: Dictionary, context: Dictionary) -> void:
-		var variable_storage: Variant = context.get("variable_storage")
-		if variable_storage == null:
-			return
-
-		var content_id: String = candidate.get("content_id", "")
-		if content_id.is_empty():
-			return
-
-		var view_count_key := YarnSaliencyStrategy.get_view_count_key(content_id)
-		var raw_count: Variant = variable_storage.get_value(view_count_key)
-		var current_count: int = int(raw_count) if raw_count != null else 0
-		variable_storage.set_value(view_count_key, current_count + 1)
+		YarnSaliencyStrategy.increment_view_count(context, candidate)
 
 	func select_candidate(candidates: Array[Dictionary], context: Dictionary) -> int:
-		var valid := YarnSaliencyStrategy.filter_valid_candidates(candidates)
-		if valid.is_empty():
-			return -1
-
-		var variable_storage: Variant = context.get("variable_storage")
-
-		var view_count_content: Array[Dictionary] = []
-		for candidate in valid:
-			var content_id: String = candidate.get("content_id", "")
-			var view_count := 0
-
-			if variable_storage != null and not content_id.is_empty():
-				var view_count_key := YarnSaliencyStrategy.get_view_count_key(content_id)
-				var raw_count: Variant = variable_storage.get_value(view_count_key)
-				if raw_count != null:
-					view_count = int(raw_count)
-
-			view_count_content.append({
-				"view_count": view_count,
-				"candidate": candidate
-			})
-
-		# Sort by view count ascending, then complexity descending
-		view_count_content.sort_custom(func(a, b):
-			if a.view_count != b.view_count:
-				return a.view_count < b.view_count
-			return a.candidate.get("complexity", 0) > b.candidate.get("complexity", 0))
-
-		var best_candidate: Dictionary = view_count_content[0].candidate
-		return YarnSaliencyStrategy.get_candidate_index(candidates, best_candidate)
+		var best := -1
+		var best_views := 0
+		for index in YarnSaliencyStrategy.valid_candidate_indices(candidates):
+			var views := YarnSaliencyStrategy.get_view_count(context, candidates[index].get("content_id", ""))
+			if best == -1 or views < best_views:
+				best = index
+				best_views = views
+			elif views == best_views and candidates[index].get("complexity", 0) > candidates[best].get("complexity", 0):
+				best = index
+		return best
 
 
 ## Returns a random choice from the best of the least-recently viewed items.
@@ -148,62 +145,34 @@ class YarnBestLeastRecentlyViewedSaliencyStrategy extends YarnSaliencyStrategy:
 class YarnRandomBestLeastRecentlyViewedSaliencyStrategy extends YarnSaliencyStrategy:
 
 	func on_candidate_selected(candidate: Dictionary, context: Dictionary) -> void:
-		var variable_storage: Variant = context.get("variable_storage")
-		if variable_storage == null:
-			return
-
-		var content_id: String = candidate.get("content_id", "")
-		if content_id.is_empty():
-			return
-
-		var view_count_key := YarnSaliencyStrategy.get_view_count_key(content_id)
-		var raw_count: Variant = variable_storage.get_value(view_count_key)
-		var current_count: int = int(raw_count) if raw_count != null else 0
-		variable_storage.set_value(view_count_key, current_count + 1)
+		YarnSaliencyStrategy.increment_view_count(context, candidate)
 
 	func select_candidate(candidates: Array[Dictionary], context: Dictionary) -> int:
-		var valid := YarnSaliencyStrategy.filter_valid_candidates(candidates)
+		var valid := YarnSaliencyStrategy.valid_candidate_indices(candidates)
 		if valid.is_empty():
 			return -1
 
-		var variable_storage: Variant = context.get("variable_storage")
+		var views: Dictionary[int, int] = {}
+		var min_views := -1
+		for index in valid:
+			var count := YarnSaliencyStrategy.get_view_count(context, candidates[index].get("content_id", ""))
+			views[index] = count
+			if min_views == -1 or count < min_views:
+				min_views = count
 
-		var view_count_content: Array[Dictionary] = []
-		for candidate in valid:
-			var content_id: String = candidate.get("content_id", "")
-			var view_count := 0
+		var max_complexity := 0
+		var has_complexity := false
+		for index in valid:
+			if views[index] != min_views:
+				continue
+			var complexity: int = candidates[index].get("complexity", 0)
+			if not has_complexity or complexity > max_complexity:
+				max_complexity = complexity
+				has_complexity = true
 
-			if variable_storage != null and not content_id.is_empty():
-				var view_count_key := YarnSaliencyStrategy.get_view_count_key(content_id)
-				var raw_count: Variant = variable_storage.get_value(view_count_key)
-				if raw_count != null:
-					view_count = int(raw_count)
+		var best_group := PackedInt32Array()
+		for index in valid:
+			if views[index] == min_views and candidates[index].get("complexity", 0) == max_complexity:
+				best_group.append(index)
 
-			view_count_content.append({
-				"view_count": view_count,
-				"complexity": candidate.get("complexity", 0),
-				"candidate": candidate
-			})
-
-		var min_view_count: int = view_count_content[0].view_count
-		for item in view_count_content:
-			if item.view_count < min_view_count:
-				min_view_count = item.view_count
-
-		var least_viewed_group: Array[Dictionary] = []
-		for item in view_count_content:
-			if item.view_count == min_view_count:
-				least_viewed_group.append(item)
-
-		var max_complexity: int = least_viewed_group[0].complexity
-		for item in least_viewed_group:
-			if item.complexity > max_complexity:
-				max_complexity = item.complexity
-
-		var best_complexity_group: Array[Dictionary] = []
-		for item in least_viewed_group:
-			if item.complexity == max_complexity:
-				best_complexity_group.append(item)
-
-		var selected_item: Dictionary = best_complexity_group[randi_range(0, best_complexity_group.size() - 1)]
-		return YarnSaliencyStrategy.get_candidate_index(candidates, selected_item.candidate)
+		return best_group[randi_range(0, best_group.size() - 1)]

@@ -64,9 +64,9 @@ func to_string_value() -> String:
 		ValueType.INTEGER:
 			return str(integer_value)
 		ValueType.FLOAT:
-			return str(float_value)
+			return YarnNumber.to_display_string(float_value)
 		ValueType.STRING:
 			return string_value
 		ValueType.BOOL:
-			return "true" if bool_value else "false"
+			return "True" if bool_value else "False"
 	return ""

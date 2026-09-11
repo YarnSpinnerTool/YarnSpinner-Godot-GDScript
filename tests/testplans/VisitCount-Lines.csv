@@ -1,0 +1,6 @@
+id,text,file,node,lineNumber
+line:a4fce93d,entered start,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitCount.yarn,Start,3
+line:32ccee4a,seconds visited count is {0},/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitCount.yarn,Start,4
+line:76bab1db,second visited {0} times,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitCount.yarn,second,11
+line:add82f94,entered third,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitCount.yarn,third,20
+line:0e4d4b0a,seconds was visited a total of {0} times,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/VisitCount.yarn,third,21

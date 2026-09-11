@@ -1,0 +1,4 @@
+id,text,file,node,lineNumber
+line:cda79ecd,entered start,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Visited.yarn,Start,3
+line:5b9799ba,we have visited Start before,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Visited.yarn,Start,5
+line:e1c69023,we have not visited Start,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Visited.yarn,Start,7

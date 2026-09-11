@@ -30,6 +30,7 @@ enum SaliencyStrategyType {
 	BEST,                     ## highest complexity score
 	FIRST,                    ## first matching candidate
 	RANDOM,                   ## random selection
+	CUSTOM,
 }
 
 signal dialogue_started()
@@ -58,6 +59,9 @@ signal command_received(command_name: String, command_args: Array)
 
 @export var yarn_project: YarnProjectResource:
 	set(value):
+		if _is_running:
+			push_error("dialogue runner: cannot set project while dialogue is running")
+			return
 		yarn_project = value
 		if yarn_project != null and _vm != null:
 			_load_program()
@@ -69,15 +73,29 @@ signal command_received(command_name: String, command_args: Array)
 ## The presenters this runner drives. List them here in the inspector, or
 ## add them at runtime with [method add_presenter]. Child nodes are NOT
 ## discovered automatically.
-@export var presenters: Array[YarnDialoguePresenter] = []
+@export var presenters: Array[YarnDialoguePresenter] = []:
+	set(value):
+		presenters = value
+		if _vm != null:
+			_presenters.clear()
+			_register_listed_presenters()
 
 ## If null, an in-memory storage is created automatically.
 @export var variable_storage: YarnVariableStorage
 
+@export var line_provider: YarnLineProvider:
+	set(value):
+		line_provider = value
+		if _vm != null and value != null:
+			_line_provider = value
+			_configure_localisation()
+			if _vm.program != null:
+				_line_provider.set_program(_vm.program)
+
 @export_group("Dialogue Behaviour")
 
 ## Continue dialogue if no presenter selects an option.
-@export var allow_option_fallthrough: bool = false
+@export var allow_option_fallthrough: bool = true
 
 ## Seconds before option fallthrough triggers (0 = no timeout).
 @export var option_timeout: float = 0.0
@@ -134,6 +152,8 @@ var _asset_provider: YarnAssetProvider
 var _smart_variable_evaluator: YarnSmartVariableEvaluator
 var _is_running: bool = false
 var _is_starting: bool = false
+var _action_sources: Dictionary = {}
+var _scene_changed_since_scan: bool = false
 ## Bumped when a run starts or is cleared. Coroutines handling lines, options
 ## and commands capture it before awaiting; a mismatch afterwards means their
 ## run was cancelled (and possibly replaced), so they must not touch the
@@ -143,6 +163,8 @@ var _current_line: YarnLine
 var _current_options: Array[YarnOption]
 var _waiting_for_content: bool = false
 var _current_cancellation_token: YarnCancellationToken
+var _current_line_token: YarnCancellationToken
+var _current_options_token: YarnCancellationToken
 ## The active options round'sselection promise select_option routes
 ## external calls through it so every selection takes the same path.
 var _current_selection: YarnPromise
@@ -152,8 +174,13 @@ var _current_selection: YarnPromise
 ## force-advancing mid-line via signal_content_complete() which might
 ## otherwise let the superseded join complete the *next* content early
 var _line_epoch := 0
+var _line_advancers: Array[Node] = []
+var _content_frame := -1
+var _completion_promise: YarnPromise
+var _stop_requested: bool = false
 
-## Once next content has been requested, a presenter that still hasn't 
+
+## Once next content has been requested, a presenter that still hasn't
 ## finished this many seconds later gets named in a warning (the dialogue is waiting on it!
 ## I like this being here, even though Unity doesn't do this, as it's helpful.
 const STALL_WARNING_SECONDS := 5.0
@@ -166,7 +193,10 @@ func _ready() -> void:
 
 	_vm = YarnVirtualMachine.new()
 	_library = YarnLibrary.new()
-	_line_provider = YarnLineProvider.new()
+	_library.set_virtual_machine(_vm)
+	if line_provider == null:
+		line_provider = YarnLineProvider.new()
+	_line_provider = line_provider
 	_asset_provider = YarnAssetProvider.new()
 
 	_vm.set_library(_library)
@@ -184,15 +214,8 @@ func _ready() -> void:
 	_smart_variable_evaluator.attach_to_storage(variable_storage)
 	variable_storage.smart_variable_evaluator = _smart_variable_evaluator
 
-	var visited_func := func(n: String) -> bool:
-		return _vm.has_visited_node(n)
-	var visited_count_func := func(n: String) -> float:
-		return float(_vm.get_visit_count(n))
-	_library.register_function("visited", visited_func, 1)
-	_library.register_function("visited_count", visited_count_func, 1)
-
 	_apply_saliency_strategy()
-	_library.set_vm_context(_vm.saliency_strategy, variable_storage)
+	_library.set_vm_context(_vm.get_effective_saliency_strategy(), variable_storage)
 	_configure_localisation()
 	_register_builtin_commands()
 	_register_global_commands()
@@ -200,6 +223,8 @@ func _ready() -> void:
 	_register_listed_presenters()
 
 	if auto_discover_commands:
+		_register_project_commands()
+		get_tree().node_added.connect(_on_tree_node_added)
 		call_deferred("_auto_discover_commands")
 
 	if yarn_project != null:
@@ -249,6 +274,8 @@ func _exit_tree() -> void:
 		if _vm != null:
 			_vm.stop()
 		_clear_run_state()
+		if _completion_promise != null:
+			_completion_promise.settle()
 
 
 ## Bind every VM signal handler. Idempotent — safe to call from both _ready
@@ -289,8 +316,8 @@ func _apply_saliency_strategy() -> void:
 			strategy = YarnSaliencyStrategy.YarnFirstSaliencyStrategy.new()
 		SaliencyStrategyType.RANDOM:
 			strategy = YarnSaliencyStrategy.YarnRandomSaliencyStrategy.new()
-		_:
-			strategy = YarnSaliencyStrategy.YarnFirstSaliencyStrategy.new()
+		SaliencyStrategyType.CUSTOM:
+			return
 
 	_vm.set_saliency_strategy(strategy)
 
@@ -308,6 +335,7 @@ func _apply_saliency_strategy() -> void:
 func set_content_saliency_strategy(strategy: YarnSaliencyStrategy) -> void:
 	if strategy == null:
 		return
+	saliency_strategy = SaliencyStrategyType.CUSTOM
 	_vm.set_saliency_strategy(strategy)
 	if _library != null:
 		_library.set_vm_context(strategy, variable_storage)
@@ -338,7 +366,78 @@ func are_options_active() -> bool:
 	return not _current_options.is_empty()
 
 
+func is_presenting_line() -> bool:
+	return _current_line_token != null
+
+
+func get_content_frame() -> int:
+	return _content_frame
+
+
+func register_line_advancer(advancer: Node) -> void:
+	if advancer != null and advancer not in _line_advancers:
+		_line_advancers.append(advancer)
+
+
+func unregister_line_advancer(advancer: Node) -> void:
+	_line_advancers.erase(advancer)
+
+
+func has_line_advancer() -> bool:
+	for advancer in _line_advancers.duplicate():
+		if not is_instance_valid(advancer):
+			_line_advancers.erase(advancer)
+	return not _line_advancers.is_empty()
+
+
+static func find_runner(node: Node) -> YarnDialogueRunner:
+	var current := node
+	while current != null:
+		if current is YarnDialogueRunner:
+			return current
+		current = current.get_parent()
+	var tree: SceneTree = null
+	if node != null and node.is_inside_tree():
+		tree = node.get_tree()
+	else:
+		tree = Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return null
+	return _find_runner_in(tree.root)
+
+
+static func _find_runner_in(node: Node) -> YarnDialogueRunner:
+	if node is YarnDialogueRunner:
+		return node
+	for child in node.get_children():
+		var found := _find_runner_in(child)
+		if found != null:
+			return found
+	return null
+
+
+func _on_tree_node_added(_node: Node) -> void:
+	_scene_changed_since_scan = true
+
+
+func _dispatch_command_with_discovery(command_text: String) -> Dictionary:
+	var result: Dictionary = await _library.dispatch_command(command_text, self)
+	if result.status == YarnLibrary.CommandDispatchStatus.NOT_FOUND and auto_discover_commands and _scene_changed_since_scan and is_inside_tree():
+		_auto_discover_commands()
+		result = await _library.dispatch_command(command_text, self)
+	return result
+
+
+func _report_duplicate_action(kind: String, yarn_name: String, script: Script) -> void:
+	if _action_sources.get(kind + ":" + yarn_name) == script:
+		return
+	push_error("dialogue runner: failed to register %s '%s' from %s: a %s by this name has already been registered" % [kind, yarn_name, script.resource_path, kind])
+
+
 func _auto_discover_commands() -> void:
+	if not is_inside_tree():
+		return
+	_scene_changed_since_scan = false
 	var root: Node = null
 	if not discovery_root.is_empty():
 		root = get_node_or_null(discovery_root)
@@ -349,19 +448,26 @@ func _auto_discover_commands() -> void:
 		root = owner if owner != null else self
 
 	var registered_scripts: Dictionary = {}
-
-	# Autoload singletons are the idiomatic Godot home for global commands (the
-	# counterpart of Unity's static [YarnCommand] methods). Scan them first so a
-	# singleton method wins the name, and register each as a global command bound
-	# to the singleton - a singleton is unambiguous, so no target is needed and
-	# <<command args>> works directly. Runs before/regardless of the scene walk,
-	# so these register even when nothing in the scene provides them.
-	_scan_singletons_for_commands(registered_scripts)
-
 	_scan_node_for_commands(root, registered_scripts)
 
 	if verbose_logging and not registered_scripts.is_empty():
 		print("dialogue runner: auto-discovered commands from %d scripts" % registered_scripts.size())
+
+
+func _register_project_commands() -> void:
+	# Autoload singletons are the idiomatic Godot home for global commands (the
+	# counterpart of Unity's static [YarnCommand] methods). Scan them first so a
+	# singleton method wins the name, and register each as a global command bound
+	# to the singleton - a singleton is unambiguous, so no target is needed and
+	# <<command args>> works directly.
+	var registered_scripts: Dictionary = {}
+	_scan_singletons_for_commands(registered_scripts)
+
+	for script in YarnActionDiscovery.get_action_scripts():
+		if registered_scripts.has(script):
+			continue
+		registered_scripts[script] = true
+		_register_script_actions(script)
 
 
 ## Registers _yarn_command_*/_yarn_function_* methods found on autoload
@@ -391,62 +497,81 @@ func _scan_singletons_for_commands(registered_scripts: Dictionary) -> void:
 			var method_name: String = method["name"]
 			if method_name.begins_with("_yarn_command_"):
 				var yarn_name := method_name.substr(14)
-				if not _library.has_command(yarn_name) and not _library.has_instance_command(yarn_name):
+				if _library.has_command(yarn_name) or _library.has_instance_command(yarn_name):
+					_report_duplicate_action("command", yarn_name, script)
+				else:
+					_action_sources["command:" + yarn_name] = script
 					_library.register_command(yarn_name, Callable(singleton, method_name))
 					if verbose_logging:
 						print("dialogue runner: registered global command '%s' on autoload '%s'" % [yarn_name, autoload_name])
 			elif method_name.begins_with("_yarn_function_"):
 				var yarn_name := method_name.substr(15)
-				if not _library.has_function(yarn_name):
-					var param_count: int = method.get("args", []).size()
-					_library.register_function(yarn_name, Callable(singleton, method_name), param_count)
+				if _library.has_function(yarn_name):
+					_report_duplicate_action("function", yarn_name, script)
+				else:
+					_action_sources["function:" + yarn_name] = script
+					_library.register_function(yarn_name, Callable(singleton, method_name))
 
 
 func _scan_node_for_commands(node: Node, registered_scripts: Dictionary) -> void:
 	var script := node.get_script() as Script
 	if script != null and not registered_scripts.has(script):
-		var methods := script.get_script_method_list()
-		var found_commands := false
-
-		for method in methods:
-			var method_name: String = method["name"]
-			var is_static: bool = (method.get("flags", 0) & METHOD_FLAG_STATIC) != 0
-
-			if method_name.begins_with("_yarn_command_"):
-				var yarn_name := method_name.substr(14)  # remove "_yarn_command_"
-
-				if not _library.has_command(yarn_name) and not _library.has_instance_command(yarn_name):
-					if is_static:
-						# Static commands are global — no target node needed.
-						# Call via the class directly: <<foo args>>
-						_library.register_command(yarn_name, Callable(node, method_name))
-					else:
-						# Instance commands resolve a target node at dispatch:
-						# <<foo targetNode args>>
-						_library.register_instance_command(yarn_name, script)
-
-					found_commands = true
-
-					if verbose_logging:
-						var script_class := _get_script_class_name(script)
-						var kind := "static command" if is_static else "instance command"
-						print("dialogue runner: auto-registered %s '%s' on %s" % [kind, yarn_name, script_class])
-
-			elif method_name.begins_with("_yarn_function_"):
-				var yarn_name := method_name.substr(15)  # remove "_yarn_function_"
-
-				if not _library.has_function(yarn_name):
-					var param_count: int = method.get("args", []).size()
-					_library.register_function(yarn_name, Callable(node, method_name), param_count)
-
-					if verbose_logging:
-						print("dialogue runner: auto-registered function '%s' from %s" % [yarn_name, node.name])
-
-		if found_commands:
+		if _register_script_actions(script):
 			registered_scripts[script] = true
 
 	for child in node.get_children():
 		_scan_node_for_commands(child, registered_scripts)
+
+
+func _register_script_actions(script: Script) -> bool:
+	var found_actions := false
+
+	for method in script.get_script_method_list():
+		var method_name: String = method["name"]
+		var is_static: bool = (method.get("flags", 0) & METHOD_FLAG_STATIC) != 0
+
+		if method_name.begins_with("_yarn_command_"):
+			var yarn_name := method_name.substr(14)  # remove "_yarn_command_"
+			found_actions = true
+
+			if _library.has_command(yarn_name) or _library.has_instance_command(yarn_name):
+				_report_duplicate_action("command", yarn_name, script)
+				continue
+
+			_action_sources["command:" + yarn_name] = script
+			if is_static:
+				# Static commands are global — no target node needed.
+				# Call via the class directly: <<foo args>>
+				_library.register_command(yarn_name, Callable(script, method_name))
+			else:
+				# Instance commands resolve a target node at dispatch:
+				# <<foo targetNode args>>
+				_library.register_instance_command(yarn_name, script)
+
+			if verbose_logging:
+				var script_class := _get_script_class_name(script)
+				var kind := "static command" if is_static else "instance command"
+				print("dialogue runner: auto-registered %s '%s' on %s" % [kind, yarn_name, script_class])
+
+		elif method_name.begins_with("_yarn_function_"):
+			var yarn_name := method_name.substr(15)  # remove "_yarn_function_"
+			found_actions = true
+
+			if _library.has_function(yarn_name):
+				_report_duplicate_action("function", yarn_name, script)
+				continue
+
+			if not is_static:
+				push_error("dialogue runner: function '%s' in %s must be static to be registered as a Yarn function" % [yarn_name, script.resource_path])
+				continue
+
+			_action_sources["function:" + yarn_name] = script
+			_library.register_function(yarn_name, Callable(script, method_name))
+
+			if verbose_logging:
+				print("dialogue runner: auto-registered function '%s' from %s" % [yarn_name, script.resource_path])
+
+	return found_actions
 
 
 func _get_script_class_name(script: Script) -> String:
@@ -463,16 +588,14 @@ func _load_program() -> void:
 	if yarn_project == null:
 		return
 
-	_vm.program = yarn_project.get_program()
-	_line_provider.set_program(_vm.program)
-	_library.set_program(_vm.program)
-	variable_storage.set_program(_vm.program)
+	var program := yarn_project.get_program()
+	_vm.program = program
+	_line_provider.set_program(program)
+	_library.set_program(program)
+	variable_storage.set_program(program)
 
 	if _smart_variable_evaluator != null:
-		_smart_variable_evaluator.set_program_context(_vm.program, _library)
-
-	if variable_storage.has_method("load_initial_values_from_program"):
-		variable_storage.load_initial_values_from_program(_vm.program)
+		_smart_variable_evaluator.set_program_context(program, _library)
 
 
 ## if dialogue is already running, it will be stopped first.
@@ -480,45 +603,79 @@ func start_dialogue(node_name: String = "") -> void:
 	if _is_starting:
 		push_warning("dialogue runner: start_dialogue called while already starting, ignoring")
 		return
-	_is_starting = true
 
 	if node_name.is_empty():
 		node_name = start_node
 
-	if _vm.program == null:
-		push_error("dialogue runner: no program loaded")
-		_is_starting = false
+	if yarn_project == null:
+		push_error("dialogue runner: can't start dialogue: no yarn project has been configured")
 		return
+
+	if _vm.program == null:
+		push_error("dialogue runner: can't start dialogue: the yarn project doesn't contain a valid program (possibly due to errors in the yarn scripts?)")
+		return
+
+	_is_starting = true
+
+	while _vm.is_continuing():
+		await (Engine.get_main_loop() as SceneTree).process_frame
 
 	if _is_running:
 		if verbose_logging:
 			print("dialogue runner: stopping existing dialogue before starting new one")
 		await stop_dialogue()
 
+	if not _vm.program.has_node(node_name):
+		push_error("dialogue runner: can't start dialogue: no node named '%s' has been loaded" % node_name)
+		_is_starting = false
+		return
+
 	_is_running = true
-	_is_starting = false
 	_run_id += 1
+	var run := _run_id
 	_content_complete_pending = false
+	_stop_requested = false
+	_completion_promise = YarnPromise.new()
+
+	if not _vm.set_node(node_name):
+		_is_running = false
+		_is_starting = false
+		_completion_promise.settle()
+		return
+
+	_apply_saliency_strategy()
+	_is_starting = false
+
+	if run != _run_id or not _is_running:
+		return
+
 	dialogue_started.emit()
 
-	# duplicate to prevent mutation during async iteration
-	var presenters_copy := _presenters.duplicate()
-	for presenter in presenters_copy:
-		if not _is_running:
-			return
-		await _safe_notify_presenter(presenter, "on_dialogue_started")
+	await _notify_presenters_together("on_dialogue_started")
 
-	if _is_running and _vm.set_node(node_name):
-		_continue_dialogue()
+	if run != _run_id or not _is_running:
+		return
+
+	_continue_dialogue()
 
 
 func stop_dialogue() -> void:
 	if not _is_running:
 		return
 
+	var completion := _completion_promise
+	_stop_requested = true
+	_cancel_current_content()
 	_vm.stop()
-	_clear_run_state()
-	await _finish_dialogue(true)
+	if completion != null:
+		await completion.wait()
+
+
+func _cancel_current_content() -> void:
+	if _current_line_token != null:
+		_current_line_token.request_next_content()
+	if _current_options_token != null:
+		_current_options_token.request_next_content()
 
 
 ## Reset per-run state without emitting any signals.
@@ -529,10 +686,10 @@ func _clear_run_state() -> void:
 	_waiting_for_content = false
 	_current_options.clear()
 	_current_selection = null
-
-	if _current_cancellation_token != null:
-		_current_cancellation_token.request_next_content()
-		_current_cancellation_token = null
+	_cancel_current_content()
+	_current_line_token = null
+	_current_options_token = null
+	_current_cancellation_token = null
 
 
 ## Shared tail for every non-teardown end of dialogue: presenters are
@@ -545,18 +702,38 @@ func _finish_dialogue(was_cancelled: bool) -> void:
 	# old run's completion signals are also skipped the new run's start
 	# has already fired, and emitting completed after it would invert order
 	var run := _run_id
-	var presenters_copy := _presenters.duplicate()
-	for presenter in presenters_copy:
-		if _run_id != run:
-			return
-		if is_instance_valid(presenter):
-			await _safe_notify_presenter(presenter, "on_dialogue_completed")
+	await _notify_presenters_together("on_dialogue_completed")
 	if _run_id != run:
 		return
 
 	if was_cancelled:
 		dialogue_cancelled.emit()
 	dialogue_completed.emit()
+
+
+func _notify_presenters_together(method: String) -> void:
+	var promises: Array[YarnPromise] = []
+	for presenter in _presenters.duplicate():
+		if not is_instance_valid(presenter):
+			continue
+		var promise := YarnPromise.new()
+		promises.append(promise)
+		_run_presenter_notification(presenter, method, promise)
+	for promise in promises:
+		await promise.wait()
+
+
+func _run_presenter_notification(presenter: Variant, method: String, promise: YarnPromise) -> void:
+	if not is_instance_valid(presenter):
+		promise.settle()
+		return
+	var on_exit := func() -> void:
+		promise.settle()
+	presenter.tree_exiting.connect(on_exit, CONNECT_ONE_SHOT)
+	await _safe_notify_presenter(presenter, method)
+	promise.settle()
+	if is_instance_valid(presenter) and presenter.tree_exiting.is_connected(on_exit):
+		presenter.tree_exiting.disconnect(on_exit)
 
 
 func is_running() -> bool:
@@ -605,10 +782,22 @@ func get_header_value(node_name: String, header_name: String) -> String:
 	return _vm.get_header_value(node_name, header_name)
 
 
+func has_header(node_name: String, header_name: String) -> bool:
+	if _vm == null:
+		return false
+	return _vm.has_header(node_name, header_name)
+
+
 func get_headers(node_name: String) -> Dictionary:
 	if _vm == null:
 		return {}
 	return _vm.get_headers(node_name)
+
+
+func get_all_headers(node_name: String) -> Array[Dictionary]:
+	if _vm == null:
+		return []
+	return _vm.get_all_headers(node_name)
 
 
 func get_string_id_for_node(node_name: String) -> String:
@@ -652,8 +841,6 @@ func get_smart_variable_evaluator() -> YarnSmartVariableEvaluator:
 	return _smart_variable_evaluator
 
 
-
-
 func get_line_provider() -> YarnLineProvider:
 	return _line_provider
 
@@ -673,35 +860,26 @@ func get_library() -> YarnLibrary:
 
 
 func add_function(func_name: String, callable: Callable, param_count: int = -1) -> void:
-	if func_name.is_empty():
-		push_error("dialogue runner: function name cannot be empty")
-		return
-	if not callable.is_valid():
-		push_error("dialogue runner: invalid callable for function '%s'" % func_name)
-		return
 	_library.register_function(func_name, callable, param_count)
 
 
 func remove_function(func_name: String) -> void:
-	if func_name.is_empty():
+	if not _library.has_function(func_name):
+		push_error("dialogue runner: cannot remove function %s: no function with that name exists in the library" % func_name)
 		return
 	_library.unregister_function(func_name)
 
 
 func add_command(command_name: String, callable: Callable) -> void:
-	if command_name.is_empty():
-		push_error("dialogue runner: command name cannot be empty")
-		return
-	if not callable.is_valid():
-		push_error("dialogue runner: invalid callable for command '%s'" % command_name)
-		return
 	_library.register_command(command_name, callable)
 
 
 func remove_command(command_name: String) -> void:
-	if command_name.is_empty():
+	if not _library.has_command(command_name) and not _library.has_instance_command(command_name):
+		push_error("dialogue runner: can't remove command %s, because no command with this name is currently registered" % command_name)
 		return
 	_library.unregister_command(command_name)
+	_library.unregister_instance_command(command_name)
 
 
 ## enables "target.method" syntax in yarn commands.
@@ -763,8 +941,8 @@ func signal_content_complete() -> void:
 	# cancellation token (e.g. SubtitlePresenter's
 	# `WaitUntilCanceled(token.NextContentToken)` pattern). Mirrors the Unity
 	# runner, which cancels NextContentToken when a line is signalled done.
-	if _current_cancellation_token != null:
-		_current_cancellation_token.request_next_content()
+	if _current_line_token != null:
+		_current_line_token.request_next_content()
 
 	if _content_complete_pending:
 		# Previous defer is queued; it will resume the VM. Don't queue another.
@@ -821,9 +999,9 @@ func _run_option_as_line(option: YarnOption) -> void:
 	line.line_id = option.line_id
 	line.raw_text = option.raw_text
 	line.substitutions = option.substitutions
-
-	if _line_provider != null:
-		_line_provider.get_localised_line(line)
+	line.metadata = option.metadata
+	line.locale_code = option.locale_code
+	line.set_markup_result(option.get_markup_result())
 
 	if verbose_logging:
 		print("dialogue runner: running selected option as line: %s" % line.get_plain_text())
@@ -831,15 +1009,17 @@ func _run_option_as_line(option: YarnOption) -> void:
 	var run := _run_id
 	_line_epoch += 1
 	_waiting_for_content = true
-	_current_cancellation_token = YarnCancellationToken.new()
-	var token := _current_cancellation_token
+	var token := YarnCancellationToken.new()
+	_current_line_token = token
+	_current_cancellation_token = token
+	_content_frame = Engine.get_process_frames()
 
 	# Mark ourselves as the source the presenters should route end-of-line
 	# requests through. Wrapper presenters (e.g. the Interruption add-on) may
 	# substitute themselves as the source before dispatching to children.
 	line.source = self
 
-	var promises := _start_line_presenters(line, run)
+	var promises := _start_line_presenters(line, run, token)
 
 	for promise in promises:
 		if run != _run_id:
@@ -855,6 +1035,8 @@ func _run_option_as_line(option: YarnOption) -> void:
 	# _continue_dialogue_safe bails forever and the dialogue hangs.
 	_waiting_for_content = false
 	token.request_next_content()
+	if _current_line_token == token:
+		_current_line_token = null
 
 
 func get_locale() -> String:
@@ -905,16 +1087,100 @@ func get_localisation_debug_info() -> String:
 ## Asks the current content to hurry (skip animation, keep it on screen).
 ## Delivered through the cancellation token, which presenters watch.
 func request_hurry_up() -> void:
-	if _current_cancellation_token != null:
-		_current_cancellation_token.request_hurry_up()
+	if _current_line_token != null:
+		_current_line_token.request_hurry_up()
 
 
 ## Asks the current content to finish and advance. Delivered through the
 ## cancellation token: presenters watching it dismiss their content and
 ## return, and the runner advances once all of them have returned.
 func request_next_content() -> void:
-	if _current_cancellation_token != null:
-		_current_cancellation_token.request_next_content()
+	if _current_line_token != null:
+		_current_line_token.request_next_content()
+
+
+func request_next_line() -> void:
+	request_next_content()
+
+
+func request_hurry_up_option() -> void:
+	if _current_options_token != null:
+		_current_options_token.request_hurry_up()
+
+
+func save_state_to_persistent_storage(save_file_name: String) -> bool:
+	if variable_storage == null:
+		push_error("dialogue runner: can't save variables: variable storage is not set")
+		return false
+
+	var typed := variable_storage.get_all_variables_typed()
+	var floats: Dictionary = typed.get("floats", {})
+	var strings: Dictionary = typed.get("strings", {})
+	var bools: Dictionary = typed.get("bools", {})
+	var data := {
+		"floatKeys": floats.keys(),
+		"floatValues": floats.values(),
+		"stringKeys": strings.keys(),
+		"stringValues": strings.values(),
+		"boolKeys": bools.keys(),
+		"boolValues": bools.values(),
+	}
+
+	var path := "user://".path_join(save_file_name)
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		push_error("dialogue runner: failed to save state to %s: %s" % [path, error_string(FileAccess.get_open_error())])
+		return false
+	file.store_string(JSON.stringify(data, "    "))
+	file.close()
+	return true
+
+
+func load_state_from_persistent_storage(save_file_name: String) -> bool:
+	if variable_storage == null:
+		push_warning("dialogue runner: can't load state from persistent storage: variable storage is not set")
+		return false
+
+	var path := "user://".path_join(save_file_name)
+	if not FileAccess.file_exists(path):
+		push_error("dialogue runner: failed to load save state at %s: the file does not exist" % path)
+		return false
+
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not parsed is Dictionary:
+		push_error("dialogue runner: failed to load save state at %s: the file is not valid JSON" % path)
+		return false
+
+	var data: Dictionary = parsed
+	var sections := [
+		["floatKeys", "floatValues", "numeric"],
+		["stringKeys", "stringValues", "string"],
+		["boolKeys", "boolValues", "boolean"],
+	]
+	var results: Array[Dictionary] = []
+	for section in sections:
+		var keys: Variant = data.get(section[0])
+		var values: Variant = data.get(section[1])
+		if not keys is Array or not values is Array:
+			push_error("dialogue runner: failed to load save state at %s: provided JSON string was not able to extract %s variables" % [path, section[2]])
+			return false
+		if (keys as Array).size() != (values as Array).size():
+			push_error("dialogue runner: failed to load save state at %s: number of keys and values of %s variables does not match" % [path, section[2]])
+			return false
+		var entries := {}
+		for i in range((keys as Array).size()):
+			entries[String(keys[i])] = values[i]
+		results.append(entries)
+
+	for key in results[0]:
+		results[0][key] = float(results[0][key])
+	for key in results[1]:
+		results[1][key] = String(results[1][key])
+	for key in results[2]:
+		results[2][key] = bool(results[2][key])
+
+	variable_storage.set_all_variables_typed(results[0], results[1], results[2], true)
+	return true
 
 
 func _continue_dialogue() -> void:
@@ -957,18 +1223,23 @@ func _on_line(line: YarnLine) -> void:
 	_current_line = line
 
 	if _line_provider != null:
-		_line_provider.get_localised_line(line)
+		var requested_id := line.line_id
+		if not _line_provider.get_localised_line(line):
+			push_error("dialogue runner: failed to get a localised line for %s!" % requested_id)
 
 	_waiting_for_content = true
 
-	_current_cancellation_token = YarnCancellationToken.new()
+	var token := YarnCancellationToken.new()
+	_current_line_token = token
+	_current_cancellation_token = token
+	_content_frame = Engine.get_process_frames()
 
 	# Mark ourselves as the source the presenters should route end-of-line
 	# requests through. Wrapper presenters (e.g. the Interruption add-on) may
 	# substitute themselves as the source before dispatching to children.
 	line.source = self
 
-	var promises := _start_line_presenters(line, run)
+	var promises := _start_line_presenters(line, run, token)
 
 	for promise in promises:
 		if run != _run_id:
@@ -976,6 +1247,9 @@ func _on_line(line: YarnLine) -> void:
 		await promise.wait()
 		if run != _run_id:
 			return
+
+	if _current_line_token == token:
+		_current_line_token = null
 
 	# Only the join for the current content may resume the VM if user code
 	# force-advanced mid-line via signal_content_complete, this join is
@@ -988,10 +1262,7 @@ func _on_line(line: YarnLine) -> void:
 ## coroutine per presenter, all launched in the same same frame and returns one
 ## promise per presenter, settled when that presenter has fully finished the
 ## line. Also arms the warn-only stall watchdog for the batch!
-func _start_line_presenters(line: YarnLine, run: int) -> Array[YarnPromise]:
-	# Capture the token before starting anyone: a presenter that stops the
-	# dialogue synchronously inside run_line nulls _current_cancellation_token.
-	var token := _current_cancellation_token
+func _start_line_presenters(line: YarnLine, run: int, token: YarnCancellationToken) -> Array[YarnPromise]:
 	var promises: Array[YarnPromise] = []
 	# Freed presenters must be skipped before the call: the wrapper's typed
 	# parameter rejects a freed object outright, which would abort the call
@@ -1001,7 +1272,7 @@ func _start_line_presenters(line: YarnLine, run: int) -> Array[YarnPromise]:
 	for presenter in _presenters.duplicate():
 		if run != _run_id:
 			break
-		if not is_instance_valid(presenter):
+		if not is_instance_valid(presenter) or _is_presenter_disabled(presenter):
 			continue
 		var promise := YarnPromise.new()
 		promises.append(promise)
@@ -1009,6 +1280,10 @@ func _start_line_presenters(line: YarnLine, run: int) -> Array[YarnPromise]:
 		_run_presenter_line(presenter, line, token, promise)
 	_watch_presentation_stall(token, started, promises, "line")
 	return promises
+
+
+func _is_presenter_disabled(presenter: Node) -> bool:
+	return presenter.process_mode == Node.PROCESS_MODE_DISABLED
 
 
 ## Runs one presenter's run_line and settles its promise when the presenter
@@ -1080,11 +1355,16 @@ func _on_options(options: Array[YarnOption]) -> void:
 	_current_options = options
 
 	if _line_provider != null:
-		for option in options:
-			_line_provider.get_localised_option(option)
+		for i in range(options.size()):
+			var option := options[i]
+			if not _line_provider.get_localised_option(option):
+				push_error("dialogue runner: failed to get a localised line for line %s (option %d)!" % [option.line_id, i + 1])
+			option.source = self
 
-	_current_cancellation_token = YarnCancellationToken.new()
-	var token := _current_cancellation_token
+	var token := YarnCancellationToken.new()
+	_current_options_token = token
+	_current_cancellation_token = token
+	_content_frame = Engine.get_process_frames()
 	var presenters_copy := _presenters.duplicate()
 
 	# The first presenter to produce a valid selection settles this promise
@@ -1094,11 +1374,10 @@ func _on_options(options: Array[YarnOption]) -> void:
 	_current_selection = selection
 	var done_promises: Array[YarnPromise] = []
 
-	# The timeout lambda must not write to a local (GDScript lambdas capture
-	# primitives by value) the token's latched flag doubles as the record
-	# that a wind-down fired before any selection...
+	var timed_out := [false]
 	if option_timeout > 0.0:
 		_start_option_timeout(option_timeout, func():
+			timed_out[0] = true
 			token.request_next_content()
 			selection.settle(-1))
 
@@ -1122,6 +1401,8 @@ func _on_options(options: Array[YarnOption]) -> void:
 	if run != _run_id or not _is_running:
 		return
 	_current_selection = null
+	if _current_options_token == token:
+		_current_options_token = null
 
 	var selected_option_index := -1
 	if selected_value is int:
@@ -1134,8 +1415,7 @@ func _on_options(options: Array[YarnOption]) -> void:
 		await _apply_selected_option(selected_option_index)
 		return
 
-	if allow_option_fallthrough or token.is_next_content_requested:
-		push_warning("dialogue runner: no presenter handled options, using fallthrough")
+	if allow_option_fallthrough or timed_out[0]:
 		token.request_next_content()
 		_vm.set_selected_option(YarnVirtualMachine.NO_OPTION_SELECTED)
 		_current_options.clear()
@@ -1212,39 +1492,38 @@ func _on_command(command_text: String) -> void:
 	# Awaited: coroutine command handlers (like the built-in <<wait>>) run
 	# to completion inside dispatch. The epoch captured above guards the
 	# completion below against content that advanced past us meanwhile.
-	var result := await _library.dispatch_command(command_text, self)
+	var result := await _dispatch_command_with_discovery(command_text)
 
-	if not result.handled:
+	if result.status == YarnLibrary.CommandDispatchStatus.NOT_FOUND:
 		if await _handle_builtin_command(command_text):
 			if run == _run_id and epoch == _line_epoch:
 				signal_content_complete()
 			return
 
-		# Emit the unhandled command signal. Matching Unity behaviour:
-		# dialogue does NOT auto-continue. The signal handler is responsible
-		# for calling signal_content_complete() when ready to proceed.
-		# If no handler is connected, log an error and continue to avoid
-		# silently hanging.
 		if command_unhandled.get_connections().size() > 0:
 			command_unhandled.emit(command_text)
 			return
-		else:
-			if not result.error.is_empty():
-				# A command name matched but dispatch failed (e.g. an instance
-				# command whose target node wasn't found). Surface why, plus the
-				# fix, instead of a generic "no handler".
-				push_error(("yarn spinner: command '%s' could not run: %s. If this is a " +
-					"_yarn_command_ on a Node it is an instance command, so its first argument " +
-					"must be a target node name (<<cmd TargetNode args>>). For a global command, " +
-					"make the method static or register it with runner.add_command(). " +
-					"Dialogue will continue.") % [command_text, result.error])
-			else:
-				push_error(("yarn spinner: no handler for command '%s'. It is not registered at " +
-					"runtime - attach its script to a node under the DialogueRunner's discovery " +
-					"root, make it static, or register it with runner.add_command(). A valid " +
-					".ysls.json does not register it. Dialogue will continue.") % command_text)
+
+		push_error(("yarn spinner: no command \"%s\" was found. It is not registered at " +
+			"runtime - attach its script to a node under the DialogueRunner's discovery " +
+			"root, make it static, or register it with runner.add_command(). A valid " +
+			".ysls.json does not register it. Dialogue will continue.") % (_parsed[0] if not _parsed.is_empty() else command_text))
+		if run == _run_id and epoch == _line_epoch:
 			signal_content_complete()
-			return
+		return
+
+	if not result.handled:
+		match result.status:
+			YarnLibrary.CommandDispatchStatus.TARGET_NOT_FOUND, YarnLibrary.CommandDispatchStatus.TARGET_MISSING_COMPONENT:
+				push_error(("yarn spinner: can't call command <<%s>>: %s. A _yarn_command_ on a " +
+					"non-static method is an instance command, so its first argument must be a " +
+					"target node name (<<cmd TargetNode args>>). For a global command, make the " +
+					"method static or register it with runner.add_command().") % [command_text, result.error])
+			_:
+				push_error("yarn spinner: can't call command <<%s>>: %s" % [command_text, result.error])
+		if run == _run_id and epoch == _line_epoch:
+			signal_content_complete()
+		return
 
 	if result.is_async:
 		var async_result: Variant = result.result
@@ -1285,7 +1564,8 @@ func _on_node_start(node_name: String) -> void:
 
 	var presenters_copy := _presenters.duplicate()
 	for presenter in presenters_copy:
-		_safe_call_presenter(presenter, "on_node_started", [node_name])
+		if is_instance_valid(presenter) and not _is_presenter_disabled(presenter):
+			_safe_call_presenter(presenter, "on_node_started", [node_name])
 
 
 func _on_node_complete(node_name: String) -> void:
@@ -1293,20 +1573,33 @@ func _on_node_complete(node_name: String) -> void:
 
 	var presenters_copy := _presenters.duplicate()
 	for presenter in presenters_copy:
-		_safe_call_presenter(presenter, "on_node_completed", [node_name])
+		if is_instance_valid(presenter) and not _is_presenter_disabled(presenter):
+			_safe_call_presenter(presenter, "on_node_completed", [node_name])
 
 
 func _on_dialogue_complete() -> void:
-	_is_running = false
+	if not _is_running:
+		return
 	# A VM error ends the run to avoid a soft-lock (GDScript has no
 	# exceptions to surface it), but it isn't a natural finish — flag it
 	# as cancelled so listeners can tell the difference.
-	await _finish_dialogue(_vm != null and _vm.has_error())
+	var was_cancelled := _stop_requested or (_vm != null and _vm.has_error())
+	var completion := _completion_promise
+	_clear_run_state()
+	await _finish_dialogue(was_cancelled)
+	if completion != null:
+		completion.settle()
 
 
 func _on_prepare_for_lines(line_ids: PackedStringArray) -> void:
+	if _line_provider != null:
+		_line_provider.prepare_for_lines(line_ids)
+
 	if _asset_provider != null:
-		_asset_provider.preload_assets(line_ids)
+		var resolved := PackedStringArray()
+		for line_id in line_ids:
+			resolved.append(_line_provider.resolve_source_line_id(line_id) if _line_provider != null else line_id)
+		_asset_provider.preload_assets(resolved)
 
 	var presenters_copy := _presenters.duplicate()
 	for presenter in presenters_copy:
@@ -1375,7 +1668,8 @@ func get_current_options_as_array() -> Array:
 
 
 func _register_builtin_commands() -> void:
-	_library.register_command("wait", _cmd_wait)
+	if not _library.has_command("wait"):
+		_library.register_command("wait", _cmd_wait)
 
 
 func _register_global_commands() -> void:
@@ -1402,9 +1696,7 @@ func _register_global_commands() -> void:
 				_library.register_function(func_name, info.get("callable"), info.get("param_count", -1))
 
 
-func _cmd_wait(duration: float = 1.0) -> void:
-	# The library coerces <<wait 2>>'s string argument to this float from
-	# the declared parameter type — commands take real types, not strings.
+func _cmd_wait(duration: float) -> void:
 	# Pause-respecting <<wait>> must not keep elapsing under a pause menu lol
 	# Fixed this thanks to Leonardo.
 	await YarnAsync.wait(self, duration)

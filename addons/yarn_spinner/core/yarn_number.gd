@@ -31,6 +31,22 @@ static func to_f32(v: float) -> float:
 	return arr[0]
 
 
+static func round_half_to_even(v: float) -> float:
+	var floored := floorf(v)
+	var diff := v - floored
+	if diff > 0.5:
+		return floored + 1.0
+	if diff < 0.5:
+		return floored
+	if fmod(floored, 2.0) == 0.0:
+		return floored
+	return floored + 1.0
+
+
+static func to_int32(v: float) -> int:
+	return int(round_half_to_even(v))
+
+
 ## Formats a number for dialogue display: the shortest
 ## decimal that round-trips back to the same float32 value, in plain
 ## decimal notation for magnitudes in [0.0001, 1e9), scientific otherwise.

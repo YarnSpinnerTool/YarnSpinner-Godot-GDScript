@@ -68,3 +68,13 @@ func has_node(node_name: String) -> bool:
 	return program.has_node(node_name)
 
 
+func get_line_ids_for_nodes(node_names: PackedStringArray) -> PackedStringArray:
+	var ids := PackedStringArray()
+	var program := get_program()
+	if program == null:
+		return ids
+	for node_name in node_names:
+		ids.append_array(program.get_line_ids_for_node(node_name))
+	return ids
+
+

@@ -43,7 +43,6 @@ func process_open(attribute_value: String, properties: Dictionary) -> String:
 		"code":
 			return "[code]"
 		_:
-			push_warning("yarn markup: unknown style '%s'" % style)
 			return ""
 
 

@@ -1,0 +1,9 @@
+id,text,file,node,lineNumber
+line:53e5dec3,Start of the node,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours-MayDetourToThemselves.yarn,Start,4
+line:c5d5d9b4,Stay here,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours-MayDetourToThemselves.yarn,Start,6
+line:7f84d02d,Go elsewhere,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours-MayDetourToThemselves.yarn,Start,7
+line:e9b4d75a,Exit,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours-MayDetourToThemselves.yarn,Start,9
+line:4a21b3c4,End of the node,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours-MayDetourToThemselves.yarn,Start,12
+line:3a850f70,Line from elsewhere,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours-MayDetourToThemselves.yarn,Elsewhere,21
+line:80d406e9,Stay here,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours-MayDetourToThemselves.yarn,Elsewhere,23
+line:16e4019e,Return,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Detours-MayDetourToThemselves.yarn,Elsewhere,24

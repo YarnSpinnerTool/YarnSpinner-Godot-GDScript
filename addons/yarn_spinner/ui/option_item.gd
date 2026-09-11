@@ -25,13 +25,15 @@ signal option_selected(option_index: int)
 
 @export var button: Button
 ## optional; falls back to button text
-@export var text_label: Label
+@export var text_label: Control
 @export var unavailable_indicator: Control
 @export var show_when_unavailable: bool = true
+@export var disabled_strike_through: bool = true
 
 var option: YarnOption
 var option_index: int = -1
 var is_available: bool = true
+var _has_submitted_selection: bool = false
 
 
 func _ready() -> void:
@@ -60,19 +62,30 @@ func setup(yarn_option: YarnOption, index: int) -> void:
 	option = yarn_option
 	option_index = index
 	is_available = yarn_option.is_available
+	_has_submitted_selection = false
 
 	# Names are stripped from option text, the same as Yarn Spinner for
 	# Unity's option items.
-	var display_text := yarn_option.text_without_character_name
+	var display_text := YarnMarkupParser.strip_bbcode_tags(yarn_option.text_without_character_name)
 	if display_text.is_empty():
 		display_text = yarn_option.raw_text
-	if text_label != null:
-		text_label.text = display_text
-	if button != null:
-		button.text = display_text
+	_apply_text(display_text)
 
 	_update_availability_visual()
 	visible = true
+
+
+func _apply_text(display_text: String) -> void:
+	if text_label is RichTextLabel:
+		var rich := text_label as RichTextLabel
+		var escaped := YarnMarkupParser.escape_text(display_text)
+		if disabled_strike_through and not is_available:
+			escaped = "[s]%s[/s]" % escaped
+		rich.text = escaped
+	elif text_label != null and "text" in text_label:
+		text_label.set("text", display_text)
+	if button != null:
+		button.text = display_text
 
 
 func _update_availability_visual() -> void:
@@ -96,9 +109,12 @@ func reset() -> void:
 	option_index = -1
 	is_available = true
 	visible = false
+	_has_submitted_selection = false
 
-	if text_label != null:
-		text_label.text = ""
+	if text_label is RichTextLabel:
+		(text_label as RichTextLabel).text = ""
+	elif text_label != null and "text" in text_label:
+		text_label.set("text", "")
 	if button != null:
 		button.text = ""
 		button.disabled = false
@@ -112,9 +128,19 @@ func grab_focus_if_available() -> void:
 		button.grab_focus()
 
 
+func is_highlighted() -> bool:
+	return button != null and button.has_focus()
+
+
+func invoke_option_selected() -> void:
+	if not is_available or _has_submitted_selection:
+		return
+	_has_submitted_selection = true
+	option_selected.emit(option_index)
+
+
 func _on_button_pressed() -> void:
-	if is_available:
-		option_selected.emit(option_index)
+	invoke_option_selected()
 
 
 func get_button() -> Button:
@@ -122,7 +148,9 @@ func get_button() -> Button:
 
 
 func set_text(text: String) -> void:
-	if text_label != null:
-		text_label.text = text
+	if text_label is RichTextLabel:
+		(text_label as RichTextLabel).text = YarnMarkupParser.escape_text(text)
+	elif text_label != null and "text" in text_label:
+		text_label.set("text", text)
 	if button != null:
 		button.text = text

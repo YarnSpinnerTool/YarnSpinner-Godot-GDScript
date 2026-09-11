@@ -1,0 +1,15 @@
+id,text,file,node,lineNumber
+line:f34fcb30,Start of test,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,TestCaseDetours,19
+line:657fcc47,Returned from detoured node group 1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,TestCaseDetours,21
+line:df2ec5de,Returned from detoured node group 2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,TestCaseDetours,23
+line:f02fbd5a,Node group option 1 (A),/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,NodeGroup,29
+line:53bad9c4,Node group option 2 (always),/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,NodeGroup,34
+line:c58adeb3,Node group option 3 (not A),/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,NodeGroup,39
+line:7fdbd72a,Node group option 4 (B),/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,NodeGroup,44
+line:e9ebd05d,Node group option 5 (once),/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,NodeGroup,49
+line:78f66fcd,Node group option 6 (once if B),/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,NodeGroup,54
+line:ef284302,Error: Node should not run,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,UnRunnableNodegroup,60
+line:e8e9b50c,Error: Node should not run,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,UnRunnableNodegroup,66
+line:c7b72d45,Detour test 1,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,DetourNode,72
+line:7de624dc,Detour test 2,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,DetourNode,78
+line:6882d605,TestCaseFunctionConditions,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/NodeGroups.yarn,TestCaseFunctionConditions,83

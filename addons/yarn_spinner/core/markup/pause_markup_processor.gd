@@ -27,9 +27,19 @@ const DEFAULT_PAUSE_DURATION_MS := 1000.0
 
 ## character position -> pause duration in milliseconds.
 var _pauses: Dictionary[int, float] = {}
+var _active_waits: Array[YarnPromise] = []
+var _wait_connections: Dictionary[YarnPromise, Array] = {}
 
 
 func on_prepare_for_line(line: Variant, text_control: Control = null) -> void:
+	_collect_pauses(line)
+
+
+func on_line_display_begin(line: Variant, text_control: Control = null) -> void:
+	_collect_pauses(line)
+
+
+func _collect_pauses(line: Variant) -> void:
 	_pauses.clear()
 
 	var attributes: Array = []
@@ -50,26 +60,47 @@ func on_prepare_for_line(line: Variant, text_control: Control = null) -> void:
 						duration_ms = pause_prop.float_value * 1000.0
 					_:
 						push_warning("pause attribute has invalid type, using default duration")
-			_pauses[attr.position] = duration_ms
+			if not _pauses.has(attr.position):
+				_pauses[attr.position] = duration_ms
 
 
-func on_line_display_begin(line: Variant, text_control: Control = null) -> void:
-	pass
-
-
-## returns a timer signal if there is a pause at this character position.
+## returns a signal if there is a pause at this character position.
 func on_character_will_appear(
 	character_index: int,
 	line: Variant,
 	cancellation_token: Variant = null
 ) -> Signal:
-	if _pauses.has(character_index):
-		var duration_sec := _pauses[character_index] / 1000.0
-		var tree := Engine.get_main_loop() as SceneTree
-		if tree != null:
-			return tree.create_timer(duration_sec).timeout
+	if not _pauses.has(character_index):
+		return Signal()
 
-	return Signal()
+	if cancellation_token is YarnCancellationToken and cancellation_token.is_hurry_up_requested:
+		return Signal()
+
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return Signal()
+
+	var wait := YarnPromise.new()
+	_active_waits.append(wait)
+	var finish := _finish_wait.bind(wait)
+	var timer := tree.create_timer(_pauses[character_index] / 1000.0, false)
+	timer.timeout.connect(finish, CONNECT_ONE_SHOT)
+	if cancellation_token is YarnCancellationToken:
+		cancellation_token.hurry_up_requested.connect(finish, CONNECT_ONE_SHOT)
+		_wait_connections[wait] = [cancellation_token, finish]
+	return wait.completed
+
+
+func _finish_wait(wait: YarnPromise) -> void:
+	_active_waits.erase(wait)
+	var connection: Array = _wait_connections.get(wait, [])
+	_wait_connections.erase(wait)
+	if connection.size() == 2:
+		var token: YarnCancellationToken = connection[0]
+		var finish: Callable = connection[1]
+		if token.hurry_up_requested.is_connected(finish):
+			token.hurry_up_requested.disconnect(finish)
+	wait.settle()
 
 
 func on_line_display_complete() -> void:
@@ -78,6 +109,8 @@ func on_line_display_complete() -> void:
 
 func on_line_will_dismiss() -> void:
 	_pauses.clear()
+
+
 func has_pause_at(position: int) -> bool:
 	return _pauses.has(position)
 
@@ -89,5 +122,7 @@ func get_pause_duration_ms(position: int) -> float:
 ## returns the pause duration at a position in seconds.
 func get_pause_duration(position: int) -> float:
 	return _pauses.get(position, 0.0) / 1000.0
+
+
 func get_all_pauses() -> Dictionary:
 	return _pauses.duplicate()

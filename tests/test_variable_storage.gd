@@ -109,23 +109,21 @@ func test_variable_changed_signal():
 	assert_eq(received[0][1], 42)
 
 
-func test_variable_changed_not_emitted_for_same_value():
+func test_variable_changed_emitted_for_same_value():
 	_storage.set_value("$x", 42)
 	var received := []
 	_storage.variable_changed.connect(func(_name, _val): received.append([_name, _val]))
 	_storage.set_value("$x", 42)
-	assert_eq(received.size(), 0, "Should not emit when value unchanged")
+	assert_eq(received.size(), 1)
 
 
-func test_validate_variable_names_warns_no_dollar():
-	_storage.validate_variable_names = true
+func test_validate_variable_names_rejects_no_dollar():
 	_storage.set_value("no_dollar", "value")
-	assert_true(_storage.contains("no_dollar"))
-	assert_push_warning_count(1)
+	assert_false(_storage.contains("no_dollar"))
+	assert_push_error_count(1)
 
 
 func test_validate_rejects_empty_name():
-	_storage.validate_variable_names = true
 	_storage.set_value("", "value")
 	assert_false(_storage.contains(""))
 	assert_push_error_count(1)
@@ -133,6 +131,9 @@ func test_validate_rejects_empty_name():
 
 func test_debug_list_format():
 	_storage.set_value("$hp", 100)
+	_storage.set_value("$alive", true)
+	_storage.set_value("$name", "Hero")
 	var debug := _storage.get_debug_list()
-	assert_true(debug.contains("$hp"))
-	assert_true(debug.contains("100"))
+	assert_true(debug.contains("$hp = 100 (Single)\n"))
+	assert_true(debug.contains("$alive = True (Boolean)\n"))
+	assert_true(debug.contains("$name = Hero (String)\n"))

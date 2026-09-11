@@ -1,0 +1,16 @@
+id,text,file,node,lineNumber
+line:b24b4f10,zero indent if with equal line,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,7
+line:247b4867,zero indent if with one indent line,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,12
+line:9e2a41fe,zero indent if with two indent line,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,17
+line:081a4689,one indent if with equal indent line,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,22
+line:ab8f2217,zero indent line,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,26
+line:3dbf2560,one indent if with two indent line,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,28
+line:87ee2cf9,zero indent line,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,32
+line:11de2b8e,one indent line,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,33
+line:80c3941e,one indent if with zero indent line and endif,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,37
+line:16f39369,zero indent if with one indent line and endif,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,42
+line:8b73bfc8,zero indent if and line with one indent,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,47
+line:1d43b8bf,one indent if and endif with zero indent line,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,52
+line:a712b126,option with subline,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,55
+line:3122b651,subline,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,56
+line:92b7d2cf,option below blank line,/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/Indentation.yarn,Start,58

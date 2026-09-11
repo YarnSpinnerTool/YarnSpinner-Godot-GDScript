@@ -47,92 +47,83 @@ var metadata: PackedStringArray = PackedStringArray()
 ## BCP-47 locale for [plural] and [ordinal] rules. Set by the line provider.
 var locale_code: String = "en"
 
+var source: Object = null
+
+var markup_result: YarnMarkupParseResult = null
+
+var markup_attributes: Array[YarnMarkupAttribute] = []
+
 
 # ---------------------------------------------------------------------------
 # Lazy-computed text
 # ---------------------------------------------------------------------------
 
-var _text_computed: bool = false
-var _text: String = ""
+var _text_override: String = ""
+var _has_text_override: bool = false
 
 ## Final text after substitution and markup processing (select, plural,
 ## and ordinal markers resolve here, the same as [member YarnLine.text]).
 ## Computed lazily on first access.
 var text: String:
 	get:
-		if not _text_computed:
-			_text_computed = true
-			_text = YarnLineParser.expand_substitutions(raw_text, substitutions)
-			_ensure_parser_initialized()
-			var result := _name_parser.parse_string(_text, locale_code, true)
-			_text = result.text
-		return _text
+		if _has_text_override:
+			return _text_override
+		_ensure_processed()
+		return markup_result.text
 	set(value):
-		_text = value
-		_text_computed = true
+		_text_override = value
+		_has_text_override = true
 
 
 ## Substitutions are now applied automatically on first access to
 ## [member text]. This method triggers processing early if needed.
 func apply_substitutions() -> void:
-	var _t := text  # triggers lazy computation
+	_ensure_processed()
 
 
-static var _name_parser: YarnLineParser
+func _ensure_processed() -> void:
+	if markup_result != null:
+		return
+	set_markup_result(YarnLineParser.create_with_builtin_replacers().parse_string(YarnLineParser.expand_substitutions(raw_text, substitutions), locale_code, true))
 
 
-static func _ensure_parser_initialized() -> void:
-	if _name_parser == null:
-		_name_parser = YarnLineParser.new()
-		var builtin_replacer := YarnBuiltInMarkupReplacer.new()
-		_name_parser.register_marker_processor("select", builtin_replacer)
-		_name_parser.register_marker_processor("plural", builtin_replacer)
-		_name_parser.register_marker_processor("ordinal", builtin_replacer)
+func set_markup_result(result: YarnMarkupParseResult) -> void:
+	markup_result = result
+	markup_attributes.clear()
+	if result != null:
+		markup_attributes.assign(result.attributes)
 
-var _name_split_done: bool = false
-var _character_name: String = ""
-var _text_without_name: String = ""
+
+func get_markup_result() -> YarnMarkupParseResult:
+	_ensure_processed()
+	return markup_result
+
+
+func get_markup_result_without_character_name() -> YarnMarkupParseResult:
+	_ensure_processed()
+	return markup_result.without_character_name()
+
+
+func try_get_attribute(attr_name: String) -> YarnMarkupAttribute:
+	_ensure_processed()
+	return markup_result.try_get_attribute_with_name(attr_name)
+
 
 ## Character name from the option's "Name:" prefix, if it has one.
 var character_name: String:
 	get:
-		_ensure_name_split()
-		return _character_name
+		_ensure_processed()
+		return markup_result.get_character_name()
 
 ## The option text with any character name prefix removed and markup
 ## processed, matching [member YarnLine.text_without_character_name].
 var text_without_character_name: String:
 	get:
-		_ensure_name_split()
-		return _text_without_name
-
-
-func _ensure_name_split() -> void:
-	if _name_split_done:
-		return
-	_name_split_done = true
-
-	_ensure_parser_initialized()
-	var result := _name_parser.parse_string(text, locale_code, true)
-	_text_without_name = result.text
-
-	for attr in result.attributes:
-		if attr.name == YarnLineParser.CHARACTER_ATTRIBUTE:
-			var name_prop: YarnMarkupValue = attr.try_get_property(YarnLineParser.CHARACTER_ATTRIBUTE_NAME_PROPERTY)
-			if name_prop != null:
-				_character_name = name_prop.string_value
-			else:
-				_character_name = result.text.substr(attr.position, attr.length).strip_edges().trim_suffix(":")
-			if attr.length > 0:
-				result = result.delete_range(attr)
-				_text_without_name = result.text
-			break
+		if _has_text_override:
+			return _text_override
+		return get_markup_result_without_character_name().text
 
 
 ## Returns the option text with markup tags stripped.
 func get_plain_text() -> String:
-	var plain := text
-	var markup_regex := RegEx.new()
-	markup_regex.compile("\\[[^\\]]+\\]")
-	plain = markup_regex.sub(plain, "", true)
-	return plain
+	return YarnMarkupParser.strip_bbcode_tags(text)

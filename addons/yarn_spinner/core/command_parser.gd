@@ -21,8 +21,13 @@ extends RefCounted
 ## Parses Yarn command strings with support for quoted arguments and escapes.
 
 
-## Whitespace characters that separate unquoted tokens in yarn command text.
-const _WHITESPACE := [" ", "\t", "\n", "\r"]
+static func _is_whitespace(character: String) -> bool:
+	var code := character.unicode_at(0)
+	if code >= 0x09 and code <= 0x0D:
+		return true
+	if code >= 0x2000 and code <= 0x200A:
+		return true
+	return code in [0x20, 0x85, 0xA0, 0x1680, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000]
 
 
 ## Returns [command_name, arg1, arg2, ...].
@@ -41,7 +46,7 @@ static func parse(command_text: String) -> Array[String]:
 	while i < length:
 		var c := command_text[i]
 
-		if c in _WHITESPACE:
+		if _is_whitespace(c):
 			if not current.is_empty():
 				parts.append(current)
 				current = ""

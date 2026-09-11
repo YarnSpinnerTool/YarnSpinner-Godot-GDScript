@@ -1,0 +1,17 @@
+id,text,file,node,lineNumber
+line:06e480b6,"Select: [select value={0} male=""male"" female=""female"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,11
+line:90d487c1,"Select: [select value={0} male=""male"" female=""female"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,14
+line:2a858e58,"Select: [select value={0} male=""male"" female=""female"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,17
+line:bcb5892f,"Plural: [plural value={0} one=""one"" two=""two"" few=""few"" many=""many"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,21
+line:1f20edb1,"Plural: [plural value={0} one=""one"" two=""two"" few=""few"" many=""many"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,24
+line:8910eac6,"Plural: [plural value={0} one=""one"" two=""two"" few=""few"" many=""many"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,27
+line:3341e35f,"Plural: [plural value={0} one=""one"" two=""two"" few=""few"" many=""many"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,30
+line:a571e428,"Ordinal: [ordinal value={0} one=""one"" two=""two"" few=""few"" many=""many"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,34
+line:346c5bb8,"Ordinal: [ordinal value={0} one=""one"" two=""two"" few=""few"" many=""many"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,37
+line:a25c5ccf,"Ordinal: [ordinal value={0} one=""one"" two=""two"" few=""few"" many=""many"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,40
+line:b1cb1504,"Ordinal: [ordinal value={0} one=""one"" two=""two"" few=""few"" many=""many"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,43
+line:27fb1273,"[select value={0} male=""male\: %"" female=""female\: %"" other=""other\: %""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,50
+line:9daa1bea,"Mae: Wow, I came [ordinal value={0} one=""%st"" two=""%nd"" few=""%rd"" other=""%th""/]!",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,53
+line:0b9a1c9d,"[select value={0} male=""male"" female=""female"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,57
+line:a80f7803,"[plural value={0} one=""one"" few=""few"" many=""many"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,58
+line:3e3f7f74,"[ordinal value={0} one=""one"" two=""two"" few=""few"" many=""many"" other=""other""/]",/Volumes/YarnSpinner/YarnSpinner/Tests/TestCases/FormatFunctions.yarn,Start,59
