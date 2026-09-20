@@ -20,7 +20,7 @@ extends Node
 ## yarn spinner singleton providing global access and utilities.
 ## autoloaded as "YarnSpinner" when the plugin is enabled.
 
-const VERSION := "3.2.0-alpha9"  # keep in sync with plugin.cfg
+const VERSION := "3.2.8-alpha9"  # keep in sync with plugin.cfg
 
 var _global_commands: Dictionary[String, Callable] = {}
 var _global_functions: Dictionary[String, Dictionary] = {}
