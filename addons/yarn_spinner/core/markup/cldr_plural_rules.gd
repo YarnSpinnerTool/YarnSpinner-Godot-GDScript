@@ -44,11 +44,12 @@ extends RefCounted
 
 ## Returns the CLDR operand set for a number.
 static func get_operands(value: float) -> Dictionary:
-	var fraction_text := _invariant_fraction_text(value)
-	var f := _fraction_value(value, fraction_text)
+	var magnitude := absf(value)
+	var fraction_text := _invariant_fraction_text(magnitude)
+	var f := _fraction_value(magnitude, fraction_text)
 	return {
-		"n": absf(value),
-		"i": _integer_value(value),
+		"n": magnitude,
+		"i": _integer_value(magnitude),
 		"v": fraction_text.length(),
 		"f": f,
 		"t": f,
@@ -291,14 +292,14 @@ static func _c_si(o: Dictionary) -> String:
 
 static func _c_ak(o: Dictionary) -> String:
 	var n: float = o.n
-	if n >= 0.0 and n <= 1.0:
+	if floorf(n) == n and n >= 0.0 and n <= 1.0:
 		return "one"
 	return "other"
 
 
 static func _c_tzm(o: Dictionary) -> String:
 	var n: float = o.n
-	if (n >= 0.0 and n <= 1.0) or (n >= 11.0 and n <= 99.0):
+	if (floorf(n) == n and n >= 0.0 and n <= 1.0) or (floorf(n) == n and n >= 11.0 and n <= 99.0):
 		return "one"
 	return "other"
 
@@ -365,7 +366,7 @@ static func _c_lv(o: Dictionary) -> String:
 	var n_mod100 := fmod(n, 100.0)
 	var f_mod10 := f % 10
 	var f_mod100 := f % 100
-	if n_mod10 == 0.0 or (n_mod100 >= 11.0 and n_mod100 <= 19.0) \
+	if n_mod10 == 0.0 or (floorf(n_mod100) == n_mod100 and n_mod100 >= 11.0 and n_mod100 <= 19.0) \
 			or (v == 2 and f_mod100 >= 11 and f_mod100 <= 19):
 		return "zero"
 	if (n_mod10 == 1.0 and n_mod100 != 11.0) or (v == 2 and f_mod10 == 1 and f_mod100 != 11) \
@@ -417,7 +418,7 @@ static func _c_shi(o: Dictionary) -> String:
 	var i: int = o.i
 	if i == 0 or n == 1.0:
 		return "one"
-	if n >= 2.0 and n <= 10.0:
+	if floorf(n) == n and n >= 2.0 and n <= 10.0:
 		return "few"
 	return "other"
 
@@ -429,7 +430,7 @@ static func _c_ro(o: Dictionary) -> String:
 	var n_mod100 := fmod(n, 100.0)
 	if i == 1 and v == 0:
 		return "one"
-	if v != 0 or n == 0.0 or (n != 1.0 and n_mod100 >= 1.0 and n_mod100 <= 19.0):
+	if v != 0 or n == 0.0 or (n != 1.0 and floorf(n_mod100) == n_mod100 and n_mod100 >= 1.0 and n_mod100 <= 19.0):
 		return "few"
 	return "other"
 
@@ -501,7 +502,7 @@ static func _c_gd(o: Dictionary) -> String:
 		return "one"
 	if n == 2.0 or n == 12.0:
 		return "two"
-	if (n >= 3.0 and n <= 10.0) or (n >= 13.0 and n <= 19.0):
+	if (floorf(n) == n and n >= 3.0 and n <= 10.0) or (floorf(n) == n and n >= 13.0 and n <= 19.0):
 		return "few"
 	return "other"
 
@@ -568,10 +569,10 @@ static func _c_be(o: Dictionary) -> String:
 	var n_mod100 := fmod(n, 100.0)
 	if n_mod10 == 1.0 and n_mod100 != 11.0:
 		return "one"
-	if n_mod10 >= 2.0 and n_mod10 <= 4.0 and not (n_mod100 >= 12.0 and n_mod100 <= 14.0):
+	if floorf(n_mod10) == n_mod10 and n_mod10 >= 2.0 and n_mod10 <= 4.0 and not (floorf(n_mod100) == n_mod100 and n_mod100 >= 12.0 and n_mod100 <= 14.0):
 		return "few"
-	if n_mod10 == 0.0 or (n_mod10 >= 5.0 and n_mod10 <= 9.0) \
-			or (n_mod100 >= 11.0 and n_mod100 <= 14.0):
+	if n_mod10 == 0.0 or (floorf(n_mod10) == n_mod10 and n_mod10 >= 5.0 and n_mod10 <= 9.0) \
+			or (floorf(n_mod100) == n_mod100 and n_mod100 >= 11.0 and n_mod100 <= 14.0):
 		return "many"
 	return "other"
 
@@ -581,9 +582,9 @@ static func _c_lt(o: Dictionary) -> String:
 	var f: int = o.f
 	var n_mod10 := fmod(n, 10.0)
 	var n_mod100 := fmod(n, 100.0)
-	if n_mod10 == 1.0 and not (n_mod100 >= 11.0 and n_mod100 <= 19.0):
+	if n_mod10 == 1.0 and not (floorf(n_mod100) == n_mod100 and n_mod100 >= 11.0 and n_mod100 <= 19.0):
 		return "one"
-	if n_mod10 >= 2.0 and n_mod10 <= 9.0 and not (n_mod100 >= 11.0 and n_mod100 <= 19.0):
+	if floorf(n_mod10) == n_mod10 and n_mod10 >= 2.0 and n_mod10 <= 9.0 and not (floorf(n_mod100) == n_mod100 and n_mod100 >= 11.0 and n_mod100 <= 19.0):
 		return "few"
 	if f != 0:
 		return "many"
@@ -614,10 +615,10 @@ static func _c_br(o: Dictionary) -> String:
 		return "one"
 	if n_mod10 == 2.0 and not (n_mod100 == 12.0 or n_mod100 == 72.0 or n_mod100 == 92.0):
 		return "two"
-	if (n_mod10 >= 3.0 and n_mod10 <= 4.0) \
-			or (n_mod10 == 9.0 and not ((n_mod100 >= 10.0 and n_mod100 <= 19.0) \
-				or (n_mod100 >= 70.0 and n_mod100 <= 79.0) \
-				or (n_mod100 >= 90.0 and n_mod100 <= 99.0))):
+	if ((floorf(n_mod10) == n_mod10 and n_mod10 >= 3.0 and n_mod10 <= 4.0) or n_mod10 == 9.0) \
+			and not ((floorf(n_mod100) == n_mod100 and n_mod100 >= 10.0 and n_mod100 <= 19.0) \
+				or (floorf(n_mod100) == n_mod100 and n_mod100 >= 70.0 and n_mod100 <= 79.0) \
+				or (floorf(n_mod100) == n_mod100 and n_mod100 >= 90.0 and n_mod100 <= 99.0)):
 		return "few"
 	if n != 0.0 and n_mod1000000 == 0.0:
 		return "many"
@@ -631,9 +632,9 @@ static func _c_mt(o: Dictionary) -> String:
 		return "one"
 	if n == 2.0:
 		return "two"
-	if n == 0.0 or (n_mod100 >= 3.0 and n_mod100 <= 10.0):
+	if n == 0.0 or (floorf(n_mod100) == n_mod100 and n_mod100 >= 3.0 and n_mod100 <= 10.0):
 		return "few"
-	if n_mod100 >= 11.0 and n_mod100 <= 19.0:
+	if floorf(n_mod100) == n_mod100 and n_mod100 >= 11.0 and n_mod100 <= 19.0:
 		return "many"
 	return "other"
 
@@ -644,9 +645,9 @@ static func _c_ga(o: Dictionary) -> String:
 		return "one"
 	if n == 2.0:
 		return "two"
-	if n >= 3.0 and n <= 6.0:
+	if floorf(n) == n and n >= 3.0 and n <= 6.0:
 		return "few"
-	if n >= 7.0 and n <= 10.0:
+	if floorf(n) == n and n >= 7.0 and n <= 10.0:
 		return "many"
 	return "other"
 
@@ -680,7 +681,7 @@ static func _c_kw(o: Dictionary) -> String:
 		return "one"
 	if n_mod100 == 2.0 or n_mod100 == 22.0 or n_mod100 == 42.0 or n_mod100 == 62.0 \
 			or n_mod100 == 82.0 \
-			or (n_mod1000 == 0.0 and n_mod100000 >= 1000.0 and n_mod100000 <= 20000.0) \
+			or (n_mod1000 == 0.0 and floorf(n_mod100000) == n_mod100000 and n_mod100000 >= 1000.0 and n_mod100000 <= 20000.0) \
 			or n_mod100000 == 40000.0 or n_mod100000 == 60000.0 or n_mod100000 == 80000.0 \
 			or (n != 0.0 and n_mod1000000 == 100000.0):
 		return "two"
@@ -702,9 +703,9 @@ static func _c_ar(o: Dictionary) -> String:
 		return "one"
 	if n == 2.0:
 		return "two"
-	if n_mod100 >= 3.0 and n_mod100 <= 10.0:
+	if floorf(n_mod100) == n_mod100 and n_mod100 >= 3.0 and n_mod100 <= 10.0:
 		return "few"
-	if n_mod100 >= 11.0 and n_mod100 <= 99.0:
+	if floorf(n_mod100) == n_mod100 and n_mod100 >= 11.0 and n_mod100 <= 99.0:
 		return "many"
 	return "other"
 
@@ -809,7 +810,7 @@ static func _o_sv(o: Dictionary) -> String:
 	var n: float = o.n
 	var n_mod10 := fmod(n, 10.0)
 	var n_mod100 := fmod(n, 100.0)
-	if n_mod10 == 1.0 or (n_mod10 == 2.0 and not (n_mod100 == 11.0 or n_mod100 == 12.0)):
+	if (n_mod10 == 1.0 or n_mod10 == 2.0) and not (n_mod100 == 11.0 or n_mod100 == 12.0):
 		return "one"
 	return "other"
 
@@ -830,7 +831,7 @@ static func _o_hu(o: Dictionary) -> String:
 
 static func _o_ne(o: Dictionary) -> String:
 	var n: float = o.n
-	if n >= 1.0 and n <= 4.0:
+	if floorf(n) == n and n >= 1.0 and n <= 4.0:
 		return "one"
 	return "other"
 
@@ -839,7 +840,7 @@ static func _o_be(o: Dictionary) -> String:
 	var n: float = o.n
 	var n_mod10 := fmod(n, 10.0)
 	var n_mod100 := fmod(n, 100.0)
-	if n_mod10 == 2.0 or (n_mod10 == 3.0 and not (n_mod100 == 12.0 or n_mod100 == 13.0)):
+	if (n_mod10 == 2.0 or n_mod10 == 3.0) and not (n_mod100 == 12.0 or n_mod100 == 13.0):
 		return "few"
 	return "other"
 
@@ -878,7 +879,7 @@ static func _o_it(o: Dictionary) -> String:
 
 static func _o_lij(o: Dictionary) -> String:
 	var n: float = o.n
-	if n == 11.0 or n == 8.0 or (n >= 80.0 and n <= 89.0) or (n >= 800.0 and n <= 899.0):
+	if n == 11.0 or n == 8.0 or (floorf(n) == n and n >= 80.0 and n <= 89.0) or (floorf(n) == n and n >= 800.0 and n <= 899.0):
 		return "many"
 	return "other"
 
@@ -908,9 +909,9 @@ static func _o_sq(o: Dictionary) -> String:
 static func _o_kw(o: Dictionary) -> String:
 	var n: float = o.n
 	var n_mod100 := fmod(n, 100.0)
-	if (n >= 1.0 and n <= 4.0) or (n_mod100 >= 1.0 and n_mod100 <= 4.0) \
-			or (n_mod100 >= 21.0 and n_mod100 <= 24.0) or (n_mod100 >= 41.0 and n_mod100 <= 44.0) \
-			or (n_mod100 >= 61.0 and n_mod100 <= 64.0) or (n_mod100 >= 81.0 and n_mod100 <= 84.0):
+	if (floorf(n) == n and n >= 1.0 and n <= 4.0) or (floorf(n_mod100) == n_mod100 and n_mod100 >= 1.0 and n_mod100 <= 4.0) \
+			or (floorf(n_mod100) == n_mod100 and n_mod100 >= 21.0 and n_mod100 <= 24.0) or (floorf(n_mod100) == n_mod100 and n_mod100 >= 41.0 and n_mod100 <= 44.0) \
+			or (floorf(n_mod100) == n_mod100 and n_mod100 >= 61.0 and n_mod100 <= 64.0) or (floorf(n_mod100) == n_mod100 and n_mod100 >= 81.0 and n_mod100 <= 84.0):
 		return "one"
 	if n == 5.0 or n_mod100 == 5.0:
 		return "many"
@@ -971,7 +972,7 @@ static func _o_mk(o: Dictionary) -> String:
 		return "one"
 	if i_mod10 == 2 and i_mod100 != 12:
 		return "two"
-	if i_mod10 == 7 or (i_mod10 == 8 and not (i_mod100 == 17 or i_mod100 == 18)):
+	if (i_mod10 == 7 or i_mod10 == 8) and not (i_mod100 == 17 or i_mod100 == 18):
 		return "many"
 	return "other"
 
@@ -1021,7 +1022,7 @@ static func _o_bn(o: Dictionary) -> String:
 
 static func _o_or(o: Dictionary) -> String:
 	var n: float = o.n
-	if n == 1.0 or n == 5.0 or (n >= 7.0 and n <= 9.0):
+	if n == 1.0 or n == 5.0 or (floorf(n) == n and n >= 7.0 and n <= 9.0):
 		return "one"
 	if n == 2.0 or n == 3.0:
 		return "two"
