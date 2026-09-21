@@ -1,8 +1,38 @@
 extends GutTest
+## Runs Yarn Spinner test plans against this runtime.
+##
+## A test plan is a transcript and it lists, in order, every line, option,
+## command and stop that a compiled Yarn program is expected to produce! Plus
+## the actions a player would take (selecting an option, setting a variable,
+## jumping to a node, changing the saliency strategy). If thte VM produces
+## exactly that transcript,it is behaving.
+##
+## This file is the GDScript counterpart of three pieces of teh C# test suite:
+##   * TestPlan.cs parses the .testplan language (ANTLR grammar,
+##     YarnSpinner.Tests/TestPlan/YarnSpinnerTestPlan.g4).
+##   * TestBase.RunStandardTestcase drives the dialogue checks each step.
+##     TestPlanRunner (at the bottom of this file) mirrors it.
+##   * LanguageTests.TestSources decides which files run, and registers the
+##     functions the test scripts call.
+##
+## Each case needs four fixture files in tests/testplans/ ...
+##   <Case>.yarnc          the the compiled program
+##   <Case>-Lines.csv      the string table (id, text, file, node, lineNumber)
+##   <Case>-Metadata.csv   line tags (id, node, lineNumber, tags)
+##   <Case>.testplan       the transcript
+##
+## To run this file on its own, copy the project to a scratch directory, add
+## GUT, and run it headless with -gdir=res://tests -gprefix=test_.
 
 
+## The fixture files for each case
 const FIXTURE_DIR := "res://tests/testplans/"
+
+## Node every plan starts from unless it says otherwise with `start:`..
 const START_NODE := "Start"
+
+## Locale used when composing line text, so [plural] and [ordinal] resolve the
+## way the C# tests expect...
 const LOCALE_CODE := "en"
 
 const _YarnProgramParser := preload("res://addons/yarn_spinner/core/yarn_program_parser.gd")
@@ -45,10 +75,11 @@ const CASES := [
 ]
 
 const SKIPPED_CASES := {
-	"DuplicateLineTags": "has no .testplan; the C# TestSources theory only checks that it fails to compile",
-	"ParseFailures": "TestCases/ParseFailures/*.yarn have no .testplan; the C# TestSources theory only checks that they fail to compile",
-	"Duplicates": "TestCases/Duplicates/*.yarn are not TestSources inputs (FileSources is not recursive); ProjectTests uses them for duplicate line ID checks",}
+	"DuplicateLineTags": "teh C# version only checks that it fails to compile, so no .testplan",
+	"ParseFailures": "TestCases/ParseFailures/*.yarn have no .testplan, C# only checks that they fail to compile",
+	"Duplicates": "TestCases/Duplicates/*.yarn are not TestSources inputs (FileSources is not recursive)... ProjectTests uses them for duplicate line ID checks",}
 
+## COMMENT and WHITESPACE are recognised so they can be skipped..
 enum Token {
 	END_OF_FILE,
 	SEPARATOR,
@@ -75,6 +106,7 @@ enum Token {
 	TEXT,
 }
 
+## Fixed strings innn the grammar...
 const LITERAL_TOKENS := [
 	["---", Token.SEPARATOR],
 	["environment:", Token.ENVIRONMENT],
@@ -92,6 +124,7 @@ const LITERAL_TOKENS := [
 	["node:", Token.NODE],
 ]
 
+## Tokens that can begin a step...
 const STEP_START_TOKENS := [
 	Token.LINE,
 	Token.OPTION,
@@ -103,10 +136,12 @@ const STEP_START_TOKENS := [
 	Token.NODE,
 ]
 
+## Lexer output and read position
 var _tokens: Array[Dictionary] = []
 var _token_index: int = 0
 
 
+## One test per case...
 func test_testplan(case_name: String = use_parameters(CASES)) -> void:
 	var fixture := _load_fixture(case_name)
 	var fixture_error: String = fixture.error
@@ -124,9 +159,13 @@ func test_testplan(case_name: String = use_parameters(CASES)) -> void:
 	if program == null or program.nodes.is_empty():
 		fail_test("[%s] compiled program could not be parsed" % case_name)
 		return
+	# The compiler emits the text and tags beside the program rather than
+	# inside it so CSVs are attached here..
 	program.string_table = fixture.string_table
 	program.line_metadata = fixture.line_metadata
 
+	# Some cases exist only to prove they compile (their plan is just `stop`,
+	# and they have no Start node to run)...
 	if not program.has_node(START_NODE):
 		pass_test("[%s] no %s node; compilation only" % [case_name, START_NODE])
 		return
@@ -141,9 +180,10 @@ func test_testplan(case_name: String = use_parameters(CASES)) -> void:
 		fail_test("[%s] %s" % [case_name, failure])
 
 
+## Reports each skipped case as pending! Use the reason from
+## SKIPPED_CASES.
 func test_testplan_skipped(case_name: String = use_parameters(SKIPPED_CASES.keys())) -> void:
 	pending("[%s] skipped: %s" % [case_name, SKIPPED_CASES[case_name]])
-
 
 func _load_fixture(case_name: String) -> Dictionary:
 	var base_path := FIXTURE_DIR.path_join(case_name)
@@ -168,7 +208,6 @@ func _load_fixture(case_name: String) -> Dictionary:
 		"line_metadata": _read_line_metadata(metadata_path),
 	}
 
-
 func _read_string_table(path: String) -> Dictionary:
 	var string_table := {}
 	var file := FileAccess.open(path, FileAccess.READ)
@@ -183,7 +222,6 @@ func _read_string_table(path: String) -> Dictionary:
 				string_table[line_id] = csv_line[1]
 	file.close()
 	return string_table
-
 
 func _read_line_metadata(path: String) -> Dictionary:
 	var line_metadata := {}
@@ -201,7 +239,6 @@ func _read_line_metadata(path: String) -> Dictionary:
 	file.close()
 	return line_metadata
 
-
 func _tokenize(source: String) -> Dictionary:
 	var tokens: Array[Dictionary] = []
 	var position := 0
@@ -214,6 +251,8 @@ func _tokenize(source: String) -> Dictionary:
 			if literal_text.length() > best_length and source.substr(position, literal_text.length()) == literal_text:
 				best_length = literal_text.length()
 				best_type = int(literal[1])
+		# Order matters: BOOL before IDENTIFIER so `true` lexes as a boolean,
+		# and HASHTAG after IDENTIFIER because both can follow a `#`.
 		var rule_matches := [
 			[_match_comment(source, position), Token.COMMENT],
 			[_match_whitespace(source, position), Token.WHITESPACE],
@@ -237,7 +276,6 @@ func _tokenize(source: String) -> Dictionary:
 	tokens.append({"type": Token.END_OF_FILE, "text": "<EOF>"})
 	return {"tokens": tokens, "error": ""}
 
-
 func _match_comment(source: String, position: int) -> int:
 	if source.substr(position, 2) != "//":
 		return 0
@@ -250,6 +288,7 @@ func _match_comment(source: String, position: int) -> int:
 	return index - position
 
 
+## WS: spaces, tabs, carriage returns and newlines.
 func _match_whitespace(source: String, position: int) -> int:
 	var index := position
 	while index < source.length():
@@ -260,6 +299,7 @@ func _match_whitespace(source: String, position: int) -> int:
 	return index - position
 
 
+## BOOL: the words `true` and `false`, used by `set:`.
 func _match_bool(source: String, position: int) -> int:
 	if source.substr(position, 4) == "true":
 		return 4
@@ -268,6 +308,8 @@ func _match_bool(source: String, position: int) -> int:
 	return 0
 
 
+## IDENTIFIER: a letter or underscore, then letters, digits or underscores.
+## Used for node names, environment names and saliency modes.
 func _match_identifier(source: String, position: int) -> int:
 	if position >= source.length() or not _is_identifier_start(source.unicode_at(position)):
 		return 0
@@ -280,6 +322,8 @@ func _match_identifier(source: String, position: int) -> int:
 	return index - position
 
 
+## HASHTAG_CONTENT: `#` followed by at least one character that isn't
+## whitespace or another `#`. A lone `#` is not a token.
 func _match_hashtag(source: String, position: int) -> int:
 	if source.unicode_at(position) != 35:
 		return 0
@@ -294,6 +338,7 @@ func _match_hashtag(source: String, position: int) -> int:
 	return index - position
 
 
+## VARIABLE: `$` followed by an identifier, as used by `set:`.
 func _match_variable(source: String, position: int) -> int:
 	if source.unicode_at(position) != 36:
 		return 0
@@ -303,12 +348,13 @@ func _match_variable(source: String, position: int) -> int:
 	return identifier_length + 1
 
 
+## NUMBER: one or more digits. Plans only ever use whole numbers, for
+## `select:` indices and `set:` values.
 func _match_number(source: String, position: int) -> int:
 	var index := position
 	while index < source.length() and _is_digit(source.unicode_at(index)):
 		index += 1
 	return index - position
-
 
 func _match_text(source: String, position: int) -> int:
 	if source.unicode_at(position) != 96:
@@ -325,7 +371,6 @@ func _is_identifier_start(code: int) -> bool:
 
 func _is_digit(code: int) -> bool:
 	return code >= 48 and code <= 57
-
 
 func _parse_test_plan(source: String) -> Dictionary:
 	var lexed := _tokenize(source)
@@ -370,11 +415,12 @@ func _parse_test_plan(source: String) -> Dictionary:
 		return {"runs": [], "error": "unexpected '%s'" % _peek_text()}
 	return {"environment": environment, "runs": runs, "error": ""}
 
-
 func _parse_step() -> Dictionary:
 	var keyword := _next_token()
 	var keyword_type: int = keyword.type
 	if keyword_type == Token.LINE:
+		# `line: *` expects a line but doesn't care what it says, so the text
+		# is stored as null and the runner skips the text comparison.
 		var line_text: Variant = null
 		if _peek_type() == Token.TEXT:
 			line_text = _trim_backticks(_next_token().text)
@@ -384,6 +430,8 @@ func _parse_step() -> Dictionary:
 			return _syntax_error("line:", "TEXT or '*'")
 		return {"kind": "line", "text": line_text, "hashtags": _parse_hashtags()}
 	if keyword_type == Token.OPTION:
+		# Options accumulate until a `select:` arrives; `[disabled]` means the
+		# option is expected to be shown but not selectable.
 		if _peek_type() != Token.TEXT:
 			return _syntax_error("option:", "TEXT")
 		var option_text := _trim_backticks(_next_token().text)
@@ -400,6 +448,9 @@ func _parse_step() -> Dictionary:
 	if keyword_type == Token.STOP:
 		return {"kind": "stop"}
 	if keyword_type == Token.SELECT:
+		# Plans number options from 1; the VM numbers them from 0, so
+		# `select: 0` becomes -1, which is the "no option selected" value used
+		# when every option is unavailable.
 		if _peek_type() != Token.NUMBER:
 			return _syntax_error("select:", "NUMBER")
 		return {"kind": "select", "index": int(_next_token().text) - 1}
@@ -425,7 +476,6 @@ func _parse_step() -> Dictionary:
 		return {"kind": "node", "node_name": _next_token().text}
 	return {"error": "unhandled step type '%s'" % keyword.text}
 
-
 func _parse_hashtags() -> PackedStringArray:
 	var hashtags := PackedStringArray()
 	while _peek_type() == Token.HASHTAG:
@@ -449,13 +499,11 @@ func _peek_type() -> int:
 func _peek_text() -> String:
 	return _tokens[_token_index].text
 
-
 func _next_token() -> Dictionary:
 	var token := _tokens[_token_index]
 	if _token_index < _tokens.size() - 1:
 		_token_index += 1
 	return token
-
 
 class TestPlanRunner:
 	extends RefCounted
@@ -466,11 +514,18 @@ class TestPlanRunner:
 	var vm: YarnVirtualMachine
 	var smart_variable_evaluator: YarnSmartVariableEvaluator
 	var locale_code: String
+	## First mismatch found, or empty while everything still matches.
 	var failure: String = ""
+	## The step currently being waited on, read by the VM handlers.
 	var _expectation: Dictionary = {}
+	## Options seen since the last `select:`, in plan order...
 	var _expected_options: Array[Dictionary] = []
+	## Human-readable position in the plan, prefixed to failures.
 	var _step_label: String = ""
+	## How many options the VM last deliveredd used to validate `select:`.
 	var _delivered_option_count: int = 0
+	## Whether the dialogue has finished. Tracked here rather than read from
+	## the VM because a plan may continue with a new run after a stop...
 	var _stopped: bool = true
 
 	func _init(test_program: YarnProgram, variable_storage: YarnInMemoryVariableStorage, locale: String) -> void:
@@ -526,6 +581,8 @@ class TestPlanRunner:
 			var start_node: String = runs[run_index].start_node
 			_step_label = "run %d, start" % (run_index + 1)
 			_expectation = {}
+			# Variables and visit counts deliberately carry over between runs;
+			# only the dialogue position is reset.
 			if not vm.set_node(start_node):
 				_fail("no node named '%s' in program" % start_node)
 				return failure
@@ -537,9 +594,13 @@ class TestPlanRunner:
 				_step_label = "run %d, step %d (%s)" % [run_index + 1, step_index + 1, describe_step(step)]
 
 				if kind == "line" or kind == "command" or kind == "stop":
+					# Content steps: expect this, then let the VM run until it
+					# delivers something.
 					_expectation = step
 					_continue_dialogue()
 				elif kind == "option":
+					# Options are collected, not awaited; the `select:` that
+					# follows is what actually runs the dialogue.
 					_expected_options.append(step)
 				elif kind == "select":
 					_expectation = step
@@ -548,11 +609,16 @@ class TestPlanRunner:
 						_select_option(step.index)
 					_expected_options.clear()
 				elif kind == "node":
+					# Jump elsewhere without ending the dialogue, as a game
+					# would when starting a different conversation.
 					if not program.has_node(step.node_name) or not vm.set_node(step.node_name):
 						_fail("no node named '%s' has been loaded" % step.node_name)
 					else:
 						_stopped = false
 				elif kind == "set":
+					# Only variables the program knows about can be set, which
+					# catches plans that drift from their script. Numbers are
+					# stored as floats because that is Yarn's only number type.
 					if not program.initial_values.has(step.variable):
 						_fail("variable %s is not valid in program" % step.variable)
 					elif step.value is bool:
@@ -569,6 +635,7 @@ class TestPlanRunner:
 
 				if not failure.is_empty():
 					return failure
+				# A stop ends this run; anything after it belongs to the next.
 				if kind == "stop":
 					break
 
@@ -611,6 +678,9 @@ class TestPlanRunner:
 		if vm.current_state == YarnVirtualMachine.ExecutionState.WAITING_FOR_INPUT:
 			_fail("cannot continue running dialogue; still waiting on option selection")
 			return
+		# A line or command leaves the VM suspended until the presenter says
+		# it has finished; there are no presenters here!!!
+		# immediately and carry on.
 		if vm.current_state == YarnVirtualMachine.ExecutionState.SUSPENDED:
 			vm.signal_content_complete()
 		vm.continue_dialogue()
