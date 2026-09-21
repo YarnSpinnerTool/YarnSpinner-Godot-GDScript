@@ -270,13 +270,13 @@ dialogue_runner.add_presenter(my_custom_presenter)
 
 ## Node Groups and Saliency
 
-If you're using node groups (multiple versions of the same content with `when:` conditions), set a saliency strategy on the runner:
+If you're using node groups (multiple versions of the same content with `when:` conditions), choose how the runner picks between them with its **Saliency Strategy** property in the inspector: `RANDOM_BEST_LEAST_RECENT` (the default), `BEST_LEAST_RECENT`, `BEST`, `FIRST` or `RANDOM`.
+
+To use your own strategy, extend `YarnSaliencyStrategy` and set it from code:
 
 ```gdscript
-dialogue_runner.saliency_strategy = YarnRandomBestLeastRecentlyViewedSaliencyStrategy.new()
+dialogue_runner.set_content_saliency_strategy(MySaliencyStrategy.new())
 ```
-
-Available strategies: `YarnFirstSaliencyStrategy`, `YarnBestSaliencyStrategy`, `YarnRandomSaliencyStrategy`, `YarnBestLeastRecentlyViewedSaliencyStrategy`, `YarnRandomBestLeastRecentlyViewedSaliencyStrategy`.
 
 ## VS Code Autocomplete
 
