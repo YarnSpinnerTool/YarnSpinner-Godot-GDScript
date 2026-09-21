@@ -67,9 +67,75 @@ unaffected!
   that is used for people's testing.
 - Malformed markup now logs a warning describing what went wrong and
   where, instead of failing silently and falling back to the raw text.
+- **Breaking:** `YarnLine.text` now includes the character name (so the same
+  as `LocalizedLine.Text` in Yarn Spinner for Unity). Use
+  `text_without_character_name` (or `get_plain_text()`) where you want the
+  line without the name. The built-in line presenter has a new
+  `show_character_name_in_line` option for when there's no separate
+  character name label.
+- **Breaking:** `allow_option_fallthrough` on the dialogue runner now
+  defaults to `true` (alsoo matching Unity). An option group with no available
+  options now continues past the options instead of stopping the dialogue!
+- **Breaking:** the in-memory variable storage now rejects variable names
+  that don't start with `$`, as Unity does. Set `validate_variable_names`
+  to `false` to turn this off.
+- **Breaking:** action markup handlers now receive the line's
+  `YarnMarkupParseResult` in `on_prepare_for_line` and
+  `on_line_display_begin`, not the `YarnLine`. The wave and colour pulse
+  example handlers have been removed.
+- **Breaking:** command parameters are now converted the same way Unity
+  converts them. An `int` parameter no longer accepts `1.5`, a `bool`
+  parameter no longer accepts `yes`, `on` or `1`, and a `Vector2`,
+  `Vector3` or `Color` that can't be parsed is now an error instead of
+  zero. A parameter typed as a node class that names a node which doesn't
+  exist now receives `null` with a warning, rather than failing the
+  command. `command_unhandled` is now only emitted for commands that
+  aren't registered at all; other command failures are logged as errors.
+- **Breaking:** `<<wait>>` now requires a duration, as in Unity. It used to
+  default to one second.
+- **Breaking:** the line advancer's defaults now match Unity: the hurry up
+  input is `ui_accept`/Space and the next line input is
+  `ui_cancel`/Escape. The line presenter's old `hurry_action` property has
+  been removed; use a line advancer or `YarnLinePresenterButtonHandler`.
+- **Breaking:** `YarnLineProvider` is now a `Resource`, and can be set on
+  the dialogue runner in the inspector along with its text, asset and
+  fallback locales.
+- Functions registered with `add_function` now take their argument count
+  and types from the method's signature, and reject return values that
+  aren't a Yarn type. Static `_yarn_function_` methods on `class_name`
+  scripts are registered automatically; non-static ones are only picked
+  up from autoloads.
+- Booleans now show as `True` and `False` when substituted into a line,
+  matching Unity.
+- The virtual machine's instruction and call depth limits are now off by
+  default, as Unity has no such limits.
+- Requesting the next line now also hurries up the current one, so a
+  presenter only needs to watch for one of them.
+- Variable change listeners fire every time a variable is set, and
+  initial values are read from the program rather than copied into
+  storage, as in Unity.
+- Added `YarnTypewriter`, with instant, letter and word typewriters, and a
+  custom typewriter option on the line presenter.
+- Added `save_state_to_persistent_storage()` and
+  `load_state_from_persistent_storage()` to the dialogue runner.
+- `format()` now follows .NET's format rules exactly, including padding,
+  precision and custom numeric formats.
+- Added `get_line_ids_for_nodes()` to `YarnProjectResource` and
+  `get_line_ids_for_node()` to `YarnProgram`, the equivalent of
+  `YarnProject.GetLineIDsForNodes()` in Unity, for preloading or debugging
+  the lines in a set of nodes.
+- Line and option text is now normalised to Unicode NFC (composed) form
+  before its markup is parsed, the same as Yarn Spinner for Unity. A line
+  written with a combining accent, like `e` followed by U+0301, now
+  produces the same text and the same attribute positions as one written
+  with a precomposed `é`.
 
 ### Fixed
 
+- Negative numbers now pick their plural form from the size of the number,
+  ignoring the sign. `[plural value=-1 one="% apple" other="% apples"]` 
+  now reads "-1 apple" rather than "-1 apples". Only the operands changed!
+- Fixed bugs in CLDR plural rules!
 - `[plural]` and `[ordinal]` markup now follows the active locale. The
   line's locale was being set after its text had already been parsed, so
   every line used English plural and ordinal rules regardless of what
@@ -78,8 +144,9 @@ unaffected!
   same as lines do. These markers in an option used to be stripped to
   nothing by the display path.
 - Modulo by zero now stops the dialogue with a clear error instead of
-  returning 0. Note the divisor converts to an integer first, so a
-  divisor smaller than 1 also counts as zero.
+  returning 0. Note both operands round to the nearest integer first
+  (halves round to even), so a divisor between -0.5 and 0.5 also counts
+  as zero.
 - Shadow lines (`#shadow:`) now display their source line's text, and play
   its voice over audio, instead of showing a raw line ID. The line provider
   resolves the shadow source before any lookup, the same way Yarn Spinner
@@ -118,6 +185,71 @@ unaffected!
   Spinner runtime. Godot's own `roundf()` rounds half away from zero. Agian,
   important while folks are testing/using the TypeScript runner as part
   of their toolchain (e.g. VSCode).
+- A truncated or corrupt compiled program now fails to load with an error
+  instead of hanging the editor.
+- Instructions the runtime doesn't recognise now stop the dialogue with an
+  error instead of shifting every jump in the node.
+- When a node has the same header more than once, the first one now wins,
+  and `get_all_headers()` returns every one of them.
+- Dialogue completion now happens in the same order as Unity: nodes
+  report completion when the dialogue is stopped, and
+  `dialogue_completed` fires before the runner is marked as stopped.
+- Starting dialogue at a node that doesn't exist now logs an error and
+  doesn't start, instead of emitting `dialogue_started` first.
+- Saliency strategies now pick between tied candidates the same way Unity
+  does, and store view counts as floats like every other Yarn number.
+- Escaped square brackets in a line (`\[` and `\]`) now display as
+  brackets instead of being read as BBCode tags, and overlapping markup
+  such as `[b]a [i]b[/b] c[/i]` now renders correctly.
+- Pauses in lines now respect hurry up, and wait for the game to be
+  unpaused.
+- Command text is now split on every Unicode whitespace character, not
+  just spaces and tabs.
+- Disabled presenters are now skipped, as in Unity.
+- Calling `start_dialogue()` from a `dialogue_completed` handler now starts
+  the new dialogue properly, instead of leaving the runner stuck.
+- Changing `yarn_project` while dialogue is running is now refused with an
+  error, the same as `set_project()`.
+- Checking a node group for content (`has_any_content()`, or
+  `get_saliency_options_for_node_group()`) now stops with an error if one
+  of its conditions can't be evaluated, as Unity does, instead of quietly
+  treating that condition as failed.
+- Command discovery now only loads scripts that actually declare a
+  `_yarn_command_` or `_yarn_function_` method, instead of any script that
+  mentions one.
+- Exported games no longer search every `class_name` script for commands
+  and functions when dialogue starts. Exported scripts don't include their
+  source, so that search couldn't rule anything out and ended up loading
+  every script. The plugin now records which scripts declare commands and
+  functions when you export, much like Yarn Spinner for Unity generates its
+  command registrations at build time, and the exported game loads only
+  those.
+- Lines, options, plural rules and variable name hashing can now be used
+  from more than one thread at once. Every line and option used to share a
+  single markup parser, so reading line text from worker threads (for
+  example, preparing lines ahead of time) could produce the wrong text or
+  crash the game.
+- Fixed several `YarnEffects` helpers:
+  - The typewriters, including `typewriter_with_line()`, now take an
+    optional cancellation token and finish immediately when hurried.
+  - `typewriter_words()` now reveals text a whole word at a time, instead
+    of by overall proportion.
+  - `typewriter_with_line()` now returns a signal that fires when the line
+    has finished, using the same typewriter as the line presenter, so
+    pauses respect hurry-up and game pause.
+  - Instant typewriters return a signal that can still be awaited.
+  - `shake()` no longer divides by zero for very short shakes.
+- Registering several replacement marker processors on a line presenter no
+  longer logs "already registered" errors for the processors registered
+  before it.
+- A dialogue runner that leaves the scene before its first command search
+  runs no longer logs a script error.
+- When two different scripts declare the same command or function name,
+  the second one is now reported as an error instead of being silently
+  ignored, as Unity does.
+- Commands on nodes added to the scene after dialogue started are now
+  found. If a command isn't registered and the scene has changed since it
+  was last searched, the runner searches it again before giving up.
 
 ### Documentation
 

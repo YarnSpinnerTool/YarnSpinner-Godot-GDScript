@@ -3,7 +3,7 @@
 > [!CAUTION]
 > This is an Alpha release of Yarn Spinner for Godot (GDScript). There will be bugs, we might change the API or features with an update, or something may break. We do not recommend you use this to ship a game just yet. 
 
-Yarn Spinner for Godot (GDScript) is a pure-GDScript implementation of the Yarn Spinner dialogue system for the Godot engine. It runs compiled Yarn programs and aims for full feature parity with Yarn Spinner for Unity 3.1, including node groups, saliency, detours, smart variables, localisation, and voice over support.
+Yarn Spinner for Godot (GDScript) is a pure-GDScript implementation of the Yarn Spinner dialogue system for the Godot engine. It runs compiled Yarn programs and aims for full feature parity with Yarn Spinner for Unity 3.2, including node groups, saliency, detours, smart variables, localisation, and voice over support.
 
 Requires Godot 4.6 or later (not the .NET/Mono version).
 
@@ -31,18 +31,21 @@ It requires the .NET-enabled build of Godot, a `.csproj`/`.sln`, and compiles Ya
 
 This GDScript version is a complete reimplementation of the Yarn Spinner runtime in pure GDScript, with no .NET dependency, no DLLs, no C# project needed. It works with the standard (non-.NET) Godot editor and export templates, making it accessible to GDScript-only projects. 
 
-Yarn scripts are compiled externally with `ysc` and both versions produce identical runtime behaviour from the same `.yarn` source files.
+Yarn scripts are compiled with the Yarn Spinner compiler bundled with the addon (with `ysc` as a fallback), and both versions produce identical runtime behaviour from the same `.yarn` source files.
 
 ## Differences from Yarn Spinner for Unity
 
-The VM, protobuf parser, library, and markup system were all written to match Unity's behaviour, but there are some differences:
+The VM, protobuf parser, library, and markup system were all written to match Unity's behaviour, and the runtime is checked against Yarn Spinner's own test plans, but there are some differences:
 
-- **CLDR plural rules** -- This implementation has rules covering the top ~20 languages (English, French, German, Spanish, Russian, Arabic, Polish, Czech, Japanese, Korean, Chinese, etc.). If you're using `[plural]` or `[ordinal]` markup tags with a less common language, you might get the default "one/other" fallback instead of the correct plural form.
-- **No Unicode NFC normalisation** -- Unity normalises markup input text to NFC (composed) form before parsing. Godot doesn't have a built-in NFC normaliser, so precomposed and decomposed Unicode characters are treated as-is. This only matters if your Yarn scripts contain combining characters like `e` + `\u0301` instead of `é`.
+- **CLDR plural rules** -- `[plural]` and `[ordinal]` use the same CLDR plural rules as Yarn Spinner, for every locale it supports.
+- **Culture** -- Unity formats the results of `string()`, `number()`, `bool()` and `format()` using the player's current culture. This implementation always uses the invariant culture, so `string(3.5)` is `3.5` on every device.
+- **Extra built-in functions** -- As well as Yarn Spinner's built-in functions, this implementation provides `abs`, `clamp`, `lerp`, `inverse_lerp`, `smoothstep`, `pow`, `sqrt`, `sign`, `wrap`, `mod`, `length`, `uppercase`, `lowercase`, `first_letter_caps`, `plural` and `ordinal`. Unity doesn't have these, so scripts that call them won't run there unless you register matching functions.
 - **Async model** -- Unity uses C# `async`/`await` with `YarnTask` and `CancellationTokenSource` chains. This implementation uses Godot signals and `await` with a simpler `YarnCancellationToken`. The behaviour is largely the same, but the presenter API signatures are different (signals instead of tasks).
-- **Command discovery** -- Unity uses `[YarnCommand]` attributes on methods. This implementation uses a naming convention (`_yarn_command_<name>`) and scene tree scanning. Both approaches auto-discover commands, just with different syntax.
-- **Error handling** -- Unity throws exceptions for invalid states (missing variables, bad option indices, etc.). This implementation uses `push_error`/`push_warning` and continues where possible, which is more idiomatic for GDScript.
-- **Localisation** -- Unity has multiple line provider backends (built-in, Unity Localization package, Addressables). This implementation uses Godot's `TranslationServer` directly.
+- **Command discovery** -- Unity uses `[YarnCommand]` and `[YarnFunction]` attributes on methods. This implementation uses a naming convention (`_yarn_command_<name>` and `_yarn_function_<name>`), registering methods from `class_name` scripts when the dialogue runner starts, and from the rest of the scene tree once the scene is ready. When you export your game, the plugin records which scripts declare these methods, so the exported game doesn't need to search for them.
+- **Error handling** -- Unity throws exceptions for invalid states (missing variables, bad option indices, etc.). This implementation reports them with `push_error`, and stops the dialogue when it can't safely continue.
+- **Markup rendering** -- The built-in line presenter renders `[b]`, `[i]`, `[u]`, `[s]`, `[code]`, `[style]` and palette markers as BBCode. In Unity these are rendered by TextMesh Pro.
+- **Execution limits** -- The virtual machine can optionally stop runaway scripts with `max_instructions_per_step` and `max_call_stack_depth`. Both are off by default; Unity has no equivalent.
+- **Localisation** -- Unity has multiple line provider backends (built-in, Unity Localization package, Addressables). This implementation uses Godot's `TranslationServer` directly, with the text, asset and fallback locales set on the line provider.
 
 ## License
 
@@ -63,7 +66,7 @@ If Godot reports missing dependencies on `res://addons/yarn_spinner/...` paths, 
 
 ## How It Works
 
-The Yarn Spinner compiler (`ysc`) compiles `.yarn` scripts into a binary protobuf program. This plugin reads that binary at import time, parses it into an in-memory program representation, and executes it in a stack-based virtual machine. The VM handles control flow, variable storage, function calls, and content delivery. A dialogue runner orchestrates the VM and routes lines, options, and commands to presenter nodes in your scene tree.
+The Yarn Spinner compiler (bundled with the addon, or `ysc`) compiles `.yarn` scripts into a binary protobuf program. This plugin reads that binary at import time, parses it into an in-memory program representation, and executes it in a stack-based virtual machine. The VM handles control flow, variable storage, function calls, and content delivery. A dialogue runner orchestrates the VM and routes lines, options, and commands to presenter nodes in your scene tree.
 
 You write dialogue in Yarn, and the plugin compiles and runs it. Compilation happens automatically when Godot imports the `.yarnproject` file, using the compiler binary bundled with the addon (or `ysc` from your PATH as a fallback).
 
