@@ -62,6 +62,26 @@ try
         return 1;
     }
 
+    var command = root.TryGetProperty("command", out var commandElement) ? commandElement.GetString() : "compile";
+
+    if (command == "tag")
+    {
+        var excluded = new HashSet<string>();
+        if (root.TryGetProperty("excludedLineIDs", out var excludedElement))
+        {
+            foreach (var id in excludedElement.EnumerateArray())
+            {
+                var value = id.GetString();
+                if (!string.IsNullOrEmpty(value))
+                    excluded.Add(value);
+            }
+        }
+
+        var taggerName = root.TryGetProperty("tagger", out var taggerElement) ? taggerElement.GetString() : "random";
+        WriteTagResult(inputs, excluded, taggerName);
+        return 0;
+    }
+
     var job = CompilationJob.CreateFromInputs(inputs);
     var result = Yarn.Compiler.Compiler.Compile(job);
 
@@ -101,6 +121,7 @@ static void WriteResult(CompilationResult result)
             w.WriteString("nodeName", kvp.Value.nodeName);
             w.WriteNumber("lineNumber", kvp.Value.lineNumber);
             w.WriteString("fileName", kvp.Value.fileName);
+            w.WriteBoolean("isImplicitTag", kvp.Value.isImplicitTag);
             w.WriteStartArray("metadata");
             if (kvp.Value.metadata != null)
                 foreach (var m in kvp.Value.metadata)
@@ -110,6 +131,46 @@ static void WriteResult(CompilationResult result)
         }
     }
     w.WriteEndObject();
+
+    w.WriteStartArray("declarations");
+    foreach (var decl in result.Declarations)
+    {
+        if (!decl.IsVariable || decl.Name.StartsWith("$Yarn.Internal"))
+            continue;
+        w.WriteStartObject();
+        w.WriteString("name", decl.Name);
+        w.WriteString("type", decl.Type.Name);
+        w.WriteBoolean("isEnum", decl.Type is Yarn.EnumType);
+        w.WriteString("description", decl.Description ?? "");
+        w.WriteBoolean("isInlineExpansion", decl.IsInlineExpansion);
+        w.WriteString("sourceFileName", decl.SourceFileName ?? "");
+        WriteConvertible(w, "defaultValue", decl.DefaultValue);
+        w.WriteEndObject();
+    }
+    w.WriteEndArray();
+
+    w.WriteStartArray("enums");
+    foreach (var type in result.UserDefinedTypes)
+    {
+        if (type is not Yarn.EnumType enumType)
+            continue;
+        w.WriteStartObject();
+        w.WriteString("name", enumType.Name);
+        w.WriteString("description", enumType.Description ?? "");
+        w.WriteString("rawType", enumType.RawType.Name);
+        w.WriteStartArray("cases");
+        foreach (var enumCase in enumType.EnumCases)
+        {
+            w.WriteStartObject();
+            w.WriteString("name", enumCase.Key);
+            w.WriteString("description", enumCase.Value.Description ?? "");
+            WriteConvertible(w, "value", enumCase.Value.Value);
+            w.WriteEndObject();
+        }
+        w.WriteEndArray();
+        w.WriteEndObject();
+    }
+    w.WriteEndArray();
 
     w.WriteStartArray("diagnostics");
     foreach (var diag in result.Diagnostics)
@@ -128,6 +189,92 @@ static void WriteResult(CompilationResult result)
     w.WriteEndObject();
     w.Flush();
     Console.WriteLine(); // trailing newline
+}
+
+static void WriteConvertible(Utf8JsonWriter w, string name, IConvertible? value)
+{
+    switch (value)
+    {
+        case null:
+            w.WriteNull(name);
+            break;
+        case bool b:
+            w.WriteBoolean(name, b);
+            break;
+        case string str:
+            w.WriteString(name, str);
+            break;
+        default:
+            w.WriteNumber(name, value.ToDouble(System.Globalization.CultureInfo.InvariantCulture));
+            break;
+    }
+}
+
+static void WriteTagResult(List<ISourceInput> inputs, HashSet<string> excluded, string? taggerName)
+{
+    var files = new List<CompilationJob.File>();
+    foreach (var input in inputs)
+        if (input is CompilationJob.File file)
+            files.Add(file);
+
+    var stringsJob = CompilationJob.CreateFromInputs(inputs);
+    stringsJob.CompilationType = CompilationJob.Type.StringsOnly;
+    var stringsResult = Yarn.Compiler.Compiler.Compile(stringsJob);
+    if (stringsResult.StringTable != null)
+        foreach (var kvp in stringsResult.StringTable)
+            if (!kvp.Value.isImplicitTag)
+                excluded.Add(kvp.Key);
+
+    using var stdout = Console.OpenStandardOutput();
+    using var w = new Utf8JsonWriter(stdout);
+
+    w.WriteStartObject();
+    w.WriteBoolean("success", true);
+
+    var errors = new List<(string Message, string FileName, int Line)>();
+
+    w.WriteStartArray("files");
+    foreach (var file in files)
+    {
+        ILineTagGenerator tagger = taggerName == "descriptive"
+            ? new DescriptiveLineTagGenerator()
+            : new RandomLineTagGenerator();
+
+        var tagged = Utility.TagLines(file, excluded, tagger);
+        foreach (var id in tagged.LineIDs)
+            excluded.Add(id);
+
+        foreach (var ex in tagged.TagExceptions)
+        {
+            var message = ex is ILineTagGenerator.CompilationTagException
+                ? "The file contains errors, so no line tags were added to it."
+                : ex.Message;
+            errors.Add((message, string.IsNullOrEmpty(ex.SourceFile) ? file.FileName : ex.SourceFile!, ex.LineNumber));
+        }
+
+        var modifiedSource = tagged.ModifiedSource ?? file.Source;
+        w.WriteStartObject();
+        w.WriteString("fileName", file.FileName);
+        w.WriteBoolean("modified", modifiedSource != file.Source);
+        w.WriteString("source", modifiedSource);
+        w.WriteEndObject();
+    }
+    w.WriteEndArray();
+
+    w.WriteStartArray("errors");
+    foreach (var error in errors)
+    {
+        w.WriteStartObject();
+        w.WriteString("message", error.Message);
+        w.WriteString("fileName", error.FileName);
+        w.WriteNumber("line", error.Line);
+        w.WriteEndObject();
+    }
+    w.WriteEndArray();
+
+    w.WriteEndObject();
+    w.Flush();
+    Console.WriteLine();
 }
 
 static void WriteError(string message)
