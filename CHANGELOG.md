@@ -2,20 +2,49 @@
 
 ## Alpha 9 (in progress)
 
+### Yarn Project inspector
+
+The inspector for `.yarnproject` files now matches Yarn Spinner for Unity's!
+
+- The Yarn Spinner header (logo and links) from the dialogue runner's
+  inspector now appears on Yarn Projects, Yarn scripts, and `.ysls.json`
+  files too!
+- Compile errors are listed in the inspector, grouped b y script. Projects that 
+  fail to compile still import, so their errors are shown!
+- The project's source file patterns can be edited, added, and removed
+  directly in the inspector. Patterns now support folders and `**` anywhere
+  (`Dialogue/**/*.yarn`), and `excludeFiles` is respected!
+- **Add Line Tags to Yarn Scripts** adds `#line:` IDs to every untagged
+  line, using either the random or the descriptive line tagger!
+- **Export Strings and Metadata as CSV** writes a Godot translation CSV
+  using the project's base language, plus a `-metadata.csv` file with each
+  line's file, node, line number and tags. Aw yeah.
+- **Update Existing Strings Files** finds the translation CSVs that contain
+  the project's lines, adds new lines, removes deleted ones, and marks
+  translations whose source text has changed with `(NEEDS UPDATE)`!
+- The project can generate a typed variable storage class, with a property
+  for each declared variable and a GDScript enum for each Yarn enum. Choose
+  its class name and parent class in the inspector!
+- Changes are made with **Apply** and **Revert**, and switching away from a
+  project with unapplied changes asks whether to keep them. This is very Unity-esque,
+  so we're open to feedback.
+
+These settings are also available in the Import dock.
+
 ### Strict warning compatibility
 
 A handful of internal variable declarations relied on inferring their type
 from a `Variant` value, which fails to compile in projects that escalate
 GDScript's `INFERENCE_ON_VARIANT` warning to an error. Those declarations
 now use explicit types, so the addon compiles cleanly under strict warning
-settings.
+settings!
 
 ### Sample gallery ordering and thumbnails
 
 The Samples tab in the Yarn Spinner editor screen now lists samples in a
 learning-path order (starting points first, then core features,
 presentation, voice over, and saliency) instead of alphabetically, and
-every sample card has an up-to-date gameplay screenshot.
+every sample card has a screenshot.
 
 ### YarnDialoguePresenter is abstract
 
