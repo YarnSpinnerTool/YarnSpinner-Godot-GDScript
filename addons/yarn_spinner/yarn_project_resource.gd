@@ -30,6 +30,8 @@ const _YarnProgramParser := preload("res://addons/yarn_spinner/core/yarn_program
 ## line_id -> tags array
 @export var line_metadata: Dictionary = {}
 @export var source_files: PackedStringArray = PackedStringArray()
+@export var line_info: Dictionary = {}
+@export var diagnostics: Array = []
 
 var _cached_program: YarnProgram
 

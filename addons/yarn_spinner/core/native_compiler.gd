@@ -50,7 +50,10 @@ static func is_available() -> bool:
 ## Returns: Dictionary with:
 ##   success: bool
 ##   program: PackedByteArray (compiled protobuf, empty on error)
-##   string_table: Dictionary { line_id: { text, nodeName, lineNumber, fileName, metadata } }
+##   compiler_failed: bool (the compiler could not run, as opposed to reporting errors)
+##   string_table: Dictionary { line_id: { text, nodeName, lineNumber, fileName, isImplicitTag, metadata } }
+##   declarations: Array of { name, type, isEnum, description, isInlineExpansion, sourceFileName, defaultValue }
+##   enums: Array of { name, description, rawType, cases: [{ name, description, value }] }
 ##   diagnostics: Array of { message, severity, fileName, line, column, code }
 static func compile(files: Array[Dictionary], declarations: Array[Dictionary] = []) -> Dictionary:
 	if not is_available():
@@ -64,11 +67,40 @@ static func compile(files: Array[Dictionary], declarations: Array[Dictionary] = 
 		input["declarations"] = declarations
 	var input_json := JSON.stringify(input)
 
-	return _compile_via_pipe(bin_path, input_json)
+	return _parse_result(_run_via_pipe(bin_path, input_json))
 
 
-## Compile by feeding the input JSON to the binary's stdin.
-static func _compile_via_pipe(bin_path: String, input_json: String) -> Dictionary:
+static func tag_lines(files: Array[Dictionary], excluded_line_ids: PackedStringArray = PackedStringArray(), tagger: String = "random") -> Dictionary:
+	if not is_available():
+		return {"success": false, "files": [], "errors": [{"message": "Native compiler not available for this platform", "fileName": "", "line": -1}]}
+
+	var bin_path := ProjectSettings.globalize_path(get_native_bin_path())
+	var input := {
+		"command": "tag",
+		"files": files,
+		"excludedLineIDs": Array(excluded_line_ids),
+		"tagger": tagger,
+	}
+	var output := _run_via_pipe(bin_path, JSON.stringify(input))
+	if output.has("error"):
+		return {"success": false, "files": [], "errors": [{"message": output.error, "fileName": "", "line": -1}]}
+
+	var json := JSON.new()
+	if json.parse(output.json) != OK or not json.data is Dictionary:
+		return {"success": false, "files": [], "errors": [{"message": "Failed to parse compiler output: %s" % json.get_error_message(), "fileName": "", "line": -1}]}
+
+	var data: Dictionary = json.data
+	if not data.has("files"):
+		return {"success": false, "files": [], "errors": [{"message": "The bundled compiler is out of date and can't add line tags. Rebuild it with native/build.sh.", "fileName": "", "line": -1}]}
+	return {
+		"success": data.get("success", false),
+		"files": data.get("files", []),
+		"errors": data.get("errors", []),
+	}
+
+
+## Feed the input JSON to the binary's stdin.
+static func _run_via_pipe(bin_path: String, input_json: String) -> Dictionary:
 	# The binary reads its job from stdin, and OS.execute can't write to a
 	# child's stdin, so the JSON goes into a temp file that the shell
 	# redirects. The filename includes the process id and a timestamp so
@@ -77,7 +109,7 @@ static func _compile_via_pipe(bin_path: String, input_json: String) -> Dictionar
 		"yarn_compile_input_%d_%d.json" % [OS.get_process_id(), Time.get_ticks_usec()])
 	var temp_file := FileAccess.open(temp_path, FileAccess.WRITE)
 	if temp_file == null:
-		return _error_result("Failed to create temp file: %s" % error_string(FileAccess.get_open_error()))
+		return {"error": "Failed to create temp file: %s" % error_string(FileAccess.get_open_error())}
 	temp_file.store_string(input_json)
 	temp_file.close()
 
@@ -99,10 +131,21 @@ static func _compile_via_pipe(bin_path: String, input_json: String) -> Dictionar
 	DirAccess.remove_absolute(temp_path)
 
 	if output.is_empty():
-		return _error_result("Native compiler produced no output (exit code %d)" % exit_code)
+		return {"error": "Native compiler produced no output (exit code %d)" % exit_code}
 
 	var result_json: String = output[0] if output[0] is String else str(output[0])
-	return _parse_result(result_json)
+	if exit_code != 0:
+		return {"error": _first_diagnostic_message(result_json, exit_code)}
+	return {"json": result_json}
+
+
+static func _first_diagnostic_message(result_json: String, exit_code: int) -> String:
+	var json := JSON.new()
+	if json.parse(result_json) == OK and json.data is Dictionary:
+		var diagnostics: Array = (json.data as Dictionary).get("diagnostics", [])
+		if not diagnostics.is_empty() and diagnostics[0] is Dictionary:
+			return str((diagnostics[0] as Dictionary).get("message", ""))
+	return "Native compiler failed (exit code %d)" % exit_code
 
 
 ## Wrap a string in single quotes for POSIX sh, escaping embedded quotes.
@@ -110,22 +153,28 @@ static func _shell_quote(s: String) -> String:
 	return "'" + s.replace("'", "'\\''") + "'"
 
 
-static func _parse_result(result_json: String) -> Dictionary:
+static func _parse_result(output: Dictionary) -> Dictionary:
+	if output.has("error"):
+		return _error_result(output.error)
+
 	var json := JSON.new()
-	var err := json.parse(result_json)
+	var err := json.parse(output.json)
 	if err != OK:
 		return _error_result("Failed to parse compiler output: %s" % json.get_error_message())
 
 	var data: Dictionary = json.data
 	var result := {
 		"success": data.get("success", false),
+		"compiler_failed": false,
 		"program": PackedByteArray(),
 		"string_table": data.get("stringTable", {}),
+		"declarations": data.get("declarations", []),
+		"enums": data.get("enums", []),
 		"diagnostics": data.get("diagnostics", []),
 	}
 
-	var program_b64: String = data.get("program", "")
-	if not program_b64.is_empty():
+	var program_b64: Variant = data.get("program")
+	if program_b64 is String and not (program_b64 as String).is_empty():
 		result["program"] = Marshalls.base64_to_raw(program_b64)
 
 	return result
@@ -134,7 +183,10 @@ static func _parse_result(result_json: String) -> Dictionary:
 static func _error_result(message: String) -> Dictionary:
 	return {
 		"success": false,
+		"compiler_failed": true,
 		"program": PackedByteArray(),
 		"string_table": {},
+		"declarations": [],
+		"enums": [],
 		"diagnostics": [{"message": message, "severity": "error", "fileName": "", "line": -1, "column": -1, "code": ""}],
 	}
