@@ -64,6 +64,7 @@ var _code_edit: CodeEdit
 var _empty_state: Control
 var _body_split: VSplitContainer
 var _commands_panel: Control
+var _commands_container: Control
 var _confirm_dialog: ConfirmationDialog
 var _new_file_dialog: FileDialog
 
@@ -93,9 +94,10 @@ func _ready() -> void:
 
 	# folded-by-default commands palette
 	_commands_panel = YarnCommandsPanel.new()
-	_commands_panel.custom_minimum_size = Vector2(0, 180)
-	_commands_panel.visible = false
-	_body_split.add_child(_commands_panel)
+	_commands_container = _framed(_commands_panel)
+	_commands_container.custom_minimum_size = Vector2(0, int(180 * EditorInterface.get_editor_scale()))
+	_commands_container.visible = false
+	_body_split.add_child(_commands_container)
 
 	# samples browser: a full-body list shown in place of the editor
 	_samples_panel = _build_samples_panel()
@@ -175,12 +177,16 @@ func _build_toolbar() -> Control:
 	docs_button.pressed.connect(func() -> void: OS.shell_open(DOCS_URL))
 	toolbar.add_child(docs_button)
 
+	for child in toolbar.get_children():
+		if child is Button:
+			(child as Button).flat = true
+
 	return toolbar
 
 
 func _build_sidebar() -> Control:
 	var sidebar := VSplitContainer.new()
-	sidebar.custom_minimum_size = Vector2(240, 0)
+	sidebar.custom_minimum_size = Vector2(int(240 * EditorInterface.get_editor_scale()), 0)
 
 	# Yarn Projects (groups) → their .yarn scripts
 	var files_box := VBoxContainer.new()
@@ -228,7 +234,8 @@ func _build_sidebar() -> Control:
 	nodes_box.add_child(_node_list)
 	sidebar.add_child(nodes_box)
 
-	return sidebar
+	_node_list.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	return _framed(sidebar)
 
 
 func _build_code_edit() -> CodeEdit:
@@ -280,6 +287,7 @@ func _build_empty_state() -> Control:
 
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(int(440 * scale), 0)
+	panel.add_theme_stylebox_override("panel", _framed_style())
 	center.add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -312,7 +320,6 @@ func _build_empty_state() -> Control:
 	body.text = "Autocomplete, live error checking, project-wide rename, and visual node-graph editing — in the standalone Yarn Spinner Editor."
 	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.modulate = Color(1, 1, 1, 0.75)
 	box.add_child(body)
 
 	var button_row := CenterContainer.new()
@@ -687,7 +694,7 @@ func _do_go_home() -> void:
 # -------------------------------------------------------------------------- #
 
 func _on_commands_toggled(pressed: bool) -> void:
-	_commands_panel.visible = pressed
+	_commands_container.visible = pressed
 	if pressed:
 		_commands_panel._refresh()
 		_position_commands_split.call_deferred()
@@ -794,7 +801,7 @@ func _build_samples_panel() -> Control:
 
 	var hint := Label.new()
 	hint.text = "Run a sample to see Yarn Spinner in action, or open its scene to see how it's built."
-	hint.modulate = Color(1, 1, 1, 0.6)
+	hint.add_theme_color_override("font_color", _secondary_font_color())
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(hint)
 
@@ -850,7 +857,7 @@ func _refresh_samples() -> void:
 	if samples.is_empty():
 		var empty := Label.new()
 		empty.text = "No samples found under res://samples/."
-		empty.modulate = Color(1, 1, 1, 0.6)
+		empty.add_theme_color_override("font_color", _secondary_font_color())
 		_samples_grid.add_child(empty)
 		return
 
@@ -914,7 +921,7 @@ func _build_sample_card(sample: Dictionary, index: int) -> Control:
 
 	var desc_label := Label.new()
 	desc_label.text = SAMPLE_DESCRIPTIONS.get(sample.folder, sample.scene.trim_prefix("res://samples/"))
-	desc_label.modulate = Color(1, 1, 1, 0.6)
+	desc_label.add_theme_color_override("font_color", _secondary_font_color())
 	desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc_label.custom_minimum_size = Vector2(0, int(52 * scale))
 	desc_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -951,18 +958,41 @@ func _build_sample_card(sample: Dictionary, index: int) -> Control:
 	return card
 
 
-func _sample_card_style(hovered: bool) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	var base := Color(0.16, 0.17, 0.21)
-	var theme := EditorInterface.get_editor_theme()
-	if theme and theme.has_color("base_color", "Editor"):
-		base = theme.get_color("base_color", "Editor")
-	sb.bg_color = base.lightened(0.07) if hovered else base.lightened(0.02)
-	sb.set_corner_radius_all(8)
+func _sample_card_style(hovered: bool) -> StyleBox:
+	var sb := _framed_style()
 	sb.set_content_margin_all(0)
-	sb.border_color = Color(1, 1, 1, 0.12) if hovered else Color(1, 1, 1, 0.05)
-	sb.set_border_width_all(1)
+	if sb is StyleBoxFlat:
+		var flat := sb as StyleBoxFlat
+		flat.set_corner_radius_all(int(8 * EditorInterface.get_editor_scale()))
+		flat.set_border_width_all(maxi(1, int(EditorInterface.get_editor_scale())))
+		if hovered:
+			flat.border_color = EditorInterface.get_editor_theme().get_color("accent_color", "Editor")
 	return sb
+
+
+func _framed_style() -> StyleBox:
+	var theme := EditorInterface.get_editor_theme()
+	var sb: StyleBox = theme.get_stylebox("panel", "Panel").duplicate() if theme and theme.has_stylebox("panel", "Panel") else StyleBoxFlat.new()
+	sb.set_content_margin_all(int(6 * EditorInterface.get_editor_scale()))
+	return sb
+
+
+func _framed(content: Control) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = content.size_flags_horizontal
+	panel.size_flags_vertical = content.size_flags_vertical
+	panel.custom_minimum_size = content.custom_minimum_size
+	panel.add_theme_stylebox_override("panel", _framed_style())
+	panel.add_child(content)
+	return panel
+
+
+func _secondary_font_color() -> Color:
+	var theme := EditorInterface.get_editor_theme()
+	if theme and theme.has_color("font_color", "Editor"):
+		var font := theme.get_color("font_color", "Editor")
+		return Color(font.r, font.g, font.b, font.a * 0.8)
+	return Color(1, 1, 1, 0.8)
 
 
 ## Builds a tidy accent gradient with the sample's initial, used until (or unless)

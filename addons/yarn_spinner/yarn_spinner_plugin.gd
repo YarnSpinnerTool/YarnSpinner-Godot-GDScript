@@ -30,7 +30,7 @@ const YarnProjectInspectorPlugin := preload("res://addons/yarn_spinner/editor/ya
 const YarnActionExportPlugin := preload("res://addons/yarn_spinner/editor/yarn_action_export_plugin.gd")
 
 const MAIN_SCREEN_NAME := "Yarn Spinner"
-const PLUGIN_ICON_PATH := "res://addons/yarn_spinner/icons/yarn_script.svg"
+const PLUGIN_ICON_PATH := "res://addons/yarn_spinner/icons/yarn_spinner_main_screen.svg"
 
 const SETTING_YSC_PATH := "yarn_spinner/compiler/ysc_path"
 const SETTING_AUTO_YSLS := "yarn_spinner/ysls/auto_regenerate"
@@ -188,7 +188,29 @@ func _get_plugin_icon() -> Texture2D:
 		image.decompress()
 	var icon_size := int(round(16.0 * EditorInterface.get_editor_scale()))
 	image.resize(icon_size, icon_size, Image.INTERPOLATE_LANCZOS)
+	var tint := _editor_icon_color()
+	image.convert(Image.FORMAT_RGBA8)
+	for y in image.get_height():
+		for x in image.get_width():
+			var alpha := image.get_pixel(x, y).a
+			image.set_pixel(x, y, Color(tint.r, tint.g, tint.b, alpha))
 	return ImageTexture.create_from_image(image)
+
+
+func _editor_icon_color() -> Color:
+	var reference := EditorInterface.get_editor_theme().get_icon("Script", "EditorIcons")
+	var image := reference.get_image() if reference != null else null
+	if image == null:
+		return Color(0.88, 0.88, 0.88)
+	if image.is_compressed():
+		image.decompress()
+	var best := Color(0.88, 0.88, 0.88, 0.0)
+	for y in image.get_height():
+		for x in image.get_width():
+			var pixel := image.get_pixel(x, y)
+			if pixel.a > best.a:
+				best = pixel
+	return best
 
 
 func _make_visible(next_visible: bool) -> void:
