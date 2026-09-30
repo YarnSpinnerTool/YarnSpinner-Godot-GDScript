@@ -134,15 +134,71 @@ func generate_ysls_dict() -> Dictionary:
 	}
 
 
-func generate_ysls_json(pretty: bool = true) -> String:
+## The .ysls.json as it's written to disk. Functions go under PascalCase
+## "Functions"! Which ysc needs when it reads from a project's "definitions" file, so
+## ysc knows each function's types! The VS Code extension reads either case!
+func generate_ysls_file_dict() -> Dictionary:
 	var data := generate_ysls_dict()
+	var functions: Array = []
+	for info: Dictionary in data["functions"]:
+		functions.append(_function_for_file(info))
+	return {
+		"version": data["version"],
+		"commands": data["commands"],
+		"Functions": functions
+	}
+
+
+## ysc needs YarnName, ReturnType, Parameters and Documentation on every
+## function, and stops with an error on any type other than these four... 
+func _function_for_file(info: Dictionary) -> Dictionary:
+	var parameters: Array = []
+	for param: Dictionary in info.get("parameters", []):
+		var file_param := {
+			"Name": param.get("name", ""),
+			"Type": _definition_type(param.get("type", "any")),
+			"IsParamsArray": param.get("isParamsArray", false)
+		}
+		if param.has("subtype"):
+			file_param["Subtype"] = param["subtype"]
+		if param.has("defaultValue"):
+			file_param["DefaultValue"] = param["defaultValue"]
+		if param.has("documentation"):
+			file_param["Documentation"] = param["documentation"]
+		parameters.append(file_param)
+
+	var return_info: Dictionary = info.get("return", {})
+	var result := {
+		"YarnName": info.get("yarnName", ""),
+		"DefinitionName": info.get("definitionName", ""),
+		"FileName": info.get("fileName", ""),
+		"Language": info.get("language", "gdscript"),
+		"Documentation": info.get("documentation", ""),
+		"Parameters": parameters,
+		"ReturnType": _definition_type(return_info.get("type", "any"))
+	}
+	if info.has("signature"):
+		result["Signature"] = info["signature"]
+	if info.has("location"):
+		result["Location"] = info["location"]
+	if info.has("containsErrors"):
+		result["containsErrors"] = info["containsErrors"]
+	return result
+
+
+static func _definition_type(type: String) -> String:
+	return type if type in ["string", "number", "bool", "any"] else "any"
+
+
+func generate_ysls_json(pretty: bool = true) -> String:
+	var data := generate_ysls_file_dict()
 	if pretty:
 		return JSON.stringify(data, "  ")
 	return JSON.stringify(data)
 
 
 func save_ysls(path: String) -> Error:
-	var data := generate_ysls_dict()
+	var data := generate_ysls_file_dict()
 	var json := JSON.stringify(data, "  ")
 
 	# Skip the write if contents are unchanged. Godot's filesystem_changed
@@ -164,7 +220,7 @@ func save_ysls(path: String) -> Error:
 	file.store_string(json)
 	file.close()
 	print("ysls generator: saved '%s' with %d commands, %d functions" % [
-		path, data["commands"].size(), data["functions"].size()
+		path, data["commands"].size(), data["Functions"].size()
 	])
 	return OK
 

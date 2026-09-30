@@ -65,6 +65,33 @@ static func is_function_error(value: Variant) -> bool:
 	return value is StringName and value == FUNCTION_ERROR
 
 
+## Types of the built-in functions that the Yarn compiler doesn't already
+## know about. The importer passes these to the compiler, so these functions
+## can be used anywhere, including inside a line. Functions in the Yarn
+## standard library, like dice() and round(), don't need to be listed.
+## Keep this innn step with _register_builtin_functions().
+const COMPILER_DECLARATIONS: Array[Dictionary] = [
+	{"name": "visited", "parameters": ["string"], "returnType": "bool"},
+	{"name": "visited_count", "parameters": ["string"], "returnType": "number"},
+	{"name": "has_any_content", "parameters": ["string"], "returnType": "bool"},
+	{"name": "abs", "parameters": ["number"], "returnType": "number"},
+	{"name": "sign", "parameters": ["number"], "returnType": "number"},
+	{"name": "clamp", "parameters": ["number", "number", "number"], "returnType": "number"},
+	{"name": "lerp", "parameters": ["number", "number", "number"], "returnType": "number"},
+	{"name": "inverse_lerp", "parameters": ["number", "number", "number"], "returnType": "number"},
+	{"name": "smoothstep", "parameters": ["number", "number", "number"], "returnType": "number"},
+	{"name": "pow", "parameters": ["number", "number"], "returnType": "number"},
+	{"name": "sqrt", "parameters": ["number"], "returnType": "number"},
+	{"name": "wrap", "parameters": ["number", "number", "number"], "returnType": "number"},
+	{"name": "mod", "parameters": ["number", "number"], "returnType": "number"},
+	{"name": "plural", "parameters": ["number"], "variadicParameterType": "string", "returnType": "string"},
+	{"name": "ordinal", "parameters": ["number"], "variadicParameterType": "string", "returnType": "string"},
+	{"name": "length", "parameters": ["string"], "returnType": "number"},
+	{"name": "uppercase", "parameters": ["string"], "returnType": "string"},
+	{"name": "lowercase", "parameters": ["string"], "returnType": "string"},
+]
+
+
 func _init() -> void:
 	_register_builtin_functions()
 

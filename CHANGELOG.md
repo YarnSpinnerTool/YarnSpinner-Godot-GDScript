@@ -56,6 +56,42 @@ now refuses the attach outright. Attach one of the presenters from
 and friends), or subclass the base for your own. Existing subclasses are
 unaffected!
 
+### Functions can be used inside lines
+
+A function call inside a line, like `Rosa: You have {coin_count()} coins.`,
+used to fail to compille with "Can't determine the type of the expression".
+This was because compiler was never told what your functions return, so it 
+could only guess from where each call was used, and a line doesn't say.
+
+Now, before compiling, the importer it scans your scripts for functions 
+(the same scan that writes the `.ysls.json`, so `_yarn_function_`
+methods and functions added with `add_function()` are both found) and passes
+each one's parameter and return types to the compiler. It also declares the
+built-in functions teh compiler didn't know about: `visited`,
+`visited_count`, `has_any_content`, `abs`, `sign`, `clamp`, `lerp`,
+`inverse_lerp`, `smoothstep`, `pow`, `sqrt`, `wrap`, `mod`, `plural`,
+`ordinal`, `length`, `uppercase` and `lowercase`.
+
+Calling a function with the wrong type of argument, or using its result as
+the wrong type, is now a compile error instead of a problem at runtime! Hooray.
+Functions are found in the folder set by the Yarn Project's **Ysls Scan Path**
+import option, which is the whole project by default. 
+
+The bundled native compiler now accepts function declarations, which is how
+it gets them. The `ysc` fallback, used where there's no native compiler,
+gets them from the project's `"definitions"` instead:
+
+- The importer adds the project's `.ysls.json` to the `.yarnproject`'s
+  `"definitions"` if it isn't already listed. Anything already there is
+  kept, and teh file is only written when the entry is
+  missing. If `"definitions"` holds something other than a path or a list
+  of paths, it's left alone and you'll get a warning.
+- Functions in the `.ysls.json` are now written under `"Functions"`, in the
+  PascalCase shape `ysc` reads. Commands are unchanged. The VS Code
+  extension reads both no problemo.
+- `ysc` only reads the first file in `"definitions"`, so if your project
+  already listed another definitions file first, that's the one it uses..
+
 ### Changed
 
 - The `plural` annd `ordinal` markup markers now use the full set of Unicode

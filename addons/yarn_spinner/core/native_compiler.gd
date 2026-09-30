@@ -47,6 +47,11 @@ static func is_available() -> bool:
 ## Compile Yarn source files using the native compiler.
 ##
 ## Input: array of dictionaries [{ "fileName": "X.yarn", "source": "..." }]
+## declarations (optional): functions the game provides, so the compiler
+##   knows their types, as [{ name, parameters: [type, ...], returnType,
+##   variadicParameterType (optional), description (optional) }]. Types are
+##   "string", "number", "bool" or "any". Entries with a missing or "any"
+##   return type are ignored.
 ## Returns: Dictionary with:
 ##   success: bool
 ##   program: PackedByteArray (compiled protobuf, empty on error)

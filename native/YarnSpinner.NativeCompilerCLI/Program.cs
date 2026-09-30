@@ -8,7 +8,18 @@
 //
 // Usage:
 //   echo '{"files":[...]}' | ysc-native
+//   echo '{"files":[...],"declarations":[...]}' | ysc-native
 //   ysc-native --version
+//
+// "declarations" is optional. Each entry declares a function the game
+// provides, so the compiler knows its types even where it can't infer them
+// (for example, a function call inside a line):
+//   {"name": "coin_count", "parameters": ["string"], "returnType": "number"}
+// A function that takes any number of extra arguments at the end adds
+// "variadicParameterType" with their type.
+// Types are "string", "number", "bool" or "any". An entry whose return type
+// is missing, unknown or "any" is skipped, and the compiler infers the type
+// from context as it would without a declaration.
 //
 // ======================================================================== //
 
@@ -19,6 +30,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using Google.Protobuf;
+using Yarn;
 using Yarn.Compiler;
 
 if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v"))
@@ -83,6 +95,9 @@ try
     }
 
     var job = CompilationJob.CreateFromInputs(inputs);
+    var functionDeclarations = ReadFunctionDeclarations(root);
+    if (functionDeclarations.Count > 0)
+        job.Declarations = functionDeclarations;
     var result = Yarn.Compiler.Compiler.Compile(job);
 
     WriteResult(result);
@@ -92,6 +107,67 @@ catch (Exception ex)
 {
     WriteError(ex.ToString());
     return 1;
+}
+
+static List<Declaration> ReadFunctionDeclarations(JsonElement root)
+{
+    var declarations = new List<Declaration>();
+    if (!root.TryGetProperty("declarations", out var element) || element.ValueKind != JsonValueKind.Array)
+        return declarations;
+
+    foreach (var entry in element.EnumerateArray())
+    {
+        if (entry.ValueKind != JsonValueKind.Object)
+            continue;
+
+        var name = entry.TryGetProperty("name", out var nameElement) && nameElement.ValueKind == JsonValueKind.String
+            ? nameElement.GetString()
+            : null;
+        if (string.IsNullOrEmpty(name))
+            continue;
+
+        var returnType = entry.TryGetProperty("returnType", out var returnElement) ? ParseYarnType(returnElement) : null;
+        if (returnType == null || returnType == Types.Any)
+            continue;
+
+        var functionType = new FunctionTypeBuilder().WithReturnType(returnType);
+        if (entry.TryGetProperty("parameters", out var parameters) && parameters.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var parameter in parameters.EnumerateArray())
+                functionType.WithParameter(ParseYarnType(parameter) ?? Types.Any);
+        }
+
+        if (entry.TryGetProperty("variadicParameterType", out var variadicElement))
+        {
+            var variadicType = ParseYarnType(variadicElement);
+            if (variadicType != null)
+                functionType.WithVariadicParameterType(variadicType);
+        }
+
+        var declaration = new DeclarationBuilder()
+            .WithName(name)
+            .WithType(functionType.FunctionType);
+        if (entry.TryGetProperty("description", out var descriptionElement) && descriptionElement.ValueKind == JsonValueKind.String)
+            declaration.WithDescription(descriptionElement.GetString());
+
+        declarations.Add(declaration.Declaration);
+    }
+
+    return declarations;
+}
+
+static IType? ParseYarnType(JsonElement element)
+{
+    if (element.ValueKind != JsonValueKind.String)
+        return null;
+    return element.GetString()?.ToLowerInvariant() switch
+    {
+        "string" => Types.String,
+        "number" => Types.Number,
+        "bool" or "boolean" => Types.Boolean,
+        "any" => Types.Any,
+        _ => null,
+    };
 }
 
 static void WriteResult(CompilationResult result)

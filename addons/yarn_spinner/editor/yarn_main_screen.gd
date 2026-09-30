@@ -29,6 +29,7 @@ const YarnSyntaxHighlighter := preload("res://addons/yarn_spinner/editor/yarn_sy
 const YarnProjectImporter := preload("res://addons/yarn_spinner/editor/yarn_project_importer.gd")
 const DOCS_URL := "https://docs.yarnspinner.dev"
 const EDITOR_URL := "https://yarnspinner.dev/editor"
+const BANNER_PATH := "res://addons/yarn_spinner/icons/yarn_spinner_for_godot.png"
 const NEW_FILE_TEMPLATE := "title: Start\n---\n\n===\n"
 
 # --- editor state ---
@@ -286,7 +287,7 @@ func _build_empty_state() -> Control:
 	center.mouse_filter = Control.MOUSE_FILTER_PASS
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(int(440 * scale), 0)
+	panel.custom_minimum_size = Vector2(int(560 * scale), 0)
 	panel.add_theme_stylebox_override("panel", _framed_style())
 	center.add_child(panel)
 
@@ -300,14 +301,20 @@ func _build_empty_state() -> Control:
 	box.add_theme_constant_override("separation", int(14 * scale))
 	margin.add_child(box)
 
-	var logo := TextureRect.new()
-	if ResourceLoader.exists("res://addons/yarn_spinner/icons/YarnSpinnerLogo.png"):
-		logo.texture = load("res://addons/yarn_spinner/icons/YarnSpinnerLogo.png")
-	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	logo.custom_minimum_size = Vector2(0, int(128 * scale))
-	logo.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	box.add_child(logo)
+	var banner := TextureRect.new()
+	if ResourceLoader.exists(BANNER_PATH):
+		banner.texture = load(BANNER_PATH)
+	banner.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	banner.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	banner.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	banner.clip_contents = true
+	banner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	banner.custom_minimum_size = Vector2(0, int(520 * scale * 9.0 / 16.0))
+	banner.resized.connect(func() -> void:
+		var h := int(banner.size.x * 9.0 / 16.0)
+		if absi(int(banner.custom_minimum_size.y) - h) > 1:
+			banner.custom_minimum_size.y = h)
+	box.add_child(banner)
 
 	var headline := Label.new()
 	headline.text = "The best editing experience for Yarn Spinner"

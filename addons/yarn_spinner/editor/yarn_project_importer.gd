@@ -128,14 +128,26 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 	var resource: YarnProjectResource = null
 
-	# Try native compiler first (bundled, no .NET dependency)
+	# Scan the project's scripts for commands and functions before compiling,
+	# so the compiler gets each function's types. The .ysls.json below is
+	# written from the same scan, whicih I think is very clever.
+	var scan_path: String = options.get("ysls_scan_path", "")
+	var generator := _scan_yarn_actions(source_file, scan_path)
+
+	# Write the .ysls.json and list it in the project's "definitions" before
+	# compiling. The ysc fallback reads each function's types from it.
+	if options.get("generate_ysls", true):
+		_save_ysls_file(generator, source_file)
+		_add_ysls_to_definitions(source_file)
+
+	# Try native compiler first 
 	if YarnNativeCompiler.is_available():
-		var result := _compile_native(source_file, abs_path, source_files)
+		var result := _compile_native(source_file, abs_path, source_files, _function_declarations(generator))
 		resource = result.resource
 		if resource != null and resource.diagnostics.is_empty():
 			_generate_variables_source(source_file, options, result.declarations, result.enums)
 		elif resource == null:
-			# Native compiler failed — fall through to ysc CLI
+			# Native compiler failed — fall through to ysc CLI boo
 			print("yarn project importer: native compiler failed, falling back to ysc CLI")
 
 	if resource == null:
@@ -149,10 +161,6 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 	var save_file := save_path + "." + _get_save_extension()
 	var save_err := ResourceSaver.save(resource, save_file)
-
-	if options.get("generate_ysls", true):
-		var scan_path: String = options.get("ysls_scan_path", "")
-		_generate_ysls_file(source_file, scan_path)
 
 	return save_err
 
@@ -262,7 +270,7 @@ func _compile_ysc(source_file: String, abs_path: String, source_files: PackedStr
 
 
 ## Compile using the bundled native compiler (no .NET required).
-func _compile_native(source_file: String, abs_path: String, source_files: PackedStringArray) -> Dictionary:
+func _compile_native(source_file: String, abs_path: String, source_files: PackedStringArray, function_declarations: Array[Dictionary] = []) -> Dictionary:
 	print("yarn project importer: using native compiler at '%s'" % YarnNativeCompiler.get_native_bin_path())
 
 	var failed := {"resource": null, "declarations": [], "enums": []}
@@ -302,7 +310,7 @@ func _compile_native(source_file: String, abs_path: String, source_files: Packed
 	if files.is_empty():
 		return failed
 
-	var result := YarnNativeCompiler.compile(files)
+	var result := YarnNativeCompiler.compile(files, function_declarations)
 
 	if result.get("compiler_failed", false):
 		for diag in result.diagnostics:
@@ -536,12 +544,81 @@ static func _find_files_recursive(dir_path: String, relative: String, regex: Reg
 	dir.list_dir_end()
 
 
-func _generate_ysls_file(yarn_project_path: String, scan_path: String) -> void:
+func _scan_yarn_actions(yarn_project_path: String, scan_path: String) -> YarnYSLSGenerator:
 	var generator := YarnYSLSGenerator.new()
 	# Use the static helper to find the best scan root, or use explicit path
 	var root := scan_path if not scan_path.is_empty() else YarnYSLSGenerator.find_scan_root(yarn_project_path)
 	generator.scan_directory(root)
+	return generator
 
+
+## Function declarations for the compiler... the built-in functions it doesn't
+## already know about, then every function the scan found. Without these the
+## compiler can only work out a function's types from where it's used, so a
+## call inside a line, like {coin_count()}, didn't compile... Oops.
+func _function_declarations(generator: YarnYSLSGenerator) -> Array[Dictionary]:
+	var declarations: Array[Dictionary] = []
+	var declared: Dictionary[String, bool] = {}
+
+	for declaration: Dictionary in YarnLibrary.COMPILER_DECLARATIONS:
+		declarations.append(declaration)
+		declared[declaration["name"]] = true
+
+	var functions: Array = generator.generate_ysls_dict().get("functions", [])
+	for info: Dictionary in functions:
+		var yarn_name := str(info.get("yarnName", ""))
+		if yarn_name.is_empty() or declared.has(yarn_name):
+			continue
+		var return_info: Dictionary = info.get("return", {})
+		var declaration := {
+			"name": yarn_name,
+			"returnType": str(return_info.get("type", "any")),
+			"parameters": [],
+		}
+		for parameter: Dictionary in info.get("parameters", []):
+			if parameter.get("isParamsArray", false):
+				declaration["variadicParameterType"] = str(parameter.get("type", "any"))
+				break
+			declaration["parameters"].append(str(parameter.get("type", "any")))
+		declarations.append(declaration)
+		declared[yarn_name] = true
+
+	return declarations
+
+
+## Lists the project's generated .ysls.json in its "definitions" so ysc and
+## the VS Code extension read it. Anything already listed stays in the same
+## order thankfully, and the file is only written when the entry is missing!
+func _add_ysls_to_definitions(yarn_project_path: String) -> void:
+	var ysls_name := yarn_project_path.get_file().get_basename() + ".ysls.json"
+	var data := YarnProjectUtility.read_project_json(yarn_project_path)
+	if data.is_empty():
+		return
+
+	var definitions: Array = []
+	var existing: Variant = data.get("definitions", null)
+	if existing is String:
+		definitions.append(existing)
+	elif existing is Array:
+		definitions = (existing as Array).duplicate()
+	elif existing != null:
+		push_warning("yarn project importer: %s has a \"definitions\" entry that isn't a path or a list of paths, so %s wasn't added to it" % [yarn_project_path, ysls_name])
+		return
+
+	for entry: Variant in definitions:
+		if entry is String and (entry as String).simplify_path().trim_prefix("./") == ysls_name:
+			return
+
+	definitions.append(ysls_name)
+	data["definitions"] = definitions
+	var err := YarnProjectUtility.write_project_json(yarn_project_path, data)
+	if err != OK:
+		push_warning("yarn project importer: couldn't add %s to the definitions in %s: %s" % [ysls_name, yarn_project_path, error_string(err)])
+	else:
+		print("yarn project importer: added %s to the definitions in %s" % [ysls_name, yarn_project_path])
+
+
+func _save_ysls_file(generator: YarnYSLSGenerator, yarn_project_path: String) -> void:
 	var ysls_path := yarn_project_path.get_basename() + ".ysls.json"
 	var err := generator.save_ysls(ysls_path)
 
