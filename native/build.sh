@@ -10,14 +10,20 @@
 #   ./build.sh              # build for current platform
 #   ./build.sh all          # cross-compile for all platforms
 #   ./build.sh macos        # macOS only (universal binary)
-#   ./build.sh windows      # Windows x64 only
-#   ./build.sh linux        # Linux x64 only
+#   ./build.sh windows      # Windows, this machine's architecture
+#   ./build.sh linux        # Linux, this machine's architecture
 #
 # Output goes to:
 #   addons/yarn_spinner/native/bin/
-#     ysc-native              (macOS universal)
-#     ysc-native.exe          (Windows x64)
-#     ysc-native-linux        (Linux x64)
+#     ysc-native-macos-universal      (macOS arm64 + x64)
+#     ysc-native-windows-x64.exe      (Windows x64)
+#     ysc-native-windows-arm64.exe    (Windows arm64)
+#     ysc-native-linux-x64            (Linux x64)
+#     ysc-native-linux-arm64          (Linux arm64)
+#
+# NativeAOT can't cross-compile between operating systems AFAIK, so each
+# platform's binaries must be built on that platform. Windows and Linux
+# build for the machine's own architecture (x64 or arm64).
 #
 
 set -euo pipefail
@@ -57,26 +63,39 @@ build_cli() {
 }
 
 build_macos() {
-    build_cli "osx-arm64" "ysc-native-arm64"
-    build_cli "osx-x64" "ysc-native-x64"
+    build_cli "osx-arm64" "ysc-native-macos-arm64"
+    build_cli "osx-x64" "ysc-native-macos-x64"
 
+    local universal="$OUTPUT_DIR/ysc-native-macos-universal"
     echo "Creating macOS universal binary..."
     lipo -create \
-        "$OUTPUT_DIR/ysc-native-arm64" \
-        "$OUTPUT_DIR/ysc-native-x64" \
-        -output "$OUTPUT_DIR/ysc-native"
-    chmod +x "$OUTPUT_DIR/ysc-native"
+        "$OUTPUT_DIR/ysc-native-macos-arm64" \
+        "$OUTPUT_DIR/ysc-native-macos-x64" \
+        -output "$universal"
+    chmod +x "$universal"
 
-    rm "$OUTPUT_DIR/ysc-native-arm64" "$OUTPUT_DIR/ysc-native-x64"
-    echo "  → $OUTPUT_DIR/ysc-native ($(du -h "$OUTPUT_DIR/ysc-native" | cut -f1))"
+    rm "$OUTPUT_DIR/ysc-native-macos-arm64" "$OUTPUT_DIR/ysc-native-macos-x64"
+    echo "  → $universal ($(du -h "$universal" | cut -f1))"
+}
+
+host_arch() {
+    case "$(uname -m)" in
+        x86_64|amd64)  echo "x64" ;;
+        arm64|aarch64) echo "arm64" ;;
+        *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+    esac
 }
 
 build_windows() {
-    build_cli "win-x64" "ysc-native.exe"
+    local arch
+    arch="$(host_arch)"
+    build_cli "win-$arch" "ysc-native-windows-$arch.exe"
 }
 
 build_linux() {
-    build_cli "linux-x64" "ysc-native-linux"
+    local arch
+    arch="$(host_arch)"
+    build_cli "linux-$arch" "ysc-native-linux-$arch"
 }
 
 build_current() {

@@ -2,24 +2,24 @@
 //                    Yarn Spinner for Godot (GDScript)                     //
 // ======================================================================== //
 //
-// Native CLI compiler — reads JSON from stdin, writes JSON to stdout.
+// Native CLI compiler — reads JSON from stdin, writes JSON to stdout!
 // Same protocol as the shared library exports, but as a standalone binary.
-// Zero .NET runtime dependency (NativeAOT compiled).
+// Not dependencies as it's compile diwht NativeAOT.
 //
-// Usage:
-//   echo '{"files":[...]}' | ysc-native
-//   echo '{"files":[...],"declarations":[...]}' | ysc-native
-//   ysc-native --version
+// Usage (binaries are named per platform, e.g. ysc-native-linux-x64):
+//   echo '{"files":[...]}' | ysc-native-<os>-<arch>
+//   echo '{"files":[...],"declarations":[...]}' | ysc-native-<os>-<arch>
+//   ysc-native-<os>-<arch> --version
 //
 // "declarations" is optional. Each entry declares a function the game
 // provides, so the compiler knows its types even where it can't infer them
 // (for example, a function call inside a line):
 //   {"name": "coin_count", "parameters": ["string"], "returnType": "number"}
 // A function that takes any number of extra arguments at the end adds
-// "variadicParameterType" with their type.
+// "variadicParameterType" with their type...
 // Types are "string", "number", "bool" or "any". An entry whose return type
 // is missing, unknown or "any" is skipped, and the compiler infers the type
-// from context as it would without a declaration.
+// from context as it would without a declaration! Binaries are per platform now.
 //
 // ======================================================================== //
 

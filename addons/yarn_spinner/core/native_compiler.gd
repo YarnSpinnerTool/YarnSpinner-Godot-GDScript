@@ -16,23 +16,46 @@ extends RefCounted
 ## requiring the ysc CLI tool or .NET runtime on the user's machine.
 
 
-const NATIVE_BIN_PATHS := {
-	"macos": "res://addons/yarn_spinner/native/bin/ysc-native",
-	"windows": "res://addons/yarn_spinner/native/bin/ysc-native.exe",
-	"linux": "res://addons/yarn_spinner/native/bin/ysc-native-linux",
+const NATIVE_BIN_DIR := "res://addons/yarn_spinner/native/bin/"
+
+const NATIVE_BIN_NAMES := {
+	"macos-universal": "ysc-native-macos-universal",
+	"windows-x64": "ysc-native-windows-x64.exe",
+	"windows-arm64": "ysc-native-windows-arm64.exe",
+	"linux-x64": "ysc-native-linux-x64",
+	"linux-arm64": "ysc-native-linux-arm64",
 }
 
 
-## Returns the path to the native compiler binary for this platform.
+## Returns the path to the native compiler binary for this platform and
+## architecture, or an empty string if there isn't one.
 static func get_native_bin_path() -> String:
 	var os_name := OS.get_name().to_lower()
+	var platform := ""
 	if os_name == "macos" or os_name == "osx":
-		return NATIVE_BIN_PATHS.get("macos", "")
+		platform = "macos"
 	elif os_name == "windows":
-		return NATIVE_BIN_PATHS.get("windows", "")
+		platform = "windows"
 	elif os_name == "linux" or os_name.contains("bsd"):
-		return NATIVE_BIN_PATHS.get("linux", "")
-	return ""
+		platform = "linux"
+	else:
+		return ""
+
+	# The macOS binary contains both architectures.
+	var arch := "universal"
+	if platform != "macos":
+		match Engine.get_architecture_name():
+			"x86_64":
+				arch = "x64"
+			"arm64":
+				arch = "arm64"
+			_:
+				return ""
+
+	var bin_name: String = NATIVE_BIN_NAMES.get("%s-%s" % [platform, arch], "")
+	if bin_name.is_empty():
+		return ""
+	return NATIVE_BIN_DIR + bin_name
 
 
 ## Returns true if the native compiler binary is available.

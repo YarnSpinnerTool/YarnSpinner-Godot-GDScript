@@ -78,7 +78,7 @@ Functions are found in the folder set by the Yarn Project's **Ysls Scan Path**
 import option, which is the whole project by default. 
 
 The bundled native compiler now accepts function declarations, which is how
-it gets them. The `ysc` fallback, used where there's no native compiler,
+it gets them. The `ysc` fallbackused where there's no native compiler,
 gets them from the project's `"definitions"` instead:
 
 - The importer adds the project's `.ysls.json` to the `.yarnproject`'s
@@ -94,6 +94,11 @@ gets them from the project's `"definitions"` instead:
 
 ### Changed
 
+- The bundled compiler binaries are now named for their platform and
+  architecture: `ysc-native-macos-universal`, `ysc-native-windows-x64.exe`,
+  `ysc-native-linux-x64`, and the `arm64` builds for Windows and Linux. The
+  importer chooses the binary that matches the editor's platform and
+  architecture. Rebuild with `native/build.sh` to get the new names!
 - The `plural` annd `ordinal` markup markers now use the full set of Unicode
   CLDR plural rules, covering over a hundred languages, instead of a
   hand-picked list of about twenty. Languages such as Welsh, Irish,
