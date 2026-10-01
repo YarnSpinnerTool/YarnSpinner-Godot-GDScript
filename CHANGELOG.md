@@ -78,7 +78,7 @@ Functions are found in the folder set by the Yarn Project's **Ysls Scan Path**
 import option, which is the whole project by default. 
 
 The bundled native compiler now accepts function declarations, which is how
-it gets them. The `ysc` fallbackused where there's no native compiler,
+it gets them. The `ysc` fallback, used where there's no native compiler,
 gets them from the project's `"definitions"` instead:
 
 - The importer adds the project's `.ysls.json` to the `.yarnproject`'s
