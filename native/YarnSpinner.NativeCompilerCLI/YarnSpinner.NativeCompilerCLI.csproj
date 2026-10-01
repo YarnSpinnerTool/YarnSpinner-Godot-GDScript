@@ -12,9 +12,11 @@
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
     <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
     <InvariantGlobalization>true</InvariantGlobalization>
+
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
 
-  <!-- Reference the compiler from the main YarnSpinner repo — no copy -->
+  <!-- Reference the compiler from the main YarnSpinner repo! -->
   <ItemGroup>
     <ProjectReference Include="../../../YarnSpinner/YarnSpinner.Compiler/YarnSpinner.Compiler.csproj" />
   </ItemGroup>

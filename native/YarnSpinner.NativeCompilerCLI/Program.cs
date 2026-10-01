@@ -30,6 +30,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Google.Protobuf;
@@ -38,7 +39,11 @@ using Yarn.Compiler;
 
 if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v"))
 {
-    Console.WriteLine(typeof(Yarn.Compiler.Compiler).Assembly.GetName().Version?.ToString() ?? "unknown");
+    var assembly = typeof(Program).Assembly;
+    var product = assembly.GetCustomAttribute<AssemblyProductAttribute>()?.Product ?? "ysc-native";
+    var cliVersion = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
+    var compilerVersion = typeof(Yarn.Compiler.Compiler).Assembly.GetName().Version?.ToString() ?? "unknown";
+    Console.WriteLine($"{product} {cliVersion} (Yarn Spinner compiler {compilerVersion})");
     return 0;
 }
 
