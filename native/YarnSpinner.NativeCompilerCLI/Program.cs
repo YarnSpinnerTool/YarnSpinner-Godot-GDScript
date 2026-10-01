@@ -9,7 +9,10 @@
 // Usage (binaries are named per platform, e.g. ysc-native-linux-x64):
 //   echo '{"files":[...]}' | ysc-native-<os>-<arch>
 //   echo '{"files":[...],"declarations":[...]}' | ysc-native-<os>-<arch>
+//   ysc-native-<os>-<arch> --input job.json
 //   ysc-native-<os>-<arch> --version
+//
+// --input reads the JSON from a file
 //
 // "declarations" is optional. Each entry declares a function the game
 // provides, so the compiler knows its types even where it can't infer them
@@ -39,16 +42,33 @@ if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v"))
     return 0;
 }
 
-// Read all of stdin
 string inputJson;
-using (var reader = new StreamReader(Console.OpenStandardInput(), Encoding.UTF8))
+if (args.Length > 0 && args[0] == "--input")
 {
+    if (args.Length < 2)
+    {
+        WriteError("--input needs a file path");
+        return 1;
+    }
+    try
+    {
+        inputJson = File.ReadAllText(args[1], Encoding.UTF8);
+    }
+    catch (Exception ex)
+    {
+        WriteError($"Couldn't read input file '{args[1]}': {ex.Message}");
+        return 1;
+    }
+}
+else
+{
+    using var reader = new StreamReader(Console.OpenStandardInput(), Encoding.UTF8);
     inputJson = reader.ReadToEnd();
 }
 
 if (string.IsNullOrWhiteSpace(inputJson))
 {
-    WriteError("No input provided on stdin");
+    WriteError("No input provided");
     return 1;
 }
 

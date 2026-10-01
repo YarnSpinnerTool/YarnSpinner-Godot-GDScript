@@ -95,7 +95,7 @@ static func compile(files: Array[Dictionary], declarations: Array[Dictionary] = 
 		input["declarations"] = declarations
 	var input_json := JSON.stringify(input)
 
-	return _parse_result(_run_via_pipe(bin_path, input_json))
+	return _parse_result(_run_compiler(bin_path, input_json))
 
 
 static func tag_lines(files: Array[Dictionary], excluded_line_ids: PackedStringArray = PackedStringArray(), tagger: String = "random") -> Dictionary:
@@ -109,7 +109,7 @@ static func tag_lines(files: Array[Dictionary], excluded_line_ids: PackedStringA
 		"excludedLineIDs": Array(excluded_line_ids),
 		"tagger": tagger,
 	}
-	var output := _run_via_pipe(bin_path, JSON.stringify(input))
+	var output := _run_compiler(bin_path, JSON.stringify(input))
 	if output.has("error"):
 		return {"success": false, "files": [], "errors": [{"message": output.error, "fileName": "", "line": -1}]}
 
@@ -127,12 +127,9 @@ static func tag_lines(files: Array[Dictionary], excluded_line_ids: PackedStringA
 	}
 
 
-## Feed the input JSON to the binary's stdin.
-static func _run_via_pipe(bin_path: String, input_json: String) -> Dictionary:
-	# The binary reads its job from stdin, and OS.execute can't write to a
-	# child's stdin, so the JSON goes into a temp file that the shell
-	# redirects. The filename includes the process id and a timestamp so
-	# concurrent editor instances sharing one cache dir don't race.
+## Run the binary on a job, passing the JSON in a temp file with --input.
+static func _run_compiler(bin_path: String, input_json: String) -> Dictionary:
+	# The binary is run directly (it includes the process id and a timestamp in the temp file name to avoid race conditions! learned that the hard).
 	var temp_path := OS.get_cache_dir().path_join(
 		"yarn_compile_input_%d_%d.json" % [OS.get_process_id(), Time.get_ticks_usec()])
 	var temp_file := FileAccess.open(temp_path, FileAccess.WRITE)
@@ -142,19 +139,7 @@ static func _run_via_pipe(bin_path: String, input_json: String) -> Dictionary:
 	temp_file.close()
 
 	var output := []
-	var exit_code: int
-	var os_name := OS.get_name().to_lower()
-
-	if os_name == "windows":
-		# Args are passed separately; Godot's process launcher quotes any
-		# argument containing spaces, so paths survive cmd's parsing.
-		exit_code = OS.execute("cmd.exe", ["/c", "type", temp_path, "|", bin_path], output, true, false)
-	else:
-		# Both paths are single-quoted for the shell (embedded quotes
-		# escaped), so spaces and metacharacters in either path can't
-		# break or inject into the command.
-		var cmd := "exec %s < %s" % [_shell_quote(bin_path), _shell_quote(temp_path)]
-		exit_code = OS.execute("/bin/sh", ["-c", cmd], output, true, false)
+	var exit_code := OS.execute(bin_path, ["--input", temp_path], output, true, false)
 
 	DirAccess.remove_absolute(temp_path)
 
@@ -163,7 +148,10 @@ static func _run_via_pipe(bin_path: String, input_json: String) -> Dictionary:
 
 	var result_json: String = output[0] if output[0] is String else str(output[0])
 	if exit_code != 0:
-		return {"error": _first_diagnostic_message(result_json, exit_code)}
+		var message := _first_diagnostic_message(result_json, exit_code)
+		if message == "No input provided on stdin":
+			message = "The bundled compiler is out of date. Rebuild it with native/build.sh."
+		return {"error": message}
 	return {"json": result_json}
 
 
@@ -174,11 +162,6 @@ static func _first_diagnostic_message(result_json: String, exit_code: int) -> St
 		if not diagnostics.is_empty() and diagnostics[0] is Dictionary:
 			return str((diagnostics[0] as Dictionary).get("message", ""))
 	return "Native compiler failed (exit code %d)" % exit_code
-
-
-## Wrap a string in single quotes for POSIX sh, escaping embedded quotes.
-static func _shell_quote(s: String) -> String:
-	return "'" + s.replace("'", "'\\''") + "'"
 
 
 static func _parse_result(output: Dictionary) -> Dictionary:
