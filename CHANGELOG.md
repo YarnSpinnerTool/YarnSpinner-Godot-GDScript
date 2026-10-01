@@ -74,8 +74,9 @@ built-in functions teh compiler didn't know about: `visited`,
 
 Calling a function with the wrong type of argument, or using its result as
 the wrong type, is now a compile error instead of a problem at runtime! Hooray.
-Functions are found in the folder set by the Yarn Project's **Ysls Scan Path**
-import option, which is the whole project by default. 
+Functions are found in the same files the `.ysls.json` is written from: the
+Yarn Project's folder and the scenes that use it, or the folder set in the
+Yarn Project's **Ysls Scan Path** import option.
 
 The bundled native compiler now accepts function declarations, which is how
 it gets them. The `ysc` fallback, used where there's no native compiler,
@@ -203,6 +204,30 @@ gets them from the project's `"definitions"` instead:
   written with a combining accent, like `e` followed by U+0301, now
   produces the same text and the same attribute positions as one written
   with a precomposed `é`.
+- When a Yarn Project's Ysls Scan Path is empty, the folder searched for
+  Commands and Functions now starts at the project's own folder and only
+  moves up while it finds no scripts. It never moves into a folder that
+  holds another Yarn Project, so projects that sit side by side no longer
+  pick up each other's Commands in their `.ysls.json`.
+- With an empty Ysls Scan Path, the `.ysls.json` now also lists the
+  Commands and Functions from every scene that uses the Yarn Project,
+  wherever their scripts live. The scenes are found by reading them as
+  text, and the search follows the scripts attached to their nodes,
+  instanced and inherited scenes, the scripts and scenes those scripts
+  preload or name by class, and your autoloads. Scenes that only use a
+  different Yarn Project are skipped. A project whose scenes use shared
+  scripts, like a character script in another folder, now gets those
+  scripts' Commands.
+- The Ysls Scan Path import option is now empty by default, so new Yarn
+  Projects get the search above instead of scanning the whole project.
+  `res://`, the old default, is stored in the import settings of existing
+  projects, so it's now treated the same as empty. Any other folder is
+  still used as it is.
+- The `.ysls.json` rewritten when you save ascriipt, and the Commands
+  palette in the Yarn Spinner tab, now use each project's Ysls Scan Path
+  import option, and the rewrite is skipped for projects with Generate Ysls
+  turned off. The Dialogue Runner's Regenerregte YSLS button uses the same
+  search when its own Ysls Scan Path is empty.
 
 ### Fixed
 
@@ -292,12 +317,12 @@ gets them from the project's `"definitions"` instead:
   `_yarn_command_` or `_yarn_function_` method, instead of any script that
   mentions one.
 - Exported games no longer search every `class_name` script for commands
-  and functions when dialogue starts. Exported scripts don't include their
+  and functions when dialogue starts. (Sorry) Exported scripts don't include their
   source, so that search couldn't rule anything out and ended up loading
   every script. The plugin now records which scripts declare commands and
   functions when you export, much like Yarn Spinner for Unity generates its
   command registrations at build time, and the exported game loads only
-  those.
+  those!
 - Lines, options, plural rules and variable name hashing can now be used
   from more than one thread at once. Every line and option used to share a
   single markup parser, so reading line text from worker threads (for
@@ -324,6 +349,22 @@ gets them from the project's `"definitions"` instead:
 - Commands on nodes added to the scene after dialogue started are now
   found. If a command isn't registered and the scene has changed since it
   was last searched, the runner searches it again before giving up.
+- The voice over presenter now asks for a shadow line's audio using its
+  source line's ID, so shadow lines get the source line's clip even when a
+  custom line provider doesn't resolve shadow lines itself.
+- `set_content_saliency_strategy()` can now be called before the dialogue
+  runner is ready. It used to crash; the strategy is now kept and applied
+  when the runner sets up, and re-applied each time dialogue starts while
+  Saliency Strategy is Custom.
+- Command bindings set up in a scene's Inspector (the Bindings list on a
+  `YarnBindingLoader`) are now found when writing the `.ysls.json` and the
+  compiler's Function declarations. Scenes are read as text, not
+  instantiated.
+- `.ysls.json` entries for Command bindings now have the target method's
+  real parameters, return type and async flag, instead of no parameters.
+- Writing the `.ysls.json` no longer loads every `.tres` and `.res` file
+  in the scan folder. Only files that hold Command bindings are read, so
+  materials, textures and models aren't loaded or imported along the way.
 
 ### Documentation
 
