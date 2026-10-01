@@ -18,12 +18,11 @@
 
 class_name YarnGodotLocalisation
 extends RefCounted
-## Yarn Spinner's localisation, built upon on Godot's own systems so
-## text through [TranslationServer] (keys are teh line id with
-## [member translation_prefix] prepended), audio through translation
-## remaps (Project Settings > Localization > Remaps)
-## by [ResourceLoader]. There is no separate Yarn localisation backend anymore.
-## It's not really needed by Godot!
+## Yarn Spinner's localisation, built on Godot's own systems: text through
+## [TranslationServer] (keys are the line ID with
+## [member translation_prefix] prepended), and audio through translation
+## remaps (Project Settings > Localization > Remaps), applied by
+## [ResourceLoader]. There is no separate Yarn localisation backend.
 
 ## Emitted when the locale is changed through [method set_current_locale].
 signal locale_changed(locale: String)

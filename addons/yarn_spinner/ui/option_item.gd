@@ -64,8 +64,7 @@ func setup(yarn_option: YarnOption, index: int) -> void:
 	is_available = yarn_option.is_available
 	_has_submitted_selection = false
 
-	# Names are stripped from option text, the same as Yarn Spinner for
-	# Unity's option items.
+	# Names are stripped from option text.
 	var display_text := YarnMarkupParser.strip_bbcode_tags(yarn_option.text_without_character_name)
 	if display_text.is_empty():
 		display_text = yarn_option.raw_text

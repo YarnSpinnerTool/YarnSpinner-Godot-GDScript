@@ -31,6 +31,7 @@ var _current_functions: Array = []
 ## Ordered list of project paths matching the selector indices (after "All Projects").
 var _project_paths: Array[String] = []
 
+const YarnProjectImporter := preload("res://addons/yarn_spinner/editor/yarn_project_importer.gd")
 const ALL_PROJECTS := "(All Projects)"
 
 
@@ -106,18 +107,17 @@ func _refresh() -> void:
 
 
 ## Scan the directory tree for the current scope and rebuild the list.
-## "All Projects" scans the whole project (res://); a specific project scans the
-## directory inferred for that .yarnproject.
+## "All Projects" scans the whole project (res://); a specific project scans
+## what that .yarnproject's .ysls.json is generated from.
 func _rescan() -> void:
-	var scan_root := "res://"
-	var selected_idx := _project_selector.selected
-	if selected_idx > 0:
-		var project_idx := selected_idx - 1  # offset for "All Projects" entry
-		if project_idx < _project_paths.size():
-			scan_root = YarnYSLSGenerator.find_scan_root(_project_paths[project_idx])
-
 	var generator := YarnYSLSGenerator.new()
-	generator.scan_directory(scan_root)
+	var selected_idx := _project_selector.selected
+	var project_idx := selected_idx - 1  # offset for "All Projects" entry
+	if selected_idx > 0 and project_idx < _project_paths.size():
+		var project_path: String = _project_paths[project_idx]
+		generator.scan_for_project(project_path, YarnProjectImporter.ysls_scan_path_option(YarnProjectImporter.ysls_import_option(project_path, "ysls_scan_path", "")))
+	else:
+		generator.scan_directory("res://")
 	var ysls := generator.generate_ysls_dict()
 	_current_commands = ysls.get("commands", [])
 	_current_functions = ysls.get("functions", [])

@@ -40,7 +40,7 @@ static func create() -> VBoxContainer:
 		logo.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		container.add_child(logo)
 
-		# Responsive logoo!
+		# Responsive logo.
 		var _update_logo := func() -> void:
 			var available_w := container.size.x
 			if available_w < min_visible_width:

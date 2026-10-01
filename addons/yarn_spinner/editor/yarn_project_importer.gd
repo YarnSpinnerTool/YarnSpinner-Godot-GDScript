@@ -74,7 +74,7 @@ func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
 		},
 		{
 			"name": "ysls_scan_path",
-			"default_value": "res://",
+			"default_value": "",
 			"hint": PROPERTY_HINT_DIR,
 			"usage": PROPERTY_USAGE_EDITOR
 		},
@@ -130,9 +130,8 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 	# Scan the project's scripts for commands and functions before compiling,
 	# so the compiler gets each function's types. The .ysls.json below is
-	# written from the same scan, whicih I think is very clever.
-	var scan_path: String = options.get("ysls_scan_path", "")
-	var generator := _scan_yarn_actions(source_file, scan_path)
+	# written from the same scan.
+	var generator := _scan_yarn_actions(source_file, ysls_scan_path_option(options.get("ysls_scan_path", "")))
 
 	# Write the .ysls.json and list it in the project's "definitions" before
 	# compiling. The ysc fallback reads each function's types from it.
@@ -140,14 +139,14 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 		_save_ysls_file(generator, source_file)
 		_add_ysls_to_definitions(source_file)
 
-	# Try native compiler first 
+	# Try native compiler first
 	if YarnNativeCompiler.is_available():
 		var result := _compile_native(source_file, abs_path, source_files, _function_declarations(generator))
 		resource = result.resource
 		if resource != null and resource.diagnostics.is_empty():
 			_generate_variables_source(source_file, options, result.declarations, result.enums)
 		elif resource == null:
-			# Native compiler failed — fall through to ysc CLI boo
+			# Native compiler failed — fall through to ysc CLI
 			print("yarn project importer: native compiler failed, falling back to ysc CLI")
 
 	if resource == null:
@@ -546,16 +545,26 @@ static func _find_files_recursive(dir_path: String, relative: String, regex: Reg
 
 func _scan_yarn_actions(yarn_project_path: String, scan_path: String) -> YarnYSLSGenerator:
 	var generator := YarnYSLSGenerator.new()
-	# Use the static helper to find the best scan root, or use explicit path
-	var root := scan_path if not scan_path.is_empty() else YarnYSLSGenerator.find_scan_root(yarn_project_path)
-	generator.scan_directory(root)
+	generator.scan_for_project(yarn_project_path, scan_path)
 	return generator
 
 
-## Function declarations for the compiler... the built-in functions it doesn't
+static func ysls_scan_path_option(value: Variant) -> String:
+	var path := String(value).strip_edges()
+	return "" if path.trim_suffix("/") in ["res:/", "res:"] else path
+
+
+static func ysls_import_option(yarn_project_path: String, option: String, default_value: Variant) -> Variant:
+	var config := ConfigFile.new()
+	if config.load(yarn_project_path + ".import") != OK:
+		return default_value
+	return config.get_value("params", option, default_value)
+
+
+## Function declarations for the compiler: the built-in functions it doesn't
 ## already know about, then every function the scan found. Without these the
 ## compiler can only work out a function's types from where it's used, so a
-## call inside a line, like {coin_count()}, didn't compile... Oops.
+## call inside a line, like {coin_count()}, wouldn't compile.
 func _function_declarations(generator: YarnYSLSGenerator) -> Array[Dictionary]:
 	var declarations: Array[Dictionary] = []
 	var declared: Dictionary[String, bool] = {}
@@ -588,7 +597,7 @@ func _function_declarations(generator: YarnYSLSGenerator) -> Array[Dictionary]:
 
 ## Lists the project's generated .ysls.json in its "definitions" so ysc and
 ## the VS Code extension read it. Anything already listed stays in the same
-## order thankfully, and the file is only written when the entry is missing!
+## order, and the file is only written when the entry is missing.
 func _add_ysls_to_definitions(yarn_project_path: String) -> void:
 	var ysls_name := yarn_project_path.get_file().get_basename() + ".ysls.json"
 	var data := YarnProjectUtility.read_project_json(yarn_project_path)

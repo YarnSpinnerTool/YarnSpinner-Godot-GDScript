@@ -757,7 +757,7 @@ const SAMPLE_DESCRIPTIONS := {
 	"feature_tour": "A guided, room-by-room walk through every major Yarn Spinner feature.",
 	"inline_events": "Fire game events like movement and emotions from right inside a line of dialogue.",
 	"instance_commands": "Commands that target a specific object instance in the scene.",
-	"node_internals": "Peek at node titles, headers and metadata from the running dialogue.",
+	"node_internals": "Look through a node's compiled instructions to find the commands it will run and the assets they need.",
 	"options_that_timeout": "Options that expire if the player takes too long to choose.",
 	"phone_chat": "A texting conversation told in chat bubbles, typing indicator and all.",
 	"replacement_markup": "Custom markup that swaps text for icons and richly styled spans.",
@@ -765,8 +765,8 @@ const SAMPLE_DESCRIPTIONS := {
 	"themed_line_presenter": "Restyle the built-in line presenter to match the look of your game.",
 	"voice_over_3d": "Recorded voice-over synced to lines in a 3D scene.",
 	"voice_over": "Play recorded voice-over alongside each spoken line.",
-	"welcome": "A friendly starting point that introduces the basics of Yarn Spinner.",
-	"yarn_basics": "The fundamentals: nodes, lines, options and jumps.",
+	"welcome": "A spoken introduction to the samples, with slides on a projector screen.",
+	"yarn_basics": "A guided tour of the Yarn language, with a short section for each feature.",
 }
 
 # A small rotating palette so placeholder thumbnails feel intentional, not blank.

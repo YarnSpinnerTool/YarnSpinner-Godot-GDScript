@@ -129,7 +129,8 @@ static func tag_lines(files: Array[Dictionary], excluded_line_ids: PackedStringA
 
 ## Run the binary on a job, passing the JSON in a temp file with --input.
 static func _run_compiler(bin_path: String, input_json: String) -> Dictionary:
-	# The binary is run directly (it includes the process id and a timestamp in the temp file name to avoid race conditions! learned that the hard).
+	# The binary is run directly. The temp file name includes the process id
+	# and a timestamp so concurrent compiles don't overwrite each other.
 	var temp_path := OS.get_cache_dir().path_join(
 		"yarn_compile_input_%d_%d.json" % [OS.get_process_id(), Time.get_ticks_usec()])
 	var temp_file := FileAccess.open(temp_path, FileAccess.WRITE)

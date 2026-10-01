@@ -31,6 +31,8 @@ var _functions: Dictionary[String, Dictionary] = {}
 var _scanned_paths: Dictionary[String, bool] = {}
 var _source_cache: Dictionary[String, Dictionary] = {}
 var _global_class_bases: Dictionary[String, String] = {}
+var _pending_bindings: Dictionary[String, Dictionary] = {}
+var _parsed_text_resources: Dictionary[String, Dictionary] = {}
 
 
 func clear() -> void:
@@ -39,9 +41,16 @@ func clear() -> void:
 	_scanned_paths.clear()
 	_source_cache.clear()
 	_global_class_bases.clear()
+	_pending_bindings.clear()
+	_parsed_text_resources.clear()
 
 
 func scan_directory(path: String) -> void:
+	_scan_directory_recursive(path)
+	_resolve_pending_bindings()
+
+
+func _scan_directory_recursive(path: String) -> void:
 	var dir := DirAccess.open(path)
 	if dir == null:
 		push_warning("ysls generator: could not open directory '%s'" % path)
@@ -55,16 +64,33 @@ func scan_directory(path: String) -> void:
 
 		if dir.current_is_dir():
 			if not file_name.begins_with(".") and file_name != "addons":
-				scan_directory(full_path)
+				_scan_directory_recursive(full_path)
 		else:
-			if file_name.ends_with(".tres") or file_name.ends_with(".res"):
-				_scan_resource_file(full_path)
-			elif file_name.ends_with(".gd"):
-				_scan_gdscript_file(full_path)
+			_scan_file(full_path)
 
 		file_name = dir.get_next()
 
 	dir.list_dir_end()
+
+
+func _scan_file(path: String) -> void:
+	match path.get_extension().to_lower():
+		"tres", "res":
+			_scan_resource_file(path)
+		"tscn":
+			_scan_scene_file(path)
+		"gd":
+			_scan_gdscript_file(path)
+
+
+func scan_for_project(yarn_project_path: String, scan_path: String = "") -> void:
+	if not scan_path.is_empty():
+		scan_directory(scan_path)
+		return
+	_scan_directory_recursive(find_scan_root(yarn_project_path))
+	for path in find_reachable_files(yarn_project_path):
+		_scan_file(path)
+	_resolve_pending_bindings()
 
 
 func scan_gdscript_file(path: String) -> void:
@@ -135,8 +161,8 @@ func generate_ysls_dict() -> Dictionary:
 
 
 ## The .ysls.json as it's written to disk. Functions go under PascalCase
-## "Functions"! Which ysc needs when it reads from a project's "definitions" file, so
-## ysc knows each function's types! The VS Code extension reads either case!
+## "Functions", which ysc needs when it reads a project's "definitions" file
+## to know each function's types. The VS Code extension reads either case.
 func generate_ysls_file_dict() -> Dictionary:
 	var data := generate_ysls_dict()
 	var functions: Array = []
@@ -150,7 +176,7 @@ func generate_ysls_file_dict() -> Dictionary:
 
 
 ## ysc needs YarnName, ReturnType, Parameters and Documentation on every
-## function, and stops with an error on any type other than these four... 
+## function, and stops with an error on any type other than these four.
 func _function_for_file(info: Dictionary) -> Dictionary:
 	var parameters: Array = []
 	for param: Dictionary in info.get("parameters", []):
@@ -239,12 +265,335 @@ func _scan_resource_file(path: String) -> void:
 		return
 	_scanned_paths[path] = true
 
-	var res := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
-	if res == null:
+	if path.get_extension().to_lower() == "tres":
+		var binding := _binding_from_text_resource(path)
+		if not binding.is_empty() and not _pending_bindings.has(path):
+			_pending_bindings[path] = {"binding": binding, "script_path": ""}
 		return
 
-	if res is YarnCommandBinding:
-		_process_command_binding(res, path)
+	if not _has_binding_dependency(path):
+		return
+	var res := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE)
+	if res is YarnCommandBinding and not _pending_bindings.has(path):
+		_pending_bindings[path] = {"binding": _binding_to_dict(res), "script_path": ""}
+
+
+func _has_binding_dependency(path: String) -> bool:
+	for dependency in ResourceLoader.get_dependencies(path):
+		if _is_binding_script_path(_resolve_dependency(dependency)):
+			return true
+	return false
+
+
+static func _uid_to_path(uid: String) -> String:
+	var id := ResourceUID.text_to_id(uid)
+	if id == ResourceUID.INVALID_ID or not ResourceUID.has_id(id):
+		return ""
+	return ResourceUID.get_id_path(id)
+
+
+func _is_binding_script_path(path: String) -> bool:
+	return path.get_file() == "command_binding.gd"
+
+
+func _binding_to_dict(binding: YarnCommandBinding) -> Dictionary:
+	return {
+		"yarn_name": binding.yarn_name,
+		"type": binding.type,
+		"target_node": String(binding.target_node),
+		"method_name": binding.method_name,
+		"parameter_count": binding.parameter_count,
+		"enabled": binding.enabled,
+		"description": binding.description,
+	}
+
+
+func _binding_from_properties(properties: Dictionary) -> Dictionary:
+	var binding := {
+		"yarn_name": "",
+		"type": YarnCommandBinding.Type.COMMAND,
+		"target_node": "",
+		"method_name": "",
+		"parameter_count": 0,
+		"enabled": true,
+		"description": "",
+	}
+	for key in binding.keys():
+		if not properties.has(key):
+			continue
+		var value: Variant = str_to_var(properties[key])
+		if value == null:
+			continue
+		match key:
+			"type", "parameter_count":
+				binding[key] = int(value)
+			"enabled":
+				binding[key] = bool(value)
+			_:
+				binding[key] = String(value).strip_edges() if key == "yarn_name" else String(value)
+	return binding
+
+
+func _binding_from_text_resource(path: String) -> Dictionary:
+	var parsed := _parse_text_resource(path)
+	if parsed.is_empty():
+		return {}
+	for section: Dictionary in parsed["sections"]:
+		if section["kind"] == "resource":
+			return _binding_from_section(parsed, section)
+	return {}
+
+
+func _binding_from_section(parsed: Dictionary, section: Dictionary) -> Dictionary:
+	var properties: Dictionary = section["properties"]
+	if not properties.has("script"):
+		return {}
+	var script_ref := _parse_resource_reference(properties["script"])
+	if script_ref.is_empty() or script_ref[0] != "ExtResource":
+		return {}
+	var ext_resources: Dictionary = parsed["ext_resources"]
+	if not _is_binding_script_path(ext_resources.get(script_ref[1], "")):
+		return {}
+	return _binding_from_properties(properties)
+
+
+func _parse_resource_reference(text: String) -> Array:
+	var regex := RegEx.create_from_string("^\\s*(ExtResource|SubResource)\\(\\s*\"([^\"]+)\"\\s*\\)\\s*$")
+	var result := regex.search(text)
+	if result == null:
+		return []
+	return [result.get_string(1), result.get_string(2)]
+
+
+func _parse_text_resource(path: String) -> Dictionary:
+	if _parsed_text_resources.has(path):
+		return _parsed_text_resources[path]
+
+	var parsed := {}
+	var text := FileAccess.get_file_as_string(path)
+	if not text.is_empty():
+		parsed = _parse_resource_text(text)
+	_parsed_text_resources[path] = parsed
+	return parsed
+
+
+func _parse_resource_text(text: String) -> Dictionary:
+	var header_regex := RegEx.create_from_string("^\\[(gd_scene|gd_resource|ext_resource|sub_resource|node|resource|connection|editable)\\b(.*)\\]\\s*$")
+	var attribute_regex := RegEx.create_from_string("(\\w+)=(\"(?:[^\"\\\\]|\\\\.)*\"|\\w+\\([^)]*\\)|[^\\s]+)")
+	var property_regex := RegEx.create_from_string("^([A-Za-z_][\\w/:]*) = (.*)$")
+
+	var sections: Array[Dictionary] = []
+	var ext_resources: Dictionary = {}
+	var current: Dictionary = {}
+	var pending_key := ""
+	var pending_value := ""
+
+	for line in text.split("\n"):
+		if not pending_key.is_empty():
+			pending_value += "\n" + line
+			if _is_complete_value(pending_value):
+				current["properties"][pending_key] = pending_value
+				pending_key = ""
+			continue
+
+		var header := header_regex.search(line)
+		if header != null:
+			var attributes := {}
+			for attribute in attribute_regex.search_all(header.get_string(2)):
+				var value := attribute.get_string(2)
+				if value.begins_with("\""):
+					value = str_to_var(value)
+				attributes[attribute.get_string(1)] = value
+			current = {"kind": header.get_string(1), "attributes": attributes, "properties": {}}
+			sections.append(current)
+			if current["kind"] == "ext_resource" and attributes.has("id"):
+				var ext_path: String = attributes.get("path", "")
+				if attributes.has("uid"):
+					var uid_path := _uid_to_path(attributes["uid"])
+					if not uid_path.is_empty():
+						ext_path = uid_path
+				ext_resources[attributes["id"]] = ext_path
+			continue
+
+		if current.is_empty():
+			continue
+		var property := property_regex.search(line)
+		if property == null:
+			continue
+		var value := property.get_string(2)
+		if _is_complete_value(value):
+			current["properties"][property.get_string(1)] = value
+		else:
+			pending_key = property.get_string(1)
+			pending_value = value
+
+	return {"sections": sections, "ext_resources": ext_resources}
+
+
+func _is_complete_value(value: String) -> bool:
+	var in_string := false
+	var escaped := false
+	var depth := 0
+	for character in value:
+		if in_string:
+			if escaped:
+				escaped = false
+			elif character == "\\":
+				escaped = true
+			elif character == "\"":
+				in_string = false
+		elif character == "\"":
+			in_string = true
+		elif character in "([{":
+			depth += 1
+		elif character in ")]}":
+			depth -= 1
+	return not in_string and depth <= 0
+
+
+func _scan_scene_file(path: String) -> void:
+	if _scanned_paths.has(path):
+		return
+	_scanned_paths[path] = true
+
+	var text := FileAccess.get_file_as_string(path)
+	if not (text.contains("command_binding.gd") or text.contains("binding_loader.gd")):
+		return
+
+	var parsed := _parse_text_resource(path)
+	if parsed.is_empty():
+		return
+
+	var ext_resources: Dictionary = parsed["ext_resources"]
+	var sub_bindings: Dictionary = {}
+	for section: Dictionary in parsed["sections"]:
+		if section["kind"] == "sub_resource" and section["attributes"].has("id"):
+			var binding := _binding_from_section(parsed, section)
+			if not binding.is_empty():
+				sub_bindings[section["attributes"]["id"]] = binding
+
+	var reference_regex := RegEx.create_from_string("(ExtResource|SubResource)\\(\\s*\"([^\"]+)\"\\s*\\)")
+	for section: Dictionary in parsed["sections"]:
+		if section["kind"] != "node":
+			continue
+		var node_path := _scene_node_path(section["attributes"])
+		for key in section["properties"]:
+			if key == "script":
+				continue
+			for reference in reference_regex.search_all(section["properties"][key]):
+				var id := reference.get_string(2)
+				var binding: Dictionary = {}
+				var binding_key := ""
+				if reference.get_string(1) == "SubResource":
+					if not sub_bindings.has(id):
+						continue
+					binding = sub_bindings[id]
+					binding_key = "%s::%s" % [path, id]
+				else:
+					var ext_path: String = ext_resources.get(id, "")
+					if ext_path.get_extension().to_lower() != "tres":
+						continue
+					binding = _binding_from_text_resource(ext_path)
+					if binding.is_empty():
+						continue
+					binding_key = ext_path
+					_scanned_paths[ext_path] = true
+				var target_path := _join_node_path(node_path, binding["target_node"])
+				var script_path := _script_for_scene_node(path, target_path, 0) if target_path != null else ""
+				if script_path.is_empty() and _pending_bindings.has(binding_key) and not _pending_bindings[binding_key]["script_path"].is_empty():
+					continue
+				_pending_bindings[binding_key] = {"binding": binding, "script_path": script_path}
+
+
+func _scene_node_path(attributes: Dictionary) -> String:
+	if not attributes.has("parent"):
+		return ""
+	var parent: String = attributes["parent"]
+	var node_name: String = attributes.get("name", "")
+	return node_name if parent == "." else parent.path_join(node_name)
+
+
+func _join_node_path(from_path: String, relative: String) -> Variant:
+	if relative.is_empty() or relative.begins_with("/") or relative.begins_with("%"):
+		return null
+	var parts: Array[String] = []
+	for part in from_path.split("/", false):
+		parts.append(part)
+	for part in relative.split("/", false):
+		if part == ".":
+			continue
+		if part == "..":
+			if parts.is_empty():
+				return null
+			parts.pop_back()
+		else:
+			parts.append(part)
+	return "/".join(parts)
+
+
+func _script_for_scene_node(scene_path: String, node_path: String, depth: int) -> String:
+	if depth > 16:
+		return ""
+	var parsed := _parse_text_resource(scene_path)
+	if parsed.is_empty():
+		return ""
+	var ext_resources: Dictionary = parsed["ext_resources"]
+	var nodes: Dictionary = {}
+	for section: Dictionary in parsed["sections"]:
+		if section["kind"] == "node":
+			nodes[_scene_node_path(section["attributes"])] = section
+
+	if nodes.has(node_path):
+		var section: Dictionary = nodes[node_path]
+		if section["properties"].has("script"):
+			var script_ref := _parse_resource_reference(section["properties"]["script"])
+			if not script_ref.is_empty() and script_ref[0] == "ExtResource":
+				return ext_resources.get(script_ref[1], "")
+		var instance := _parse_resource_reference(section["attributes"].get("instance", ""))
+		if not instance.is_empty():
+			return _script_for_scene_node(ext_resources.get(instance[1], ""), "", depth + 1)
+		return ""
+
+	var best_prefix := ""
+	var best_instance := ""
+	for candidate: String in nodes:
+		if not (candidate.is_empty() or node_path.begins_with(candidate + "/")):
+			continue
+		var instance := _parse_resource_reference(nodes[candidate]["attributes"].get("instance", ""))
+		if instance.is_empty():
+			continue
+		if best_instance.is_empty() or candidate.length() > best_prefix.length():
+			best_prefix = candidate
+			best_instance = ext_resources.get(instance[1], "")
+	if best_instance.is_empty():
+		return ""
+	var remainder := node_path if best_prefix.is_empty() else node_path.substr(best_prefix.length() + 1)
+	return _script_for_scene_node(best_instance, remainder, depth + 1)
+
+
+func _resolve_pending_bindings() -> void:
+	for key: String in _pending_bindings:
+		var pending: Dictionary = _pending_bindings[key]
+		var binding: Dictionary = pending["binding"]
+		if binding["yarn_name"].is_empty() or binding["method_name"].is_empty() or binding["target_node"].is_empty() or not binding["enabled"]:
+			continue
+		var script_path: String = pending["script_path"]
+		if script_path.is_empty():
+			script_path = _find_unique_script_defining(binding["method_name"])
+		_process_command_binding(binding, key.get_slice("::", 0), script_path)
+	_pending_bindings.clear()
+
+
+func _find_unique_script_defining(method_name: String) -> String:
+	var found := ""
+	for path: String in _scanned_paths:
+		if path.get_extension() != "gd":
+			continue
+		if _get_source_methods(path, "").has(method_name):
+			if not found.is_empty():
+				return ""
+			found = path
+	return found
 
 
 func _scan_gdscript_file(path: String) -> void:
@@ -304,47 +653,55 @@ func _scan_script_methods(script: Script, path: String) -> void:
 			_functions[yarn_name] = _build_function_info(yarn_name, method_name, method, file_name, source_method)
 
 
-func _process_command_binding(binding: YarnCommandBinding, path: String) -> void:
-	if not binding.is_valid() or not binding.enabled:
-		return
+func _process_command_binding(binding: Dictionary, path: String, script_path: String) -> void:
+	var yarn_name: String = binding["yarn_name"]
+	var method_name: String = binding["method_name"]
+	var is_function: bool = binding["type"] == YarnCommandBinding.Type.FUNCTION
+	var description: String = binding["description"]
 
-	var file_name := path.get_file()
+	var info: Dictionary = {}
+	var script: Script = null
+	if not script_path.is_empty() and ResourceLoader.exists(script_path):
+		script = ResourceLoader.load(script_path, "Script", ResourceLoader.CACHE_MODE_IGNORE) as Script
+	if script != null:
+		var method_info: Dictionary = {}
+		for method in script.get_script_method_list():
+			if method["name"] == method_name:
+				method_info = method
+				break
+		if not method_info.is_empty():
+			var source_method := _find_source_method(script, method_name)
+			if is_function:
+				info = _build_function_info(yarn_name, method_name, method_info, script_path.get_file(), source_method)
+			else:
+				info = _build_command_info(yarn_name, method_name, method_info, script_path.get_file(), false, "", source_method)
 
-	# binding resources lack full method signatures, so entries are approximate
-	var params: Array = []
-
-	if binding.type == YarnCommandBinding.Type.FUNCTION:
-		for i in range(binding.parameter_count):
-			params.append({
-				"name": "arg%d" % i,
-				"type": "any",
-				"isParamsArray": false
-			})
-
-		var info := {
-			"yarnName": binding.yarn_name,
-			"definitionName": binding.method_name,
-			"fileName": file_name,
-			"language": "gdscript",
-			"parameters": params,
-			"async": false,
-			"return": {"type": "any"}
-		}
-		if not binding.description.is_empty():
-			info["documentation"] = binding.description
-		_functions[binding.yarn_name] = info
-	else:
-		var info := {
-			"yarnName": binding.yarn_name,
-			"definitionName": binding.method_name,
-			"fileName": file_name,
+	if info.is_empty():
+		var params: Array = []
+		if is_function:
+			for i in range(binding["parameter_count"]):
+				params.append({
+					"name": "arg%d" % i,
+					"type": "any",
+					"isParamsArray": false
+				})
+		info = {
+			"yarnName": yarn_name,
+			"definitionName": method_name,
+			"fileName": path.get_file(),
 			"language": "gdscript",
 			"parameters": params,
 			"async": false
 		}
-		if not binding.description.is_empty():
-			info["documentation"] = binding.description
-		_commands[binding.yarn_name] = info
+		if is_function:
+			info["return"] = {"type": "any"}
+
+	if not description.is_empty():
+		info["documentation"] = description
+	if is_function:
+		_functions[yarn_name] = info
+	else:
+		_commands[yarn_name] = info
 
 
 func _extract_callable_info(callable: Callable, yarn_name: String, is_command: bool) -> Dictionary:
@@ -1003,53 +1360,190 @@ func _scan_runtime_bindings(source: String, file_name: String, path: String = ""
 # STATIC HELPERS
 # =============================================================================
 
-## Generate YSLS for a project. scan_root defaults to the nearest ancestor
-## directory containing .gd scripts (walks up from the .yarnproject).
+## Generate YSLS for a project. With no scan_root, scans the folder from
+## [method find_scan_root] plus the files from [method find_reachable_files].
 ## Pass "res://" to scan the entire Godot project.
 static func generate_for_project(yarn_project_path: String, scan_root: String = "") -> Error:
 	var generator := YarnYSLSGenerator.new()
-	var root := scan_root if not scan_root.is_empty() else find_scan_root(yarn_project_path)
-	generator.scan_directory(root)
+	generator.scan_for_project(yarn_project_path, scan_root)
 	return generator.save_ysls_for_project(yarn_project_path)
 
 
-## Find the best directory to scan for a .yarnproject file. Walks up from
-## the project file's directory looking for .gd files in the directory or
-## its immediate children (e.g. a sibling "scripts/" folder).
+## Find the directory to scan for a .yarnproject file. Starts at the project
+## file's folder and moves up while that folder's tree has no .gd files, but
+## never into a folder that holds another Yarn Project, so unrelated projects
+## next to this one are left alone.
 static func find_scan_root(yarn_project_path: String) -> String:
 	var dir := yarn_project_path.get_base_dir()
-	while dir != "res://" and dir != "res:/" and not dir.is_empty():
-		var d := DirAccess.open(dir)
-		if d != null:
-			d.list_dir_begin()
-			var fname := d.get_next()
-			var has_gd := false
-			while not fname.is_empty():
-				if fname.ends_with(".gd"):
-					has_gd = true
-					break
-				if d.current_is_dir() and not fname.begins_with(".") and fname != "addons":
-					var sub := DirAccess.open(dir.path_join(fname))
-					if sub != null:
-						sub.list_dir_begin()
-						var sf := sub.get_next()
-						while not sf.is_empty():
-							if sf.ends_with(".gd"):
-								has_gd = true
-								break
-							sf = sub.get_next()
-						sub.list_dir_end()
-				if has_gd:
-					break
-				fname = d.get_next()
-			d.list_dir_end()
-			if has_gd:
-				return dir
-		dir = dir.get_base_dir()
-	# No code directory found near the .yarnproject (e.g. scripts live elsewhere
-	# under res://). Fall back to scanning the whole project rather than just the
-	# project file's folder, so commands defined anywhere are still discovered.
-	return "res://"
+	while not _tree_has_extension(dir, "gd", ""):
+		if dir == "res://" or dir == "res:/" or dir.is_empty():
+			break
+		var parent := dir.get_base_dir()
+		if _tree_has_extension(parent, "yarnproject", dir):
+			break
+		dir = parent
+	return dir
+
+
+static func _tree_has_extension(dir_path: String, extension: String, skip_path: String) -> bool:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return false
+	dir.list_dir_begin()
+	var file_name := dir.get_next()
+	while not file_name.is_empty():
+		var full_path := dir_path.path_join(file_name)
+		if dir.current_is_dir():
+			if not file_name.begins_with(".") and file_name != "addons" and full_path != skip_path:
+				if _tree_has_extension(full_path, extension, skip_path):
+					dir.list_dir_end()
+					return true
+		elif file_name.get_extension() == extension:
+			dir.list_dir_end()
+			return true
+		file_name = dir.get_next()
+	dir.list_dir_end()
+	return false
+
+
+static func find_reachable_files(yarn_project_path: String) -> PackedStringArray:
+	var graph: Dictionary = {}
+	var reached: Dictionary = {}
+	var classes := _project_global_classes()
+
+	var scenes: Array[String] = []
+	_collect_files("res://", ["tscn", "scn"], scenes)
+	var queue: Array[String] = []
+	for scene in scenes:
+		if _projects_reached(scene, graph, classes, reached).has(yarn_project_path):
+			queue.append(scene)
+	for setting in ProjectSettings.get_property_list():
+		var setting_name: String = setting["name"]
+		if setting_name.begins_with("autoload/"):
+			var autoload_path := _resolve_dependency(String(ProjectSettings.get_setting(setting_name)).trim_prefix("*"))
+			if _is_followed_path(autoload_path):
+				queue.append(autoload_path)
+
+	var found: Dictionary = {}
+	while not queue.is_empty():
+		var path: String = queue.pop_back()
+		if found.has(path):
+			continue
+		found[path] = true
+		for dependency in _file_dependencies(path, graph, classes):
+			if found.has(dependency) or dependency.get_extension() == "yarnproject":
+				continue
+			var projects := _projects_reached(dependency, graph, classes, reached)
+			if projects.is_empty() or projects.has(yarn_project_path):
+				queue.append(dependency)
+	return PackedStringArray(found.keys())
+
+
+static func _projects_reached(path: String, graph: Dictionary, classes: Dictionary, reached: Dictionary) -> Dictionary:
+	if reached.has(path):
+		return reached[path]
+	var projects: Dictionary = {}
+	reached[path] = projects
+	if path.get_extension() == "gd":
+		return projects
+	for dependency in _file_dependencies(path, graph, classes):
+		if dependency.get_extension() == "yarnproject":
+			projects[dependency] = true
+		else:
+			projects.merge(_projects_reached(dependency, graph, classes, reached))
+	return projects
+
+
+static func _file_dependencies(path: String, graph: Dictionary, classes: Dictionary) -> Array[String]:
+	if graph.has(path):
+		return graph[path]
+	var dependencies: Array[String] = []
+	graph[path] = dependencies
+
+	var candidates: Array[String] = []
+	if path.get_extension() == "gd":
+		var source := FileAccess.get_file_as_string(path)
+		var path_regex := RegEx.create_from_string("\"([^\"\\n]+\\.(?:gd|tscn|scn|tres|res))\"")
+		for result in path_regex.search_all(source):
+			var reference := result.get_string(1)
+			if reference.begins_with("uid://") or reference.begins_with("res://"):
+				candidates.append(_resolve_dependency(reference))
+			else:
+				candidates.append(path.get_base_dir().path_join(reference).simplify_path())
+		var word_regex := RegEx.create_from_string("\\b[A-Z]\\w*\\b")
+		var seen_words: Dictionary = {}
+		for result in word_regex.search_all(source):
+			var word := result.get_string()
+			if not seen_words.has(word) and classes.has(word):
+				seen_words[word] = true
+				candidates.append(classes[word])
+	elif path.get_extension() in ["tscn", "tres"]:
+		var file := FileAccess.open(path, FileAccess.READ)
+		var attribute_regex := RegEx.create_from_string("\\b(path|uid)=\"([^\"]*)\"")
+		while file != null and not file.eof_reached():
+			var line := file.get_line()
+			if line.begins_with("[node") or line.begins_with("[sub_resource") or line.begins_with("[resource"):
+				break
+			if not line.begins_with("[ext_resource"):
+				continue
+			var parts: Array[String] = []
+			for attribute in attribute_regex.search_all(line):
+				parts.append(attribute.get_string(2))
+			candidates.append(_resolve_dependency("::".join(parts)))
+	elif ResourceLoader.exists(path):
+		for dependency in ResourceLoader.get_dependencies(path):
+			candidates.append(_resolve_dependency(dependency))
+
+	for candidate in candidates:
+		if candidate != path and not dependencies.has(candidate) and (candidate.get_extension() == "yarnproject" or _is_followed_path(candidate)):
+			dependencies.append(candidate)
+	return dependencies
+
+
+static func _is_followed_path(path: String) -> bool:
+	if not path.begins_with("res://") or path.begins_with("res://addons/"):
+		return false
+	if not path.get_extension().to_lower() in ["gd", "tscn", "scn", "tres", "res"]:
+		return false
+	return FileAccess.file_exists(path)
+
+
+static func _resolve_dependency(dependency: String) -> String:
+	var path := ""
+	for part in dependency.split("::"):
+		if part.begins_with("uid://"):
+			var uid_path := _uid_to_path(part)
+			if not uid_path.is_empty():
+				return uid_path
+		elif part.begins_with("res://"):
+			path = part
+	return path
+
+
+static func _project_global_classes() -> Dictionary:
+	var classes: Dictionary = {}
+	for class_info in ProjectSettings.get_global_class_list():
+		var class_path := String(class_info.get("path", ""))
+		if not class_path.begins_with("res://addons/"):
+			classes[String(class_info.get("class", ""))] = class_path
+	return classes
+
+
+static func _collect_files(dir_path: String, extensions: Array, results: Array[String]) -> void:
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var file_name := dir.get_next()
+	while not file_name.is_empty():
+		var full_path := dir_path.path_join(file_name)
+		if dir.current_is_dir():
+			if not file_name.begins_with(".") and file_name != "addons":
+				_collect_files(full_path, extensions, results)
+		elif file_name.get_extension().to_lower() in extensions:
+			results.append(full_path)
+		file_name = dir.get_next()
+	dir.list_dir_end()
 
 
 static func generate_from_runner(yarn_project_path: String, dialogue_runner) -> Error:

@@ -137,8 +137,9 @@ signal command_received(command_name: String, command_args: Array)
 ## .ysls.json used by the VS Code extension (autocomplete and squiggles).
 ## This does NOT register anything at runtime - a green .ysls.json does not
 ## mean a command/function is callable. To make it callable, use the
-## Discovery Root above or add_command()/add_function(). Defaults to the Yarn
-## project's directory; set to "res://" to scan the whole project.
+## Discovery Root above or add_command()/add_function(). When empty, scans
+## the Yarn Project's folder and the scenes that use it; set to "res://" to
+## scan the whole project.
 @export_dir var ysls_scan_path: String = ""
 
 @export_tool_button("Regenerate YSLS", "Reload") var _regenerate_ysls_button = _regenerate_ysls_pressed
@@ -146,6 +147,7 @@ signal command_received(command_name: String, command_args: Array)
 var _presenters: Array[YarnDialoguePresenter] = []
 var _content_complete_pending: bool = false
 var _vm: YarnVirtualMachine
+var _custom_saliency_strategy: YarnSaliencyStrategy
 var _library: YarnLibrary
 var _line_provider: YarnLineProvider
 var _asset_provider: YarnAssetProvider
@@ -165,14 +167,14 @@ var _waiting_for_content: bool = false
 var _current_cancellation_token: YarnCancellationToken
 var _current_line_token: YarnCancellationToken
 var _current_options_token: YarnCancellationToken
-## The active options round'sselection promise select_option routes
+## The active options round's selection promise. select_option routes
 ## external calls through it so every selection takes the same path.
 var _current_selection: YarnPromise
 ## Bumped for every piece of content the runner presents (lines, option
 ## lines, options, commands). A presentation join captures it and only
-## resumes the VM if it is still current so nothing weird happens if
-## force-advancing mid-line via signal_content_complete() which might
-## otherwise let the superseded join complete the *next* content early
+## resumes the VM if it is still current, so force-advancing mid-line via
+## signal_content_complete() can't let the superseded join complete the
+## *next* content early.
 var _line_epoch := 0
 var _line_advancers: Array[Node] = []
 var _content_frame := -1
@@ -181,8 +183,8 @@ var _stop_requested: bool = false
 
 
 ## Once next content has been requested, a presenter that still hasn't
-## finished this many seconds later gets named in a warning (the dialogue is waiting on it!
-## I like this being here, even though Unity doesn't do this, as it's helpful.
+## finished this many seconds later gets named in a warning, since the
+## dialogue is waiting on it.
 const STALL_WARNING_SECONDS := 5.0
 
 
@@ -236,7 +238,7 @@ func _ready() -> void:
 
 func _enter_tree() -> void:
 	# Re-bind VM signal handlers after a re-parent. _exit_tree disconnects
-	# them defensively (Unity OnDestroy parity), but _ready only fires the
+	# them defensively, but _ready only fires the
 	# first time a node enters the tree — without this hook, any subsequent
 	# add_child to a new parent would leave the runner alive but its VM
 	# silent (SHOW_OPTIONS, lines, commands all emitted into the void).
@@ -249,7 +251,6 @@ func _enter_tree() -> void:
 
 func _exit_tree() -> void:
 	# Clean up signal connections and cancel any in-progress dialogue.
-	# Matches Unity's OnDestroy pattern.
 	if _vm != null:
 		if _vm.line_handler.is_connected(_on_line):
 			_vm.line_handler.disconnect(_on_line)
@@ -317,7 +318,9 @@ func _apply_saliency_strategy() -> void:
 		SaliencyStrategyType.RANDOM:
 			strategy = YarnSaliencyStrategy.YarnRandomSaliencyStrategy.new()
 		SaliencyStrategyType.CUSTOM:
-			return
+			if _custom_saliency_strategy == null:
+				return
+			strategy = _custom_saliency_strategy
 
 	_vm.set_saliency_strategy(strategy)
 
@@ -330,12 +333,15 @@ func _apply_saliency_strategy() -> void:
 
 ## Installs a custom [YarnSaliencyStrategy], overriding the built-in chosen by
 ## the [member saliency_strategy] export. Keeps the VM and the library's
-## has-salient-content context in step. The Godot equivalent of Unity's
-## DialogueRunner.Dialogue.ContentSaliencyStrategy.
+## has-salient-content context in step. Safe to call before the runner is
+## ready: the strategy is applied once the VM exists.
 func set_content_saliency_strategy(strategy: YarnSaliencyStrategy) -> void:
 	if strategy == null:
 		return
+	_custom_saliency_strategy = strategy
 	saliency_strategy = SaliencyStrategyType.CUSTOM
+	if _vm == null:
+		return
 	_vm.set_saliency_strategy(strategy)
 	if _library != null:
 		_library.set_vm_context(strategy, variable_storage)
@@ -455,11 +461,10 @@ func _auto_discover_commands() -> void:
 
 
 func _register_project_commands() -> void:
-	# Autoload singletons are the idiomatic Godot home for global commands (the
-	# counterpart of Unity's static [YarnCommand] methods). Scan them first so a
-	# singleton method wins the name, and register each as a global command bound
-	# to the singleton - a singleton is unambiguous, so no target is needed and
-	# <<command args>> works directly.
+	# Autoload singletons are the idiomatic Godot home for global commands.
+	# Scan them first so a singleton method wins the name, and register each as
+	# a global command bound to the singleton - a singleton is unambiguous, so
+	# no target is needed and <<command args>> works directly.
 	var registered_scripts: Dictionary = {}
 	_scan_singletons_for_commands(registered_scripts)
 
@@ -473,7 +478,7 @@ func _register_project_commands() -> void:
 ## Registers _yarn_command_*/_yarn_function_* methods found on autoload
 ## singletons as GLOBAL definitions bound to the singleton instance. Because a
 ## singleton is unique, both static and non-static methods bind directly (no
-## target resolution), matching how Unity treats static commands as global.
+## target resolution).
 func _scan_singletons_for_commands(registered_scripts: Dictionary) -> void:
 	var tree := get_tree()
 	if tree == null or tree.root == null:
@@ -918,12 +923,10 @@ func remove_presenter(presenter: YarnDialoguePresenter) -> void:
 ## currently-running line to end. Wrapper presenters (e.g. the Interruption
 ## add-on) may substitute themselves as the source and intercept this call.
 ##
-## Mirrors Yarn Spinner for Unity's
-## [code]IRequestLineCancellation.RequestLineCancellation[/code], which calls
-## [code]RequestNextLine()[/code]. The cancellation token fires, waking
+## Calls [method request_next_content]. The cancellation token fires, waking
 ## presenters parked on [method YarnCancellationToken.wait_for_next_content].
-## The line actually ends when all presenters have finished... the token is
-## the request, the presenters' completion is teh "proof"
+## The line actually ends when all presenters have finished: the token is
+## the request, and the presenters' completion confirms it.
 func request_line_cancellation(_line: YarnLine) -> void:
 	request_next_content()
 
@@ -938,9 +941,7 @@ func signal_content_complete() -> void:
 	_waiting_for_content = false
 
 	# Wake up presenters that are passively waiting on the current line's
-	# cancellation token (e.g. SubtitlePresenter's
-	# `WaitUntilCanceled(token.NextContentToken)` pattern). Mirrors the Unity
-	# runner, which cancels NextContentToken when a line is signalled done.
+	# cancellation token, since the line has been signalled done.
 	if _current_line_token != null:
 		_current_line_token.request_next_content()
 
@@ -978,7 +979,7 @@ func _apply_selected_option(option_index: int) -> void:
 	# Present the option BEFORE resuming the VM. set_selected_option
 	# flips the VM back to RUNNING, and when a presenter selects
 	# synchronously (inside the SHOW_OPTIONS emission) the VM's instruction
-	# loop is still on the stack resuming first would let it steamrol
+	# loop is still on the stack, so resuming first would let it run
 	# straight past the echo line.
 	if show_selected_option_as_line and selected_option != null:
 		var run := _run_id
@@ -988,9 +989,9 @@ func _apply_selected_option(option_index: int) -> void:
 
 	_vm.set_selected_option(option_index)
 
-	# Use the guarded continueasthe VM may already be suspended on the next
-	# piece of content by the time this deferred fires the unsafe variant
-	# would force SUSPENDED back to RUNNING and steamroll that content.
+	# Use the guarded continue, as the VM may already be suspended on the next
+	# piece of content by the time this deferred call fires. The unsafe
+	# variant would force SUSPENDED back to RUNNING and skip that content.
 	call_deferred("_continue_dialogue_safe")
 
 
@@ -1059,7 +1060,7 @@ func has_locale(locale_code: String) -> bool:
 ## Points voice-over lookup at the folder of BASE-language audio files
 ## (named after the line id: line:tutorial-tom-01 -> tutorial-tom-01.wav).
 ## Localised audio comes from Godot's translation remaps (Project Settings >
-## Localization > Remaps), applied automatically when the file loads! MAGIC
+## Localization > Remaps), applied automatically when the file loads.
 func set_audio_base_path(path: String) -> void:
 	_line_provider.set_audio_base_path(path)
 
@@ -1251,17 +1252,17 @@ func _on_line(line: YarnLine) -> void:
 	if _current_line_token == token:
 		_current_line_token = null
 
-	# Only the join for the current content may resume the VM if user code
+	# Only the join for the current content may resume the VM. If user code
 	# force-advanced mid-line via signal_content_complete, this join is
-	# superseded and must stay silent! SILENT!
+	# superseded and must stay silent.
 	if _is_running and epoch == _line_epoch:
 		signal_content_complete()
 
 
-## Starts run_line on every presenter concurrently one detached wrapper
-## coroutine per presenter, all launched in the same same frame and returns one
+## Starts run_line on every presenter concurrently (one detached wrapper
+## coroutine per presenter, all launched in the same frame) and returns one
 ## promise per presenter, settled when that presenter has fully finished the
-## line. Also arms the warn-only stall watchdog for the batch!
+## line. Also arms the warn-only stall watchdog for the batch.
 func _start_line_presenters(line: YarnLine, run: int, token: YarnCancellationToken) -> Array[YarnPromise]:
 	var promises: Array[YarnPromise] = []
 	# Freed presenters must be skipped before the call: the wrapper's typed
@@ -1295,10 +1296,10 @@ func _run_presenter_line(presenter: YarnDialoguePresenter, line: YarnLine,
 	if not is_instance_valid(presenter):
 		promise.settle()
 		return
-	# A presenter freeed or removed from the tree mid-line can never resume
-	# its coroutine... count it as finished so the join cannot hang on it
-	# (settle() latches.. so this is a noop when the presenter finished
-	# normally first)
+	# A presenter freed or removed from the tree mid-line can never resume
+	# its coroutine, so count it as finished and the join cannot hang on it
+	# (settle() latches, so this is a no-op when the presenter finished
+	# normally first).
 	var on_exit := func() -> void:
 		promise.settle()
 	presenter.tree_exiting.connect(on_exit, CONNECT_ONE_SHOT)
@@ -1308,11 +1309,11 @@ func _run_presenter_line(presenter: YarnDialoguePresenter, line: YarnLine,
 		presenter.tree_exiting.disconnect(on_exit)
 
 
-## Warn-only stall diagnostic! Once next content has been requested, every
-## presenter is implicitly promising to finish promptly nothing can
+## Warn-only stall diagnostic. Once next content has been requested, every
+## presenter is implicitly promising to finish promptly. Nothing can
 ## enforce that, so if a promise is still unsettled STALL_WARNING_SECONDS
 ## later, name the presenter: a forgotten return otherwise presents as a
-## silent hang. Never advances teh dialogue
+## silent hang. Never advances the dialogue.
 func _watch_presentation_stall(token: YarnCancellationToken,
 		presenters: Array[YarnDialoguePresenter], promises: Array[YarnPromise],
 		what: String) -> void:
@@ -1381,7 +1382,7 @@ func _on_options(options: Array[YarnOption]) -> void:
 			token.request_next_content()
 			selection.settle(-1))
 
-	# Start all presenters concurrently (matching Unity's WhenAll pattern!).
+	# Start all presenters concurrently.
 	# Freed presenters skipped before the call see _start_line_presenters.
 	var started: Array[YarnDialoguePresenter] = []
 	for presenter in presenters_copy:
@@ -1409,8 +1410,8 @@ func _on_options(options: Array[YarnOption]) -> void:
 		selected_option_index = int(selected_value)
 
 	if selected_option_index >= 0:
-		# Ask the remaining presenters to wind down per the token contract
-		# they must finish once this fires!
+		# Ask the remaining presenters to wind down. Per the token contract,
+		# they must finish once this fires.
 		token.request_next_content()
 		await _apply_selected_option(selected_option_index)
 		return
@@ -1465,7 +1466,7 @@ func _run_presenter_options(presenter: YarnDialoguePresenter, options: Array[Yar
 
 ## Settles [param selection] with -1 once every presenter has finished
 ## without selecting, so options with no willing presenter fall through
-## instead of hanging. A real selection wins tehrace!
+## instead of hanging. A real selection wins the race.
 func _watch_options_completion(done_promises: Array[YarnPromise], selection: YarnPromise) -> void:
 	var run := _run_id
 	for done in done_promises:
@@ -1607,7 +1608,7 @@ func _on_prepare_for_lines(line_ids: PackedStringArray) -> void:
 
 
 # Deliberately untyped parameter: a typed YarnDialoguePresenter argument
-# would make the CALL itself error on a freed object, before this guard runs!
+# would make the call itself error on a freed object, before this guard runs.
 func _safe_notify_presenter(presenter: Variant, method: String) -> void:
 	if not is_instance_valid(presenter):
 		return
@@ -1697,8 +1698,8 @@ func _register_global_commands() -> void:
 
 
 func _cmd_wait(duration: float) -> void:
-	# Pause-respecting <<wait>> must not keep elapsing under a pause menu lol
-	# Fixed this thanks to Leonardo.
+	# Pause-respecting <<wait>> must not keep elapsing under a pause menu.
+	# Fixed thanks to Leonardo.
 	await YarnAsync.wait(self, duration)
 
 
@@ -1718,10 +1719,7 @@ func regenerate_ysls() -> void:
 		return
 
 	var generator := YarnYSLSGenerator.new()
-
-	# Default to nearest ancestor with scripts if no scan path configured
-	var scan_root := ysls_scan_path if not ysls_scan_path.is_empty() else YarnYSLSGenerator.find_scan_root(project_path)
-	generator.scan_directory(scan_root)
+	generator.scan_for_project(project_path, ysls_scan_path)
 
 	if _library != null:
 		generator.scan_library(_library)

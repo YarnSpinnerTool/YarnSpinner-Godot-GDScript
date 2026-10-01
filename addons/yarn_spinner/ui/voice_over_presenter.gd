@@ -69,9 +69,9 @@ func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
 	if audio == null:
 		push_error("voice over presenter: no audio found for line '%s'" % line.line_id)
 		if end_line_when_voice_complete:
-			# Just like in Unity: a missing clip in a voice-driven scene should
-			# skip the line, not stall it. Deferred so every presenter has
-			# started this line before the wind-down request fires!
+			# A missing clip in a voice-driven scene should skip the line, not
+			# stall it. Deferred so every presenter has started this line
+			# before the wind-down request fires.
 			_request_line_end.call_deferred(line)
 		return
 
@@ -170,7 +170,7 @@ func _is_player_stopped(player: Node) -> bool:
 func _load_audio_for_line(line: YarnLine) -> AudioStream:
 	# Prefer the runner's audio lookup (set via set_audio_base_path;
 	# localised by Godot's translation remaps on load) so set_locale()
-	# swaps voice as well as text. It has its own cache!
+	# swaps voice as well as text. It has its own cache.
 	# A shadow line plays its source line's audio, so resolve the ID first.
 	var source_line_id := line.line_id
 	if dialogue_runner != null:
@@ -179,7 +179,7 @@ func _load_audio_for_line(line: YarnLine) -> AudioStream:
 			var shadow_source := provider.get_shadow_line_source(line.line_id)
 			if not shadow_source.is_empty():
 				source_line_id = shadow_source
-		var localised: AudioStream = dialogue_runner.get_localised_audio(line.line_id)
+		var localised: AudioStream = dialogue_runner.get_localised_audio(source_line_id)
 		if localised != null:
 			return localised
 
@@ -191,7 +191,7 @@ func _load_audio_for_line(line: YarnLine) -> AudioStream:
 
 
 func _get_audio_path(line_id: String) -> String:
-	# Strip the "line:" prefix first .. audio files are conventionally named
+	# Strip the "line:" prefix first: audio files are conventionally named
 	# after the bare id (tutorial-tom-01.wav for line:tutorial-tom-01),
 	# matching the localisation resolver's lookup order.
 	var filename := line_id.trim_prefix("line:").replace(":", "_").replace("/", "_")

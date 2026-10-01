@@ -20,7 +20,7 @@ class_name YarnLibrary
 extends RefCounted
 ## Manages built-in and custom Yarn Spinner functions and commands.
 ## Command arguments are automatically coerced to match parameter types;
-## Node-typed parameters are resolved from the scene tree (matching Unity).
+## Node-typed parameters are resolved from the scene tree.
 
 
 enum CommandDispatchStatus {
@@ -69,7 +69,7 @@ static func is_function_error(value: Variant) -> bool:
 ## know about. The importer passes these to the compiler, so these functions
 ## can be used anywhere, including inside a line. Functions in the Yarn
 ## standard library, like dice() and round(), don't need to be listed.
-## Keep this innn step with _register_builtin_functions().
+## Keep this in step with _register_builtin_functions().
 const COMPILER_DECLARATIONS: Array[Dictionary] = [
 	{"name": "visited", "parameters": ["string"], "returnType": "bool"},
 	{"name": "visited_count", "parameters": ["string"], "returnType": "number"},
@@ -1053,14 +1053,14 @@ func _builtin_ceil(value: float) -> int:
 
 
 func _builtin_inc(value: float) -> int:
-	# Unity: no decimal -> value + 1, else ceil
+	# no decimal -> value + 1, else ceil
 	if _builtin_decimal(value) == 0.0:
 		return int(YarnNumber.to_f32(value + 1.0))
 	return int(ceilf(value))
 
 
 func _builtin_dec(value: float) -> int:
-	# Unity: no decimal -> value - 1, else floor
+	# no decimal -> value - 1, else floor
 	if _builtin_decimal(value) == 0.0:
 		return int(value) - 1
 	return int(floorf(value))

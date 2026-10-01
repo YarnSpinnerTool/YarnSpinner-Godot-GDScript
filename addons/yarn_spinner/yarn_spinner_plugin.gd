@@ -417,9 +417,11 @@ func _do_ysls_regenerate() -> void:
 	if yarn_projects.is_empty():
 		return
 
-	# Generate per-project YSLS — each scoped to its own directory tree
 	for project_path in yarn_projects:
-		YarnYSLSGenerator.generate_for_project(project_path)
+		if not YarnProjectImporter.ysls_import_option(project_path, "generate_ysls", true):
+			continue
+		var scan_path := YarnProjectImporter.ysls_scan_path_option(YarnProjectImporter.ysls_import_option(project_path, "ysls_scan_path", ""))
+		YarnYSLSGenerator.generate_for_project(project_path, scan_path)
 
 
 func _create_yarn_project() -> void:

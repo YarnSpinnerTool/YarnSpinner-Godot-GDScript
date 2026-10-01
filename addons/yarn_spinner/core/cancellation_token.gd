@@ -72,18 +72,18 @@ func escalate_to_next_content() -> void:
 		request_next_content()
 
 
-## Awaitable stuff... resumes when next content is requested which is immediately 
-## if it already has been. This is the most important bit of our new coroutine-style:
+## Resumes when next content is requested, or immediately if it already has
+## been. This is the core of the coroutine-style presenter contract:
 ## [codeblock]
 ## func run_line(line: YarnLine, token: YarnCancellationToken = null):
 ##     label.text = line.text
 ##     await token.wait_for_next_content()
 ##     label.text = ""
 ## [/codeblock]
-## Once this resumes, you are promising to finish promptly and
-## return so the the runner holds the line open until every presenter's run_line
-## has actually returned. Nothing enforces the promise... a presenter that
-## keeps running holds the whole dialogue! We don't want thaaaaat.
+## Once this resumes, you are promising to finish promptly and return: the
+## runner holds the line open until every presenter's run_line has actually
+## returned. Nothing enforces the promise, so a presenter that keeps running
+## holds up the whole dialogue.
 func wait_for_next_content() -> void:
 	if is_next_content_requested:
 		return

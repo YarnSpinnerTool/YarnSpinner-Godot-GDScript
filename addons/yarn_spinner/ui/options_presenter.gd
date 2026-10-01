@@ -23,7 +23,7 @@ extends YarnDialoguePresenter
 ## Creates buttons for each option and handles selection.
 ##
 ## When [member show_last_line] is enabled, the most recent dialogue line
-## is shown above the options (matching Unity's OptionsPresenter behaviour).
+## is shown above the options.
 ## The [code][lastline][/code] markup tag can be used to truncate the
 ## displayed text at that point.
 
@@ -34,15 +34,12 @@ signal option_selected(index: int, option: YarnOption)
 
 @export var options_container: Container
 
-## Scene instantiated per option, like the Option Item prefab in Yarn
-## Spinner for Unity. The root may be a [YarnOptionItem] (preferred) or any
+## Scene instantiated per option. The root may be a [YarnOptionItem] (preferred) or any
 ## [BaseButton]. Edit the default scene or point this at your own to
 ## restyle options.
 @export var option_button_scene: PackedScene = preload("res://addons/yarn_spinner/ui/option_item.tscn")
 
 ## Hide options whose is_available is false (instead of showing them greyed out).
-## Defaults to true to match Unity's OptionsPresenter, whose showUnavailableOptions
-## defaults to false (i.e. unavailable options are hidden).
 @export var hide_unavailable: bool = true
 
 ## Input action prefix for keyboard shortcuts (e.g. "option_" → "option_1", "option_2").
@@ -50,7 +47,7 @@ signal option_selected(index: int, option: YarnOption)
 
 @export_group("Fade")
 
-## fade the panel in and out around the options (mirrors Unity's OptionsPresenter).
+## fade the panel in and out around the options.
 @export var use_fade_effect: bool = true
 @export var fade_up_duration: float = 0.25
 @export var fade_down_duration: float = 0.1
@@ -235,8 +232,8 @@ func _show_last_line() -> void:
 	else:
 		markup = _last_seen_line.get_markup_result_without_character_name()
 
-	# Handle [lastline] markup — show text AFTER the marker with "..." prefix
-	# (matching Unity: truncates everything before the marker)
+	# Handle [lastline] markup: truncate everything before the marker and show
+	# the text after it with a "..." prefix
 	var prefix := ""
 	var lastline_attr := markup.try_get_attribute_with_name(LASTLINE_MARKUP)
 	if lastline_attr != null and lastline_attr.position <= markup.text.length():

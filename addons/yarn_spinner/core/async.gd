@@ -20,7 +20,7 @@ class_name YarnAsync
 extends RefCounted
 ## Async helpers shared by the runner and presenters.
 
-## Awaitable pause-respecting wait.. teh clock only advances on frames where
+## Awaitable pause-respecting wait. The clock only advances on frames where
 ## [param node] can process, so dialogue timers honour the node's
 ## [member Node.process_mode] under [member SceneTree.paused] exactly like
 ## the rest of the engine (unlike [method SceneTree.create_timer], whose

@@ -31,19 +31,19 @@ extends Node
 ## Extends [Node] so presenters can be non-visual (audio, signals, analytics).
 ## UI presenters can use [method _set_presenter_visible] to toggle visibility.
 ##
-## [b]Presenters...[/b] [method run_line] returns when a
+## [b]Presenters:[/b] [method run_line] returns when a
 ## presenter has finished with the line. Present your content, then
 ## [code]await[/code] whatever takes time (a typewriter, audio,
 ## [code]await token.wait_for_next_content()[/code]), clean up, and return.
 ## A presenter with nothing to wait for simply returns immediately.
 ## [br]The runner starts every presenter in the same frame and advances only
 ## when [b]all[/b] of them have returned. Once the token reports next
-## content requested you are promising to finish promptly but nothing
-## enforces it, the runner just waits (and warns after a few seconds).
+## content requested you are promising to finish promptly, but nothing
+## enforces it: the runner just waits (and warns after a few seconds).
 ## [br][method run_options] follows the same rule, returning the selected
 ## option index (>= 0), or -1 if this presenter does not handle options.
-## The first valid selection wins! The token then fires so the rest wind
-## down proeprly
+## The first valid selection wins. The token then fires so the rest wind
+## down.
 
 ## Reference to the dialogue runner this presenter is registered with.
 ## Set automatically when the presenter is added to a runner.
@@ -88,7 +88,7 @@ func _get_presenter_canvas_item() -> CanvasItem:
 
 
 ## Fade the presenter's UI between two modulate alphas over [param duration]
-## seconds (the Godot counterpart of Unity's canvas group fade). Awaitable.
+## seconds. Awaitable.
 ## Finishes early when [param cancel] returns true. No-op for non-visual
 ## presenters.
 func _fade_presenter_alpha(from_alpha: float, to_alpha: float, duration: float, cancel: Callable = Callable()) -> void:
@@ -177,10 +177,10 @@ func run_line(_line: YarnLine, _token: YarnCancellationToken = null) -> void:
 ## Override this in your subclass to display options. Each option's text
 ## is available via [code]option.text[/code] (lazy-computed).
 ##
-## [b]Return value[/b] (same rule as [method run_line].. return when done):
+## [b]Return value[/b] (same rule as [method run_line]: return when done):
 ## - The selected option index (int >= 0), awaiting the player's choice
-##   first if needed!
-## - -1 if this presenter does not handle options, all done
+##   first if needed.
+## - -1 if this presenter does not handle options.
 ##
 ## When multiple presenters are active all are started concurrently. The
 ## first valid selection (>=0 wins; the token then fires so the others
@@ -197,8 +197,7 @@ func run_options(_options: Array[YarnOption], _token: YarnCancellationToken = nu
 ## Routes through [member YarnLine.source] when available so that wrapper
 ## presenters like the Interruption add-on can intercept; otherwise falls
 ## back to calling [method YarnDialogueRunner.signal_content_complete]
-## directly. Mirrors Unity Yarn Spinner's
-## [code]IRequestLineCancellation.RequestLineCancellation[/code] dispatch.
+## directly.
 func _request_line_end(line: YarnLine) -> void:
 	if line != null and line.source != null and is_instance_valid(line.source) and line.source.has_method(&"request_line_cancellation"):
 		line.source.request_line_cancellation(line)

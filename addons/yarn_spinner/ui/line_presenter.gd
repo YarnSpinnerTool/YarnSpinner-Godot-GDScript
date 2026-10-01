@@ -22,7 +22,7 @@ extends YarnDialoguePresenter
 ## built-in presenter for displaying dialogue lines.
 ## provides a typewriter effect, a continue indicator, and a list of
 ## [YarnActionMarkupHandler] event handlers that are invoked as each character
-## is revealed (mirroring Yarn Spinner for Unity's LinePresenter).
+## is revealed.
 
 ## typewriter animation modes
 enum TypewriterMode {
@@ -76,8 +76,7 @@ signal continue_requested()
 @export var use_markup: bool = true
 
 ## display-time event handlers, invoked as each character is revealed.
-## attach [YarnActionMarkupHandlerNode]s in your scene and list them here
-## (the scene-attached counterpart to Unity's "Event Handlers" list). a pause
+## attach [YarnActionMarkupHandlerNode]s in your scene and list them here. a pause
 ## handler for [pause] markup is always added automatically, ahead of this list.
 @export var event_handlers: Array[YarnActionMarkupHandlerNode] = []
 
@@ -118,8 +117,7 @@ func _ready() -> void:
 		text_label.meta_hover_started.connect(_on_meta_hover_started)
 		text_label.meta_hover_ended.connect(_on_meta_hover_ended)
 
-	# A pause handler is always present so that [pause] markup works, matching
-	# Unity's LinePresenter which prepends a PauseEventProcessor.
+	# A pause handler is always present so that [pause] markup works.
 	_pause_processor = YarnPauseEventProcessor.new()
 
 
@@ -248,8 +246,8 @@ func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
 	typewriter = active_typewriter
 	active_typewriter.prepare_for_content(markup, display_text)
 
-	# Unity's continue arrow is visible for the whole line, not just once the
-	# text has fully revealed, so match that here.
+	# The continue indicator is visible for the whole line, not just once the
+	# text has fully revealed.
 	if continue_indicator != null:
 		continue_indicator.visible = true
 
@@ -398,8 +396,7 @@ func _wait_for_auto_advance(token: YarnCancellationToken) -> void:
 
 ## Registers a custom replacement-marker processor so that markup like
 ## [code][marker_name]...[/marker_name][/code] is transformed when this presenter
-## renders a line. The Godot equivalent of registering a ReplacementMarkupHandler
-## in Unity.
+## renders a line.
 func register_marker_processor(marker_name: String, processor: YarnAttributeMarkerProcessor) -> void:
 	_marker_processors[marker_name] = processor
 	_apply_marker_processors()
