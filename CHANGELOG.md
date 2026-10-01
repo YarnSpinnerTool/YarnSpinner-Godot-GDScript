@@ -1,6 +1,6 @@
 # Yarn Spinner for Godot (GDScript) — Changelog
 
-## Alpha 9 (in progress)
+## Early Access 3.2
 
 ### Yarn Project inspector
 

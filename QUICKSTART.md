@@ -1,17 +1,14 @@
 # Quickstart
 
-> [!CAUTION]
-> This is an Alpha release of Yarn Spinner for Godot (GDScript). There will be bugs, we might change the API or features with an update, or something may break. We do not recommend you use this to ship a game just yet. 
-
 This gets you from zero to running dialogue in about five minutes. It assumes you already know how to write Yarn, and how to use Godot.
 
 > [!IMPORTANT]
-> Yarn Spinner for Godot (GDScript) is not yet for sale (it will always be available here for free, too). We rely on your support to keep everything free and accessible. If you want to support us during the Alpha period, you can support us on [GitHub Sponsors](https://github.com/sponsors/YarnSpinnerTool) or [Patreon](https://patreon.com/secretlab). GitHub sponsors of $25 and above, and Patreon members of the "Scribe" or above tier will receive a license to the paid version when it is released.
+> To get Yarn Spinner for Godot (GDScript), and support the team behind it, buy a copy for Godot from the Yarn Spinner Itch.io Store or from the Godot Asset Store (coming soon), or check out the Yarn Spinner Documentation to install other ways.
 
 > [!TIP]
-> **Please submit issues or feature requests via this form during the pre-release period:** http://yarnspinner.dev/pre-release-feedback
+> **Please submit support or feature requests via this form during Early Access:** http://yarnspinner.dev/pre-release-feedback
 
-Visit the [documentation](https://docs.yarnspinner.dev/yarn-spinner-for-godot/godot-gdscript) and [Yarn Spinner site](https://yarnspinner.dev) for more information.
+Visit the [documentation](https://yarnspinner.dev/docs/) and [Yarn Spinner site](https://yarnspinner.dev) for more information.
 
 ## Install the Plugin
 

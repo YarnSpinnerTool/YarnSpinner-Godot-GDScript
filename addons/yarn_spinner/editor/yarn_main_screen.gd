@@ -27,8 +27,9 @@ extends Control
 const YarnCommandsPanel := preload("res://addons/yarn_spinner/editor/yarn_commands_panel.gd")
 const YarnSyntaxHighlighter := preload("res://addons/yarn_spinner/editor/yarn_syntax_highlighter.gd")
 const YarnProjectImporter := preload("res://addons/yarn_spinner/editor/yarn_project_importer.gd")
+const YarnSpinnerScript := preload("res://addons/yarn_spinner/yarn_spinner.gd")
 const DOCS_URL := "https://docs.yarnspinner.dev"
-const EDITOR_URL := "https://yarnspinner.dev/editor"
+const HELP_URL := "https://yarnspinner.dev/help"
 const BANNER_PATH := "res://addons/yarn_spinner/icons/yarn_spinner_for_godot.png"
 const NEW_FILE_TEMPLATE := "title: Start\n---\n\n===\n"
 
@@ -279,8 +280,8 @@ func _build_editor_area() -> Control:
 	return wrapper
 
 
-## Centered card shown when no .yarn file is open — promotes the standalone
-## Yarn Spinner Editor (autocomplete / live errors / rename / node graph).
+## Centered card shown when no .yarn file is open: the addon's name and
+## version, and a link to help on the website.
 func _build_empty_state() -> Control:
 	var scale := EditorInterface.get_editor_scale()
 	var center := CenterContainer.new()
@@ -316,27 +317,27 @@ func _build_empty_state() -> Control:
 			banner.custom_minimum_size.y = h)
 	box.add_child(banner)
 
-	var headline := Label.new()
-	headline.text = "The best editing experience for Yarn Spinner"
-	headline.theme_type_variation = "HeaderMedium"
-	headline.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	headline.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(headline)
+	var title := Label.new()
+	title.text = "Yarn Spinner for Godot (GDScript)"
+	title.theme_type_variation = "HeaderMedium"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(title)
 
-	var body := Label.new()
-	body.text = "Autocomplete, live error checking, project-wide rename, and visual node-graph editing — in the standalone Yarn Spinner Editor."
-	body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(body)
+	var version := Label.new()
+	version.text = "Early Access %s" % YarnSpinnerScript.VERSION
+	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	version.modulate.a = 0.7
+	box.add_child(version)
 
 	var button_row := CenterContainer.new()
 	box.add_child(button_row)
 
 	var button := Button.new()
-	button.text = "Get it at yarnspinner.dev/editor"
+	button.text = "Get help at yarnspinner.dev/help"
 	button.icon = _editor_icon("ExternalLink")
-	button.tooltip_text = EDITOR_URL
-	button.pressed.connect(func() -> void: OS.shell_open(EDITOR_URL))
+	button.tooltip_text = HELP_URL
+	button.pressed.connect(func() -> void: OS.shell_open(HELP_URL))
 	button_row.add_child(button)
 
 	return center

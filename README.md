@@ -1,19 +1,19 @@
 # Yarn Spinner for Godot (GDScript)
 
 > [!CAUTION]
-> This is an Alpha release of Yarn Spinner for Godot (GDScript). There will be bugs, we might change the API or features with an update, or something may break. We do not recommend you use this to ship a game just yet. 
+> This is Yarn Spinner for Godot (GDScript) Early Access 3.2. There will be bugs, we might change the API or features with an update, or something may break. We do not recommend you use this to ship a game just yet. 
 
 Yarn Spinner for Godot (GDScript) is a pure-GDScript implementation of the Yarn Spinner dialogue system for the Godot engine. It runs compiled Yarn programs and aims for full feature parity with Yarn Spinner for Unity 3.2, including node groups, saliency, detours, smart variables, localisation, and voice over support.
 
 Requires Godot 4.6 or later (not the .NET/Mono version).
 
 > [!IMPORTANT]
-> Yarn Spinner for Godot (GDScript) is not yet for sale (it will always be available here for free, too). We rely on your support to keep everything free and accessible. If you want to support us during the Alpha period, you can support us on [GitHub Sponsors](https://github.com/sponsors/YarnSpinnerTool) or [Patreon](https://patreon.com/secretlab). GitHub sponsors of $25 and above, and Patreon members of the "Scribe" or above tier will receive a license to the paid version when it is released.
+> Yarn Spinner for Godot (GDScript) is not yet for sale (it will always be available here for free, too). We rely on your support to keep everything free and accessible. If you want to support us during Early Access, you can support us on [GitHub Sponsors](https://github.com/sponsors/YarnSpinnerTool) or [Patreon](https://patreon.com/secretlab). GitHub sponsors of $25 and above, and Patreon members of the "Scribe" or above tier will receive a license to the paid version when it is released.
 
 Visit the [documentation](https://docs.yarnspinner.dev/yarn-spinner-for-godot/godot-gdscript) and [Yarn Spinner site](https://yarnspinner.dev) for more information.
 
 > [!TIP]
-> **Please submit issues or feature requests via this form during the pre-release period:** http://yarnspinner.dev/pre-release-feedback
+> **Please submit issues or feature requests via this form during Early Access:** http://yarnspinner.dev/pre-release-feedback
 
 ## Samples
 
