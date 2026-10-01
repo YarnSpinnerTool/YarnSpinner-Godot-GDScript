@@ -99,6 +99,10 @@ gets them from the project's `"definitions"` instead:
   `ysc-native-linux-x64`, and the `arm64` builds for Windows and Linux. The
   importer chooses the binary that matches the editor's platform and
   architecture. Rebuild with `native/build.sh` to get the new names!
+- The bundled compiler is nowrun directly instead of through `cmd.exe` or
+  `/bin/sh` etc., and reads its job from a file passed with `--input`. This
+  fixes the compiler failing on Windows, where `cmd` seemed to misread Godot's
+  forward-slash paths... 
 - The `plural` annd `ordinal` markup markers now use the full set of Unicode
   CLDR plural rules, covering over a hundred languages, instead of a
   hand-picked list of about twenty. Languages such as Welsh, Irish,
