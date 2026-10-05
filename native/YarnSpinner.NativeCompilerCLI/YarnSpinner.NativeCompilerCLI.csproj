@@ -14,6 +14,10 @@
     <InvariantGlobalization>true</InvariantGlobalization>
 
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <NativeDebugSymbols>false</NativeDebugSymbols>
   </PropertyGroup>
 
   <!-- Reference the compiler from the main YarnSpinner repo! -->
