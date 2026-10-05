@@ -16,6 +16,7 @@
 #                                                                          #
 # ======================================================================== #
 
+@tool
 class_name YarnNode
 extends Resource
 ## represents a single node in a yarn program.

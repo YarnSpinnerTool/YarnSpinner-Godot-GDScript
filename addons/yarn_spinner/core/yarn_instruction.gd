@@ -16,6 +16,7 @@
 #                                                                          #
 # ======================================================================== #
 
+@tool
 class_name YarnInstruction
 extends Resource
 ## Represents a single instruction in a yarn node.

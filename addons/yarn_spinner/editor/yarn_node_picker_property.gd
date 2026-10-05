@@ -20,12 +20,12 @@
 extends EditorProperty
 ## Dropdown property editor for selecting a Yarn node name.
 
-const _YarnProgramParser := preload("res://addons/yarn_spinner/core/yarn_program_parser.gd")
-
-static var _names_cache: Dictionary = {}
+var source_property: StringName = &"yarn_project"
+var value_type: Variant.Type = TYPE_STRING
 
 var _option_button: OptionButton
 var _updating: bool = false
+var _read_only: bool = false
 
 
 func _init() -> void:
@@ -36,6 +36,23 @@ func _init() -> void:
 	add_child(_option_button)
 
 
+func _enter_tree() -> void:
+	var inspector := EditorInterface.get_inspector()
+	if not inspector.property_edited.is_connected(_on_inspector_property_edited):
+		inspector.property_edited.connect(_on_inspector_property_edited)
+
+
+func _exit_tree() -> void:
+	var inspector := EditorInterface.get_inspector()
+	if inspector.property_edited.is_connected(_on_inspector_property_edited):
+		inspector.property_edited.disconnect(_on_inspector_property_edited)
+
+
+func _set_read_only(read_only: bool) -> void:
+	_read_only = read_only
+	_option_button.disabled = _read_only or _option_button.item_count == 0
+
+
 func _update_property() -> void:
 	_updating = true
 	_option_button.clear()
@@ -44,8 +61,10 @@ func _update_property() -> void:
 	var node_names := _get_node_names()
 
 	if node_names.is_empty():
-		_option_button.add_item(current_value if not current_value.is_empty() else "Start")
-		_option_button.selected = 0
+		if not current_value.is_empty():
+			_option_button.add_item(current_value)
+			_option_button.selected = 0
+		_option_button.disabled = _read_only or _option_button.item_count == 0
 		_updating = false
 		return
 
@@ -63,45 +82,56 @@ func _update_property() -> void:
 	else:
 		_option_button.selected = 0
 
+	_option_button.disabled = _read_only
 	_updating = false
 
 
 func _on_item_selected(index: int) -> void:
 	if _updating:
 		return
-	emit_changed(get_edited_property(), _option_button.get_item_text(index))
+	var text := _option_button.get_item_text(index)
+	if value_type == TYPE_STRING_NAME:
+		emit_changed(get_edited_property(), StringName(text))
+	else:
+		emit_changed(get_edited_property(), text)
+
+
+func _on_inspector_property_edited(property: String) -> void:
+	if property == source_property and get_edited_object() != null:
+		update_property()
 
 
 func _get_node_names() -> PackedStringArray:
-	var obj := get_edited_object()
-	if obj == null:
+	var project := _find_project()
+	if project == null or project.compiled_program.is_empty():
 		return PackedStringArray()
 
-	var project_variant: Variant = obj.get("yarn_project")
-	if not (project_variant is Resource):
-		return PackedStringArray()
-
-	var compiled_variant: Variant = (project_variant as Resource).get("compiled_program")
-	if not (compiled_variant is PackedByteArray):
-		return PackedStringArray()
-
-	var bytes: PackedByteArray = compiled_variant
-	if bytes.is_empty():
-		return PackedStringArray()
-
-	var cache_key := (project_variant as Resource).get_instance_id()
-	var bytes_hash := hash(bytes)
-	var cached: Dictionary = _names_cache.get(cache_key, {})
-	if cached.get("hash", 0) == bytes_hash and cached.get("size", -1) == bytes.size():
-		return cached["names"]
-
-	var program: YarnProgram = _YarnProgramParser.parse_from_bytes(bytes)
+	var program := project.get_program()
 	if program == null:
 		return PackedStringArray()
 
-	var filtered := filter_node_names(program)
-	_names_cache[cache_key] = {"hash": bytes_hash, "size": bytes.size(), "names": filtered}
-	return filtered
+	return filter_node_names(program)
+
+
+func _find_project() -> YarnProjectResource:
+	var obj := get_edited_object()
+	if obj == null:
+		return null
+
+	var source: Variant = obj.get(source_property)
+	if source is NodePath and obj is Node:
+		var path: NodePath = source
+		source = (obj as Node).get_node_or_null(path)
+
+	if typeof(source) != TYPE_OBJECT or not is_instance_valid(source):
+		return null
+	if source is YarnProjectResource:
+		return source
+
+	var nested: Variant = (source as Object).get("yarn_project")
+	if nested is YarnProjectResource:
+		return nested
+	return null
 
 
 static func filter_node_names(program: YarnProgram) -> PackedStringArray:

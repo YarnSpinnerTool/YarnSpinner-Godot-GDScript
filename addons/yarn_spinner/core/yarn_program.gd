@@ -16,6 +16,7 @@
 #                                                                          #
 # ======================================================================== #
 
+@tool
 class_name YarnProgram
 extends Resource
 ## Represents a compiled yarn spinner program.

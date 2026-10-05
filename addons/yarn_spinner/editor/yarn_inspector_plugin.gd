@@ -24,17 +24,25 @@ extends EditorInspectorPlugin
 const YarnNodePickerProperty := preload("res://addons/yarn_spinner/editor/yarn_node_picker_property.gd")
 const YarnInspectorHeader := preload("res://addons/yarn_spinner/editor/yarn_inspector_header.gd")
 
+const NODE_PICKER_HINT := "yarn_node"
+
 
 var _edited_object: Object
 
 
 func _can_handle(object: Object) -> bool:
-	if object is YarnDialogueRunner or object is YarnScriptResource:
+	return _is_yarn_object(object) or _has_node_picker_property(object)
+
+
+func _parse_property(object: Object, type: Variant.Type, name: String, hint_type: PropertyHint, hint_string: String, _usage_flags: int, _wide: bool) -> bool:
+	if _is_node_picker_property(type, hint_type, hint_string):
+		var custom_picker := YarnNodePickerProperty.new()
+		custom_picker.source_property = _node_picker_source(hint_string)
+		custom_picker.value_type = type
+		add_property_editor(name, custom_picker)
 		return true
-	return object is JSON and (object as JSON).resource_path.ends_with(".ysls.json")
-
-
-func _parse_property(object: Object, _type: Variant.Type, name: String, _hint_type: PropertyHint, _hint_string: String, _usage_flags: int, _wide: bool) -> bool:
+	if not _is_yarn_object(object):
+		return false
 	if name == "yarn_project":
 		_edited_object = object
 	if name == "start_node":
@@ -79,4 +87,36 @@ func _on_browse_project() -> void:
 
 
 func _parse_begin(object: Object) -> void:
-	add_custom_control(YarnInspectorHeader.create())
+	if _is_yarn_object(object):
+		add_custom_control(YarnInspectorHeader.create())
+
+
+static func _is_yarn_object(object: Object) -> bool:
+	if object is YarnDialogueRunner or object is YarnScriptResource:
+		return true
+	return object is JSON and (object as JSON).resource_path.ends_with(".ysls.json")
+
+
+static func _has_node_picker_property(object: Object) -> bool:
+	for property in object.get_property_list():
+		var type: int = property.get("type", TYPE_NIL)
+		var hint_type: int = property.get("hint", PROPERTY_HINT_NONE)
+		var hint_string: String = property.get("hint_string", "")
+		if _is_node_picker_property(type, hint_type, hint_string):
+			return true
+	return false
+
+
+static func _is_node_picker_property(type: int, hint_type: int, hint_string: String) -> bool:
+	if type != TYPE_STRING and type != TYPE_STRING_NAME:
+		return false
+	if hint_type != PROPERTY_HINT_NONE:
+		return false
+	return hint_string == NODE_PICKER_HINT or hint_string.begins_with(NODE_PICKER_HINT + ":")
+
+
+static func _node_picker_source(hint_string: String) -> StringName:
+	var source := hint_string.trim_prefix(NODE_PICKER_HINT).trim_prefix(":").strip_edges()
+	if source.is_empty():
+		return &"yarn_project"
+	return StringName(source)

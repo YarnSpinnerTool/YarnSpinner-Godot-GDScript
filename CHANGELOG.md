@@ -39,6 +39,32 @@ GDScript's `INFERENCE_ON_VARIANT` warning to an error. Those declarations
 now use explicit types, so the addon compiles cleanly under strict warning
 settings!
 
+### Yarn node picker for your own scripts
+
+The node dropdown used by the Dialogue Runner's `start_node` can now be
+used on your own exported properties!! Export a `String` or `StringName`
+with the `yarn_node` hint and name the property that holds the Yarn Project
+or Dialogue Runner:
+
+```gdscript
+@export var dialogue_runner: YarnDialogueRunner
+@export_custom(PROPERTY_HINT_NONE, "yarn_node:dialogue_runner") var start_at: String
+```
+
+The source property can hold a `YarnProjectResource` or anything with a
+`yarn_project` property, such as a Dialogue Runner. Plain `"yarn_node"`
+reads a `yarn_project` property on the same object... The dropdown refreshes
+when the source property is changed in the inspector! Magic.
+
+### Yarn Projects work in `@tool` scripts
+
+`YarnProjectResource`, `YarnProgram`, `YarnNode` and `YarnInstruction` are
+now `@tool`, so their methods can be called from editor scripts.
+`get_program()`, `get_node_names()` and `has_node()` used to fail in the
+editor, because Godot only exposes a non-tool script's exported properties
+there. The parsed program is cached and refreshed when the project is
+reimported.
+
 ### Sample gallery ordering and thumbnails
 
 The Samples tab in the Yarn Spinner editor screen now lists samples in a

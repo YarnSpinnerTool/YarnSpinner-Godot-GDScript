@@ -96,6 +96,13 @@ The central node. Add it to your scene, assign a `.yarnproject`, an call `start_
 
 Signals: `dialogue_started`, `dialogue_completed`, `dialogue_cancelled`, `node_started`, `node_completed`, `command_unhandled`, `command_received`.
 
+To choose a Yarn node from a dropdown on your own scripts, export a `String` with the `yarn_node` hint, naming the property that holds the Dialogue Runner or Yarn Project:
+
+```gdscript
+@export var dialogue_runner: YarnDialogueRunner
+@export_custom(PROPERTY_HINT_NONE, "yarn_node:dialogue_runner") var start_at: String
+```
+
 ### YarnLinePresenter
 
 Displays a line of dialogue with optional typewriter animation (letter-by-letter or word-by-word). Expects a `RichTextLabel` for text and an optional `Label` for character names. Shows a continue indicator when the line is fully revealed.

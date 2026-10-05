@@ -22,7 +22,6 @@ extends EditorInspectorPlugin
 ## Shows compilation status, errors, statistics, source scripts, nodes,
 ## variables, localisation tools, and variable storage generation.
 
-const _YarnProgramParser := preload("res://addons/yarn_spinner/core/yarn_program_parser.gd")
 const YarnInspectorHeader := preload("res://addons/yarn_spinner/editor/yarn_inspector_header.gd")
 const YarnProjectUtility := preload("res://addons/yarn_spinner/editor/yarn_project_utility.gd")
 const YarnProjectImporter := preload("res://addons/yarn_spinner/editor/yarn_project_importer.gd")
@@ -71,21 +70,10 @@ func _parse_begin(object: Object) -> void:
 
 	container.add_child(YarnInspectorHeader.create())
 
-	# Parse program directly (YarnProjectResource is not @tool, so we
-	# cannot call its methods on the placeholder instance)
 	var program: YarnProgram = null
-	var compiled_variant: Variant = project.get("compiled_program")
-	var has_compiled_data := compiled_variant is PackedByteArray and not (compiled_variant as PackedByteArray).is_empty()
+	var has_compiled_data := not project.compiled_program.is_empty()
 	if has_compiled_data:
-		var compiled: PackedByteArray = compiled_variant
-		program = _YarnProgramParser.parse_from_bytes(compiled)
-		if program != null:
-			var st: Variant = project.get("string_table")
-			var lm: Variant = project.get("line_metadata")
-			if st is Dictionary:
-				program.string_table = (st as Dictionary).duplicate()
-			if lm is Dictionary:
-				program.line_metadata = (lm as Dictionary).duplicate()
+		program = project.get_program()
 
 	var diagnostics: Array = []
 	var diagnostics_variant: Variant = project.get("diagnostics")

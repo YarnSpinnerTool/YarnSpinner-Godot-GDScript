@@ -16,6 +16,7 @@
 #                                                                          #
 # ======================================================================== #
 
+@tool
 extends RefCounted
 ## Binary protobuf reader for parsing .yarnc files.
 

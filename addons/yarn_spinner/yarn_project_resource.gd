@@ -16,6 +16,7 @@
 #                                                                          #
 # ======================================================================== #
 
+@tool
 @icon("res://addons/yarn_spinner/icons/yarn_project.svg")
 class_name YarnProjectResource
 extends Resource
@@ -24,11 +25,20 @@ extends Resource
 
 const _YarnProgramParser := preload("res://addons/yarn_spinner/core/yarn_program_parser.gd")
 
-@export var compiled_program: PackedByteArray = PackedByteArray()
+@export var compiled_program: PackedByteArray = PackedByteArray():
+	set(value):
+		compiled_program = value
+		_cached_program = null
 ## line_id -> text
-@export var string_table: Dictionary = {}
+@export var string_table: Dictionary = {}:
+	set(value):
+		string_table = value
+		_cached_program = null
 ## line_id -> tags array
-@export var line_metadata: Dictionary = {}
+@export var line_metadata: Dictionary = {}:
+	set(value):
+		line_metadata = value
+		_cached_program = null
 @export var source_files: PackedStringArray = PackedStringArray()
 @export var line_info: Dictionary = {}
 @export var diagnostics: Array = []
