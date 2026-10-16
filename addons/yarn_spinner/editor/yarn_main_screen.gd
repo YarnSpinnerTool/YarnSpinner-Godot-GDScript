@@ -138,7 +138,7 @@ func _build_toolbar() -> Control:
 	_save_button = Button.new()
 	_save_button.text = "Save"
 	_save_button.icon = _editor_icon("Save")
-	_save_button.tooltip_text = "Save the current file (Ctrl+S)"
+	_save_button.tooltip_text = "Save the current file (%s)" % ("Cmd+S" if OS.get_name() == "macOS" else "Ctrl+S")
 	_save_button.pressed.connect(_save_file)
 	toolbar.add_child(_save_button)
 
@@ -1144,10 +1144,17 @@ func _on_new_file_selected(path: String) -> void:
 # -------------------------------------------------------------------------- #
 
 func _shortcut_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and event.ctrl_pressed and event.keycode == KEY_S:
-		if not _current_path.is_empty():
-			_save_file()
-			accept_event()
+	if not (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_S):
+		return
+	if not event.is_command_or_control_pressed() or event.shift_pressed or event.alt_pressed:
+		return
+	if _current_path.is_empty() or not is_visible_in_tree():
+		return
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus == null or not is_ancestor_of(focus):
+		return
+	_save_file()
+	accept_event()
 
 
 func _editor_icon(icon_name: String) -> Texture2D:
