@@ -123,13 +123,16 @@ Base class for game state storage. The built-in `YarnInMemoryVariableStorage` st
 
 Define commands in your scripts by naming methods `_yarn_command_<name>`. The runner discovers them automatically. Return a `Signal` to make the runner wait for it before continuing.
 
+A `static` method is called with just its arguments. A method that isn't `static` belongs to a node, so its first argument in Yarn is the name of the node to call it on. Methods on autoloads are called with just their arguments, `static` or not.
+
 ```gdscript
-func _yarn_command_shake(intensity: float) -> void:
+static func _yarn_command_shake(intensity: float) -> void:
     # called from Yarn: <<shake 2.5>>
     pass
 
+# On a script attached to a node called Door
 func _yarn_command_fade(duration: float) -> Signal:
-    # async: runner waits for the signal
+    # called from Yarn: <<fade Door 0.5>>
     var tween = create_tween()
     tween.tween_property(self, "modulate:a", 0.0, duration)
     return tween.finished

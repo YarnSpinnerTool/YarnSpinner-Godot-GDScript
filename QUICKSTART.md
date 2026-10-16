@@ -93,57 +93,57 @@ That's it. Run the scene and your dialogue plays.
 
 ## Commands
 
-Commands let Yarn tell your game to do things. The easiest way is the naming convention -- prefix any method with `_yarn_command_` and the runner finds it automatically.
+Commands let Yarn tell your game to do things. The easiest way is the naming convention -- prefix any method with `_yarn_command_` and the runner finds it automatically. The runner looks in scripts with a `class_name`, scripts attached to nodes in the running scene, and autoloads.
+
+Whether the method is `static` decides how you call it from Yarn.
+
+### Static Commands
+
+A `static` method is a command you can call from anywhere, with just its arguments:
 
 ```gdscript
-# On any node in your scene tree:
-
-func _yarn_command_shake(intensity: float) -> void:
+static func _yarn_command_shake(intensity: float) -> void:
 	# <<shake 2.5>>
-	# Runs instantly, dialogue continues immediately
-	camera.shake(intensity)
-
-func _yarn_command_fade(duration: float) -> Signal:
-	# <<fade 0.5>>
-	# Returns a Signal -- dialogue waits for it to complete
-	var tween = create_tween()
-	tween.tween_property($Overlay, "modulate:a", 1.0, duration)
-	return tween.finished
-
-func _yarn_command_wait(seconds: float) -> Signal:
-	# <<wait 1.5>>
-	return get_tree().create_timer(seconds).timeout
+	CameraRig.shake(intensity)
 ```
 
-Make sure `auto_discover_commands` is enabled on the dialogue runner (it is by default). The runner scans the scene tree on startup and registers everything it finds.
+Methods on an autoload work the same way, `static` or not.
 
-If a command returns `void`, dialogue continues immediately. If it returns a `Signal`, dialogue pauses until that signal fires.
+### Commands on a Node
 
-### Instance Commands
-
-For commands that target specific nodes (like `<<move mae center>>`), define the method on the node's class:
+A method that isn't `static` belongs to a node. In Yarn, the first argument is the name of the node to call it on:
 
 ```gdscript
-class_name Character
+# Character.gd, attached to a node called Mae
 extends Node2D
 
-func _yarn_command_move(destination: String) -> Signal:
-	var target := get_node("/root/Game/Waypoints/" + destination)
+func _yarn_command_move(x: float, y: float) -> Signal:
+	# <<move Mae 700 400>>
 	var tween := create_tween()
-	tween.tween_property(self, "position", target.position, 1.0)
+	tween.tween_property(self, "position", Vector2(x, y), 1.0)
 	return tween.finished
 ```
 
-Register the class as an instance command source:
+The runner looks for a node called `Mae` anywhere in the running game, checks it has the script, and calls `_yarn_command_move(700, 400)` on it. Writing `<<move 700 400>>` without the node name won't work: the runner reads `700` as the node's name.
+
+Make sure `auto_discover_commands` is enabled on the dialogue runner (it is by default).
+
+If a command returns `void`, dialogue continues immediately. If it returns a `Signal`, or uses `await`, dialogue pauses until it finishes.
+
+### Adding Commands from Code
+
+To use any name and any method, add the command to the runner yourself:
 
 ```gdscript
 func _ready():
-	var library := dialogue_runner.get_library()
-	library.register_instance_command("move", Character)
-	library.set_target_root(self)
+	dialogue_runner.add_command("give_item", _give_item)
+
+func _give_item(item_name: String, count: int) -> void:
+	# <<give_item "brass key" 1>>
+	Inventory.add(item_name, count)
 ```
 
-Now `<<move mae center>>` finds the node named "mae", checks it's a `Character`, and calls `_yarn_command_move("center")` on it.
+`<<wait>>` and `<<stop>>` are built in, so don't use those names for your own commands.
 
 ## Functions
 
