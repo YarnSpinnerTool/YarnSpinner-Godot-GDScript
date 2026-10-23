@@ -1520,6 +1520,8 @@ func _on_command(command_text: String) -> void:
 					"non-static method is an instance command, so its first argument must be a " +
 					"target node name (<<cmd TargetNode args>>). For a global command, make the " +
 					"method static or register it with runner.add_command().") % [command_text, result.error])
+			YarnLibrary.CommandDispatchStatus.INVALID_PARAMETER_COUNT:
+				push_error("yarn spinner: can't call command <<%s>>: %s%s" % [command_text, result.error, _ysls_parameter_count_hint(_parsed)])
 			_:
 				push_error("yarn spinner: can't call command <<%s>>: %s" % [command_text, result.error])
 		if run == _run_id and epoch == _line_epoch:
@@ -1705,6 +1707,39 @@ func _cmd_wait(duration: float) -> void:
 
 func _regenerate_ysls_pressed() -> void:
 	regenerate_ysls()
+
+
+func _ysls_parameter_count_hint(parsed: Array) -> String:
+	if parsed.is_empty() or yarn_project == null or yarn_project.resource_path.is_empty():
+		return ""
+	var ysls_path := yarn_project.resource_path.get_basename() + ".ysls.json"
+	if not FileAccess.file_exists(ysls_path):
+		return ""
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(ysls_path))
+	if not data is Dictionary:
+		return ""
+
+	for command: Variant in data.get("commands", []):
+		if not command is Dictionary or command.get("yarnName", "") != parsed[0]:
+			continue
+		var required := 0
+		var allowed := 0
+		var unlimited := false
+		for param: Variant in command.get("parameters", []):
+			if not param is Dictionary:
+				continue
+			if param.get("isParamsArray", false):
+				unlimited = true
+			else:
+				allowed += 1
+				if not param.has("defaultValue"):
+					required += 1
+		var provided := parsed.size() - 1
+		if provided < required or (not unlimited and provided > allowed):
+			return ""
+		return (" The .ysls.json used by VS Code accepts this call, so it's out of date with " +
+			"the code. Regenerate it with Regenerate YSLS on the Dialogue Runner.")
+	return ""
 
 
 ## regenerates the .ysls.json file next to the yarn project for VS Code integration.

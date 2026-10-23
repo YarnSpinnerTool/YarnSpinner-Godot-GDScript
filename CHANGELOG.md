@@ -121,6 +121,13 @@ gets them from the project's `"definitions"` instead:
 
 ### Changed
 
+- The error for a commnd called with the wrong number of parameters now
+  names the handler plus its signature and script, and tells you which 
+  parameters have no default value. If the handler is a lambda, it says 
+  that lambdas can't have optional parameters. If a project's `.ysls.json` 
+  accepts the call, tje error says it's out of date with the code and needs 
+  regenerating, as editors/VS Code reads the `.ysls.json` but the game reads 
+  the GDScript function!
 - The bundled compiler binaries are now named for their platform and
   architecture: `ysc-native-macos-universal`, `ysc-native-windows-x64.exe`,
   `ysc-native-linux-x64`, and the `arm64` builds for Windows and Linux. The

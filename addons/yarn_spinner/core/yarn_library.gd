@@ -527,7 +527,7 @@ func _make_dispatch_result(status: CommandDispatchStatus, handled: bool, is_asyn
 func _safe_call(target: Object, method_name: String, args: Array, command_name: String = "") -> Dictionary:
 	if command_name.is_empty():
 		command_name = method_name
-	var coercion := _coerce_call_args(_find_method_info(target, method_name), args, command_name, Callable(), 0)
+	var coercion := _coerce_call_args(_find_method_info(target, method_name), args, command_name, Callable(), 0, target)
 	if not coercion.success:
 		return {"success": false, "status": coercion.status, "error": coercion.error, "result": null}
 
@@ -542,7 +542,7 @@ func _safe_call(target: Object, method_name: String, args: Array, command_name: 
 func _safe_callv(callable: Callable, args: Array, command_name: String) -> Dictionary:
 	var coercion := _coerce_call_args(
 		_find_method_info(callable.get_object(), callable.get_method()), args, command_name,
-		callable, callable.get_bound_arguments_count())
+		callable, callable.get_bound_arguments_count(), callable.get_object())
 	if not coercion.success:
 		return {"success": false, "status": coercion.status, "error": coercion.error, "result": null}
 
@@ -578,7 +578,7 @@ func _find_method_info(obj: Object, method_name: String) -> Dictionary:
 
 ## Validates argument count and converts each string argument to the
 ## handler's declared parameter type. Returns {success, status, error, args}.
-func _coerce_call_args(method_info: Dictionary, args: Array, command_name: String, callable: Callable = Callable(), bound_count: int = 0) -> Dictionary:
+func _coerce_call_args(method_info: Dictionary, args: Array, command_name: String, callable: Callable = Callable(), bound_count: int = 0, handler: Object = null) -> Dictionary:
 	# Deliberately untyped: args arrives as Array[String], and a typed
 	# duplicate() would reject the coerced ints/floats/bools/Nodes.
 	var coerced: Array = []
@@ -602,8 +602,13 @@ func _coerce_call_args(method_info: Dictionary, args: Array, command_name: Strin
 		max_args = -1 if variadic else expected_args.size()
 
 	if args.size() < min_args or (max_args >= 0 and args.size() > max_args):
+		var message := _parameter_count_message(command_name, min_args, max_args, args.size())
+		if method_info.is_empty():
+			message += " Its handler is a lambda, so every parameter is required, even ones with a default value. To make a parameter optional, use a named method instead."
+		else:
+			message += " " + _handler_description(method_info, expected_args, min_args, args.size(), handler)
 		return {"success": false, "status": CommandDispatchStatus.INVALID_PARAMETER_COUNT,
-			"error": _parameter_count_message(command_name, min_args, max_args, args.size()), "args": coerced}
+			"error": message, "args": coerced}
 
 	for i in range(mini(args.size(), expected_args.size())):
 		var expected_type: int = expected_args[i].get("type", TYPE_NIL)
@@ -627,6 +632,32 @@ func _parameter_count_message(command_name: String, min_args: int, max_args: int
 	else:
 		description = "%d %s" % [min_args, "parameter" if min_args == 1 else "parameters"]
 	return "%s requires %s, but %d %s provided." % [command_name, description, provided, "was" if provided == 1 else "were"]
+
+
+func _handler_description(method_info: Dictionary, expected_args: Array, min_args: int, provided: int, handler: Object) -> String:
+	var params := PackedStringArray()
+	for arg: Dictionary in expected_args:
+		var arg_name: String = arg.get("name", "")
+		var type_name: String = arg.get("class_name", "")
+		if type_name.is_empty() and int(arg.get("type", TYPE_NIL)) != TYPE_NIL:
+			type_name = type_string(int(arg.get("type", TYPE_NIL)))
+		params.append(arg_name if type_name.is_empty() else "%s: %s" % [arg_name, type_name])
+	if (int(method_info.get("flags", 0)) & METHOD_FLAG_VARARG) != 0:
+		params.append("...")
+
+	var description := "Its handler is %s(%s)" % [method_info.get("name", ""), ", ".join(params)]
+	var script: Script = handler if handler is Script else (handler.get_script() if handler != null else null)
+	if script != null and not script.resource_path.is_empty():
+		description += " in %s" % script.resource_path
+
+	var missing := PackedStringArray()
+	for i in range(provided, min_args):
+		missing.append(String(expected_args[i].get("name", "")))
+	if missing.is_empty():
+		return description + "."
+	if missing.size() == 1:
+		return description + ", and %s has no default value." % missing[0]
+	return description + ", and %s have no default values." % ", ".join(missing)
 
 
 ## Converts one command argument to the handler's declared parameter type.
