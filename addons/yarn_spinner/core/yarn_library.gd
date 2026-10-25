@@ -295,8 +295,9 @@ func call_function(func_name: String, stack: Array, vm: YarnVirtualMachine) -> V
 		return _function_failure("stack underflow calling '%s' (need %d, have %d)" % [func_name, arg_count, stack.size()])
 
 	var args: Array = []
-	for i in range(arg_count):
-		args.push_front(stack.pop_back())
+	args.resize(arg_count)
+	for i in range(arg_count - 1, -1, -1):
+		args[i] = stack.pop_back()
 
 	var signature: Dictionary = _function_signatures[func_name]
 	var min_args: int = signature.min
@@ -306,10 +307,14 @@ func call_function(func_name: String, stack: Array, vm: YarnVirtualMachine) -> V
 		return _function_failure("function %s expected %s parameters, but received %d" % [func_name, expected, arg_count])
 
 	var types: Array = signature.types
-	for i in range(args.size()):
-		if i >= types.size():
-			break
-		var converted := _convert_function_argument(args[i], types[i])
+	for i in range(mini(args.size(), types.size())):
+		# Most arguments already arrive as the type the function asked for.
+		var arg: Variant = args[i]
+		var target_type: int = types[i]
+		if target_type == TYPE_NIL or (target_type == TYPE_FLOAT and arg is float) \
+				or (target_type == TYPE_BOOL and arg is bool) or (target_type == TYPE_STRING and arg is String):
+			continue
+		var converted := _convert_function_argument(arg, target_type)
 		if not converted.ok:
 			return _function_failure("function %s: parameter %d %s" % [func_name, i + 1, converted.error])
 		args[i] = converted.value

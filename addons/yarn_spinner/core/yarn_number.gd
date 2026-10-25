@@ -25,6 +25,10 @@ extends RefCounted
 
 ## Rounds a double to the nearest representable 32-bit float value.
 static func to_f32(v: float) -> float:
+	# Whole numbers up to 2^24 are already exact in float32.. so we can skip the
+	# round trip through an array mostly :)
+	if v == floorf(v) and absf(v) <= 16777216.0:
+		return v
 	var arr := PackedFloat32Array()
 	arr.resize(1)
 	arr[0] = v
@@ -44,6 +48,8 @@ static func round_half_to_even(v: float) -> float:
 
 
 static func to_int32(v: float) -> int:
+	if v == floorf(v):
+		return int(v)
 	return int(round_half_to_even(v))
 
 
@@ -62,6 +68,10 @@ static func to_display_string(v: float) -> String:
 
 	var negative := v < 0.0
 	var abs_v := absf(v)
+	# Every whole number up to 2^24 is exact in float32, so its shortest
+	# round-trip form is just its digits!
+	if abs_v == floorf(abs_v) and abs_v <= 16777216.0:
+		return str(int(v))
 	var exponent := _magnitude(abs_v)
 
 	var digits := ""
@@ -73,11 +83,7 @@ static func to_display_string(v: float) -> String:
 		digit_exponent = found.exponent
 		if to_f32(candidate) == abs_v:
 			break
-
-	# Plain vs scientific is decided from the decimal exponent of the
-	# rounded digits (not the raw double), since a float32 value near the
-	# 0.0001 boundary can sit a hair below it in double precision even
-	# though its shortest decimal representation is exactly "0.0001".
+			
 	var is_plain := digit_exponent >= -4 and digit_exponent < 9
 	var body: String
 	if is_plain:
