@@ -144,6 +144,12 @@ thats only declared and hasn't been set yet now checks the stored values first.
 
 ### Changed
 
+- Gamepads can work with the Presenters out of the box!! Godot's default
+  `ui_accept` and `ui_cancel` have no gamepad buttonsso a gamepad couldn't
+  advance dialogue or choose an option. At startup, the `YarnSpinner`
+  autoload now adds the A button to `ui_accept` and the B button to
+  `ui_cancel`, but only when that action has no gamepad buttons, so projects
+  with their own gamepad bindings are left alone :)
 - The error for a commnd called with the wrong number of parameters now
   names the handler plus its signature and script, and tells you which 
   parameters have no default value. If the handler is a lambda, it says 
