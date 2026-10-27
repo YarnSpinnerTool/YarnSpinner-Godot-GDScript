@@ -151,6 +151,8 @@ func _load_node(node_name: String, clear_state: bool) -> void:
 			print("  [%d] %s%s" % [i, opcode_name, extra])
 
 	node_start_handler.emit(node_name)
+	if _current_node == null:
+		return
 	prepare_for_lines_handler.emit(_collect_line_ids(_current_node))
 
 

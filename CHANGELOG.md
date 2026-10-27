@@ -287,6 +287,9 @@ thats only declared and hasn't been set yet now checks the stored values first.
 
 ### Fixed
 
+- Calling `stop_dialogue()` from a `node_started` handler no longer fails.
+  The runner now stops cleanly, whether the node was jumped to or was the 
+  one dialogue started on!
 - Negative numbers now pick their plural form from the size of the number,
   ignoring the sign. `[plural value=-1 one="% apple" other="% apples"]` 
   now reads "-1 apple" rather than "-1 apples". Only the operands changed!
