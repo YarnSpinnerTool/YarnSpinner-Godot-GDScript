@@ -13,7 +13,7 @@ Requires Godot 4.6 or later (not the .NET/Mono version).
 Visit the [documentation](https://docs.yarnspinner.dev/yarn-spinner-for-godot/godot-gdscript) and [Yarn Spinner site](https://yarnspinner.dev) for more information.
 
 > [!TIP]
-> **Please submit issues or feature requests via this form during Early Access:** http://yarnspinner.dev/pre-release-feedback
+> **Please submit issues or feature requests here:** https://github.com/YarnSpinnerTool/IssuesDiscussion/issues
 
 ## Samples
 
