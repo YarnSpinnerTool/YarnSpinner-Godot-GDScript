@@ -29,6 +29,20 @@ var _saliency_strategies: Dictionary[String, YarnSaliencyStrategy] = {}
 
 func _ready() -> void:
 	_register_default_saliency_strategies()
+	_add_default_joypad_button(&"ui_accept", JOY_BUTTON_A)
+	_add_default_joypad_button(&"ui_cancel", JOY_BUTTON_B)
+
+
+func _add_default_joypad_button(action: StringName, button: JoyButton) -> void:
+	if not InputMap.has_action(action):
+		return
+	for event in InputMap.action_get_events(action):
+		if event is InputEventJoypadButton:
+			return
+	var event := InputEventJoypadButton.new()
+	event.device = -1
+	event.button_index = button
+	InputMap.action_add_event(action, event)
 
 
 func register_command(command_name: String, callable: Callable) -> void:
