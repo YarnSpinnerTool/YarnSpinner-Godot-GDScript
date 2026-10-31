@@ -180,12 +180,16 @@ var _line_advancers: Array[Node] = []
 var _content_frame := -1
 var _completion_promise: YarnPromise
 var _stop_requested: bool = false
+var _continue_frame := -1
+var _continues_this_frame := 0
 
 
 ## Once next content has been requested, a presenter that still hasn't
 ## finished this many seconds later gets named in a warning, since the
 ## dialogue is waiting on it.
 const STALL_WARNING_SECONDS := 5.0
+
+const MAX_CONTINUES_PER_FRAME := 100
 
 
 func _ready() -> void:
@@ -642,23 +646,22 @@ func start_dialogue(node_name: String = "") -> void:
 	_stop_requested = false
 	_completion_promise = YarnPromise.new()
 
-	if not _vm.set_node(node_name):
-		_is_running = false
-		_is_starting = false
-		_completion_promise.settle()
-		return
-
 	_apply_saliency_strategy()
 	_is_starting = false
-
-	if run != _run_id or not _is_running:
-		return
 
 	dialogue_started.emit()
 
 	await _notify_presenters_together("on_dialogue_started")
 
 	if run != _run_id or not _is_running:
+		return
+
+	if not _vm.set_node(node_name):
+		var completion := _completion_promise
+		_clear_run_state()
+		await _finish_dialogue(true)
+		if completion != null:
+			completion.settle()
 		return
 
 	_continue_dialogue()
@@ -1210,6 +1213,19 @@ func _continue_dialogue_safe() -> void:
 	# Signal/coroutine) AND lines/sync commands where a new RUN_LINE has
 	# started while the previous completion's deferred call was queued.
 	if _waiting_for_content:
+		return
+	var frame := Engine.get_process_frames()
+	if frame != _continue_frame:
+		_continue_frame = frame
+		_continues_this_frame = 0
+	_continues_this_frame += 1
+	if _continues_this_frame > MAX_CONTINUES_PER_FRAME and is_inside_tree():
+		var run := _run_id
+		_content_complete_pending = true
+		await get_tree().process_frame
+		if run != _run_id or not _is_running:
+			return
+		_continue_dialogue_safe()
 		return
 	_continue_dialogue()
 
