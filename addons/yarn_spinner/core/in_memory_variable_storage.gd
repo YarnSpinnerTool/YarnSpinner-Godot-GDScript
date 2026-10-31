@@ -72,7 +72,7 @@ func set_value(variable_name: String, value: Variant) -> void:
 
 
 func get_value(variable_name: String) -> Variant:
-	# Stored values skip teh {found, value} Dictionary!
+	# Stored values skip the {found, value} Dictionary!
 	if _variables.has(variable_name) and (not validate_variable_names or variable_name.begins_with("$")):
 		return _variables[variable_name]
 	return super(variable_name)
