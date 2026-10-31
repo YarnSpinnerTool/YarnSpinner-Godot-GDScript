@@ -3,7 +3,7 @@
 This gets you from zero to running dialogue in about five minutes. It assumes you already know how to write Yarn, and how to use Godot.
 
 > [!IMPORTANT]
-> Yarn Spinner+ for Godot (GDScript), with the Classic RPG and Snaaake dialogue presenters and priority email support, is available to buy at [yarnspinner.dev/godot](https://yarnspinner.dev/godot). Buying it supports the team behind Yarn Spinner. See the [Installation](https://yarnspinner.dev/docs/godot/gdscript/01-installation/) docs for every way to install.
+> Yarn Spinner+ for Godot (GDScript), with the Classic RPG and Snaaake dialogue Presenters and priority email support, is available to buy at [yarnspinner.dev/godot](https://yarnspinner.dev/godot). Buying it supports the team behind Yarn Spinner. See the [Installation](https://yarnspinner.dev/docs/godot/gdscript/01-installation/) docs for every way to install.
 
 > [!TIP]
 > **Please submit bug reports and feature requests here:** https://github.com/YarnSpinnerTool/IssuesDiscussion/issues
@@ -47,7 +47,7 @@ If `ysc` isn't on your PATH, you can compile manually:
 ysc compile your_project.yarnproject
 ```
 
-You can also set the path to `ysc` in the import options for the `.yarnproject` file in the Godot inspector, or in **Project Settings > Yarn Spinner > YSC Path**.
+You can also set the path to `ysc` in the import options for the `.yarnproject` file in the Godot Inspector, or in **Project Settings > Yarn Spinner > YSC Path**.
 
 More detail: [The compiler](https://yarnspinner.dev/docs/godot/gdscript/01-installation/#the-compiler), [Yarn Projects](https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/01-yarn-projects/), [Importing Yarn Files](https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/02-importing-yarn-files/) and [Editor Tools](https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/03-editor-tools/).
 
@@ -68,17 +68,17 @@ Game (Node2D)
 │       └── OptionsContainer (VBoxContainer)
 ```
 
-1. **YarnDialogueRunner** -- add a Node, attach the `YarnDialogueRunner` script (`addons/yarn_spinner/dialogue_runner.gd`). In the inspector, set `Yarn Project` to your `.yarnproject` file.
+1. **YarnDialogueRunner** -- add a Node, attach the `YarnDialogueRunner` script (`addons/yarn_spinner/dialogue_runner.gd`). In the Inspector, set `Yarn Project` to your `.yarnproject` file.
 
 2. **LinePresenter** -- add a PanelContainer, attach the `YarnLinePresenter` script (`addons/yarn_spinner/ui/line_presenter.gd`). Give it a `RichTextLabel` child named `TextLabel` for dialogue text, a `Label` named `CharacterLabel` for the speaker name, and optionally a `Label` named `ContinueIndicator`.
 
 3. **OptionsPresenter** -- add a PanelContainer, attach the `YarnOptionsPresenter` script (`addons/yarn_spinner/ui/options_presenter.gd`). Give it a `VBoxContainer` child named `OptionsContainer` -- buttons are created automatically at runtime.
 
-The ready-made presenter scripts all live in `addons/yarn_spinner/ui/`. The `dialogue_presenter.gd` at the addon's root is the abstract base class you subclass to write a custom presenter; it can't be attached to a node directly.
+The ready-made Presenter scripts all live in `addons/yarn_spinner/ui/`. The `dialogue_presenter.gd` at the addon's root is the abstract base class you subclass to write a custom Presenter; it can't be attached to a node directly.
 
 ## Wire It Up
 
-In your game script, connect the presenters to the runner and start dialogue:
+In your game script, connect the Presenters to the runner and start dialogue:
 
 ```gdscript
 extends Node2D
@@ -132,7 +132,7 @@ func _yarn_command_move(x: float, y: float) -> Signal:
 
 The runner looks for a node called `Mae` anywhere in the running game, checks it has the script, and calls `_yarn_command_move(700, 400)` on it. Writing `<<move 700 400>>` without the node name won't work: the runner reads `700` as the node's name.
 
-Make sure `auto_discover_commands` is enabled on the dialogue runner (it is by default).
+Make sure `auto_discover_commands` is enabled on the Dialogue Runner (it is by default).
 
 If a command returns `void`, dialogue continues immediately. If it returns a `Signal`, or uses `await`, dialogue pauses until it finishes.
 
@@ -207,13 +207,13 @@ var coins = dialogue_runner.variable_storage.get_value("$coins")
 dialogue_runner.variable_storage.set_value("$player_name", "Hero")
 ```
 
-The runner creates a `YarnInMemoryVariableStorage` automatically. If you need persistence, subclass `YarnVariableStorage` and assign it in the inspector.
+The runner creates a `YarnInMemoryVariableStorage` automatically. If you need persistence, subclass `YarnVariableStorage` and assign it in the Inspector.
 
 More detail: [Variables and Storage](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/04-variables-and-storage/) and [Smart Variables](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/05-smart-variables/).
 
 ## Signals
 
-The dialogue runner emits signals for lifecycle events:
+The Dialogue Runner emits signals for lifecycle events:
 
 ```gdscript
 dialogue_runner.dialogue_started.connect(func(): show_dialogue_ui())
@@ -229,7 +229,7 @@ Once you connect `command_unhandled`, the dialogue waits on each unknown Command
 
 ## Useful Settings
 
-On the `YarnDialogueRunner` in the inspector:
+On the `YarnDialogueRunner` in the Inspector:
 
 - **Start Node** -- which Yarn node to begin from (default: `"Start"`)
 - **Auto Start** -- begin dialogue when the scene loads
@@ -251,13 +251,13 @@ More detail: [Typewriter and Effects](https://yarnspinner.dev/docs/godot/gdscrip
 
 ## Custom Presenters
 
-To make your own presenter UI, subclass `YarnDialoguePresenter`. `run_line`
+To make your own Presenter UI, subclass `YarnDialoguePresenter`. `run_line`
 returns nothing: hold the line open by awaiting inside it, and return when
 the line is done. The token tells you when the runner wants the line to end,
 so wait on it and ask the runner to move on when the player clicks.
 
 `run_options` returns the index of the chosen option. Return `-1` if the
-token fires first, which happens when another presenter chose or the options
+token fires first, which happens when another Presenter chose or the options
 timed out.
 
 ```gdscript
@@ -303,7 +303,7 @@ More detail: [Building Your Own Presenter](https://yarnspinner.dev/docs/godot/gd
 
 ## Node Groups and Saliency
 
-If you're using node groups (multiple versions of the same content with `when:` conditions), choose how the runner picks between them with its **Saliency Strategy** property in the inspector: `RANDOM_BEST_LEAST_RECENT` (the default), `BEST_LEAST_RECENT`, `BEST`, `FIRST` or `RANDOM`.
+If you're using node groups (multiple versions of the same content with `when:` conditions), choose how the runner picks between them with its **Saliency Strategy** property in the Inspector: `RANDOM_BEST_LEAST_RECENT` (the default), `BEST_LEAST_RECENT`, `BEST`, `FIRST` or `RANDOM`.
 
 To use your own strategy, extend `YarnSaliencyStrategy` and set it from code:
 
@@ -321,5 +321,5 @@ The plugin generates a `.ysls.json` file next to each `.yarnproject` for the nex
 
 - [Localising Your Game](https://yarnspinner.dev/docs/godot/gdscript/06-localisation-and-assets/01-localising-your-game/): export your lines, translate them, and switch language.
 - [Samples](https://yarnspinner.dev/docs/godot/gdscript/07-samples/): a walkthrough of every sample in the [YarnSpinner-Godot-Samples](https://github.com/YarnSpinnerTool/YarnSpinner-Godot-Samples) project.
-- [Yarn Spinner+ and Add-Ons](https://yarnspinner.dev/docs/godot/gdscript/08-yarn-spinner-plus-and-add-ons/): the paid version, with the Classic RPG and Snaaake presenters.
+- [Yarn Spinner+ and Add-Ons](https://yarnspinner.dev/docs/godot/gdscript/08-yarn-spinner-plus-and-add-ons/): the paid version, with the Classic RPG and Snaaake Presenters.
 - [Writing Yarn](https://yarnspinner.dev/docs/yarn/): the Yarn language itself.

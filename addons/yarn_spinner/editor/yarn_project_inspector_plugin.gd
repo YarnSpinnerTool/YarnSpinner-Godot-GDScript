@@ -97,9 +97,8 @@ func _parse_begin(object: Object) -> void:
 		)
 		help_label.text = (
 			"[center]Yarn Projects are created by importing a [b].yarnproject[/b] file.\n"
-			+ "Create one using the [url=https://marketplace.visualstudio.com/items?itemName=SecretLab.yarn-spinner]"
-			+ "Yarn Spinner VS Code extension[/url], then import it into your project.\n\n"
-			+ "[url=https://docs.yarnspinner.dev/using-yarnspinner-with-godot/overview]"
+			+ "Create one with [b]Project > Tools > Create Yarn Project...[/b], then add your .yarn files.\n\n"
+			+ "[url=https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/01-yarn-projects/]"
 			+ "Learn more in the docs.[/url][/center]"
 		)
 		container.add_child(help_label)

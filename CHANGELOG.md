@@ -1,30 +1,37 @@
 # Yarn Spinner for Godot (GDScript) — Changelog
 
+## Early Access 3.3
+
+- Presenters now get `on_dialogue_started` before `on_node_started`, and the Dialogue Runner emits `dialogue_started` before `node_started`. The start node is entered after every Presenter has finished `on_dialogue_started`.
+- A run of content that finishes instantly, such as a looping node whose Presenters return straight away, no longer locks the game. The Dialogue Runner now waits a frame after 100 pieces of content in a single frame.
+- The editor's Docs links now open the Yarn Spinner for Godot (GDScript) documentation, and the Yarn Project Inspector's help text points to **Project > Tools > Create Yarn Project...**.
+- The native compiler and plugin now report version 3.3.
+
 ## Early Access 3.2
 
-### Yarn Project inspector
+### Yarn Project Inspector
 
-The inspector for `.yarnproject` files now matches Yarn Spinner for Unity's!
+The Inspector for `.yarnproject` files now matches the one in Yarn Spinner for Unity.
 
-- The Yarn Spinner header (logo and links) from the dialogue runner's
-  inspector now appears on Yarn Projects, Yarn scripts, and `.ysls.json`
-  files too!
-- Compile errors are listed in the inspector, grouped by script. Projects that 
-  fail to compile still import, so their errors are shown!
+- The Yarn Spinner header (logo and links) from the Dialogue Runner's
+  Inspector now appears on Yarn Projects, Yarn scripts, and `.ysls.json`
+  files too.
+- Compile errors are listed in the Inspector, grouped by script. Projects that 
+  fail to compile still import, so their errors are shown.
 - The project's source file patterns can be edited, added, and removed
-  directly in the inspector. Patterns now support folders and `**` anywhere
-  (`Dialogue/**/*.yarn`), and `excludeFiles` is respected!
+  directly in the Inspector. Patterns now support folders and `**` anywhere
+  (`Dialogue/**/*.yarn`), and `excludeFiles` is respected.
 - **Add Line Tags to Yarn Scripts** adds `#line:` IDs to every untagged
-  line, using either the random or the descriptive line tagger!
+  line, using either the random or the descriptive line tagger.
 - **Export Strings and Metadata as CSV** writes a Godot translation CSV
   using the project's base language, plus a `-metadata.csv` file with each
   line's file, node, line number and tags.
 - **Update Existing Strings Files** finds the translation CSVs that contain
   the project's lines, adds new lines, removes deleted ones, and marks
-  translations whose source text has changed with `(NEEDS UPDATE)`!
-- The project can generate a typed variable storage class, with a property
+  translations whose source text has changed with `(NEEDS UPDATE)`.
+- The project can generate a typed Variable Storage class, with a property
   for each declared variable and a GDScript enum for each Yarn enum. Choose
-  its class name and parent class in the inspector!
+  its class name and parent class in the Inspector.
 - Changes are made with **Apply** and **Revert**, and switching away from a
   project with unapplied changes asks whether to keep them. This is very Unity-esque,
   so we're open to feedback.
@@ -37,7 +44,7 @@ A handful of internal variable declarations relied on inferring their type
 from a `Variant` value, which fails to compile in projects that escalate
 GDScript's `INFERENCE_ON_VARIANT` warning to an error. Those declarations
 now use explicit types, so the addon compiles cleanly under strict warning
-settings!
+settings.
 
 ### Yarn node picker for your own scripts
 
@@ -53,8 +60,8 @@ or Dialogue Runner:
 
 The source property can hold a `YarnProjectResource` or anything with a
 `yarn_project` property, such as a Dialogue Runner. Plain `"yarn_node"`
-reads a `yarn_project` property on the same object... The dropdown refreshes
-when the source property is changed in the inspector.
+reads a `yarn_project` property on the same object. The dropdown refreshes
+when the source property is changed in the Inspector.
 
 ### Yarn Projects work in `@tool` scripts
 
@@ -77,19 +84,19 @@ every sample card has a screenshot.
 `YarnDialoguePresenter` is now marked `@abstract`, matching its Yarn Spinner for Unity
 equivalent (`DialoguePresenterBase`). Attaching the base script to a node
 used to look like it worked, then displayed nothing at runtime; the editor
-now refuses the attach outright. Attach one of the presenters from
+now refuses the attach outright. Attach one of the Presenters from
 `addons/yarn_spinner/ui/` (`YarnLinePresenter`, `YarnOptionsPresenter`,
 and friends), or subclass the base for your own. Existing subclasses are
-unaffected!
+unaffected.
 
 ### Functions can be used inside lines
 
 A function call inside a line, like `Rosa: You have {coin_count()} coins.`,
 used to fail to compile with "Can't determine the type of the expression".
-This was because compiler was never told what your functions return, so it 
+This was because the compiler was never told what your functions return, so it 
 could only guess from where each call was used, and a line doesn't say.
 
-Now, before compiling, the importer it scans your scripts for functions 
+Now, before compiling, the importer scans your scripts for functions 
 (the same scan that writes the `.ysls.json`, so `_yarn_function_`
 methods and functions added with `add_function()` are both found) and passes
 each one's parameter and return types to the compiler. It also declares the
@@ -122,9 +129,9 @@ gets them from the project's `"definitions"` instead:
 ### Faster function calls and numbers
 
 All the operators in Yarn (`+`, `<`, `==` et al) are a function call, so
-the virtual machine calls functions a lot! Each call used to build a
+the virtual machine calls functions a lot. Each call used to build a
 Dictionary for every argument, which was just used to report whether
-converting it worked... Arguments that already have the type the function 
+converting it worked. Arguments that already have the type the function 
 declares now skip the conversion, so the argument array is filled by index 
 instead of with `push_front`. A call to `Number.Add` is now faster, basically.
 
@@ -134,13 +141,13 @@ slow paths:
 - `YarnNumber.to_f32` returns them as they are, instead of round-tripping
   through a `PackedFloat32Array`.
 - `YarnNumber.to_display_string` prints them with `str(int(v))`, which makes
-  turning a whole number into text much faster...
-- `YarnNumber.to_int32` skips banker's rounding for them.. :)
+  turning a whole number into text much faster.
+- `YarnNumber.to_int32` skips banker's rounding for them.
 
 `YarnInMemoryVariableStorage.get_value` now returns a stored value directly
 instead of going through `try_get_value`'s `{found, value}` Dictionary.
 Reading a stored variable went from 0.42 µs to 0.13 µs. Reading a variable
-thats only declared and hasn't been set yet now checks the stored values first.
+that's only declared and hasn't been set yet now checks the stored values first.
 
 ### Changed
 
@@ -149,23 +156,23 @@ thats only declared and hasn't been set yet now checks the stored values first.
   advance dialogue or choose an option. At startup, the `YarnSpinner`
   autoload now adds the A button to `ui_accept` and the B button to
   `ui_cancel`, but only when that action has no gamepad buttons, so projects
-  with their own gamepad bindings are left alone :)
+  with their own gamepad bindings are left alone.
 - The error for a command called with the wrong number of parameters now
   names the handler plus its signature and script, and tells you which 
   parameters have no default value. If the handler is a lambda, it says 
   that lambdas can't have optional parameters. If a project's `.ysls.json` 
-  accepts the call, tje error says it's out of date with the code and needs 
+  accepts the call, the error says it's out of date with the code and needs 
   regenerating, as editors/VS Code reads the `.ysls.json` but the game reads 
-  the GDScript function!
+  the GDScript function.
 - The bundled compiler binaries are now named for their platform and
   architecture: `ysc-native-macos-universal`, `ysc-native-windows-x64.exe`,
   `ysc-native-linux-x64`, and the `arm64` builds for Windows and Linux. The
   importer chooses the binary that matches the editor's platform and
-  architecture. Rebuild with `native/build.sh` to get the new names!
+  architecture. Rebuild with `native/build.sh` to get the new names.
 - The bundled compiler is now run directly instead of through `cmd.exe` or
   `/bin/sh` etc., and reads its job from a file passed with `--input`. This
   fixes the compiler failing on Windows, where `cmd` seemed to misread Godot's
-  forward-slash paths... 
+  forward-slash paths.
 - The `plural` annd `ordinal` markup markers now use the full set of Unicode
   CLDR plural rules, covering over a hundred languages, instead of a
   hand-picked list of about twenty. Languages such as Welsh, Irish,
@@ -173,9 +180,9 @@ thats only declared and hasn't been set yet now checks the stored values first.
   Icelandic, and most South and Southeast Asian languages now get correct
   plural forms in `[plural value="%" ...]` and `[ordinal value="%" ...]`
   text, rather than falling back to a generic "one for 1, other for
-  everything else" guess. The rules are onm their own file,
+  everything else" guess. The rules are in their own file,
   `cldr_plural_rules.gd`, so they can be extended without touching the
-  markup replacement code itself! Woo! This took a while.
+  markup replacement code itself. Woo. This took a while.
 - Command text is now split into arguments the same way Yarn Spinner for
   Unity does: only double quotes delimit a quoted argument, and inside one
   only `\\` and `\"` are treated as escapes. Single quotes and stray
@@ -185,7 +192,7 @@ thats only declared and hasn't been set yet now checks the stored values first.
   `there'`) or on a backslash escaping something other than a quote or
   another backslash. Wrap arguments that ned spaces in double quotes
   instead, and expect a literal backslash wherever your command text has
-  one...
+  one.
 - `bool()` and `number()` now stop the dialogue with a clear error when
   given input they can't convert, instead of logging a warning and
   quietly substituting `false` or `0`. `bool()` also no longer accepts
@@ -207,13 +214,13 @@ thats only declared and hasn't been set yet now checks the stored values first.
 - **Breaking:** `YarnLine.text` now includes the character name (so the same
   as `LocalizedLine.Text` in Yarn Spinner for Unity). Use
   `text_without_character_name` (or `get_plain_text()`) where you want the
-  line without the name. The built-in line presenter has a new
+  line without the name. The built-in Line Presenter has a new
   `show_character_name_in_line` option for when there's no separate
   character name label.
-- **Breaking:** `allow_option_fallthrough` on the dialogue runner now
+- **Breaking:** `allow_option_fallthrough` on the Dialogue Runner now
   defaults to `true` (also matching Unity). An option group with no available
-  options now continues past the options instead of stopping the dialogue!
-- **Breaking:** the in-memory variable storage now rejects variable names
+  options now continues past the options instead of stopping the dialogue.
+- **Breaking:** the in-memory Variable Storage now rejects variable names
   that don't start with `$`, as Unity does. Set `validate_variable_names`
   to `false` to turn this off.
 - **Breaking:** action markup handlers now receive the line's
@@ -232,10 +239,10 @@ thats only declared and hasn't been set yet now checks the stored values first.
   default to one second.
 - **Breaking:** the line advancer's defaults now match Unity: the hurry up
   input is `ui_accept`/Space and the next line input is
-  `ui_cancel`/Escape. The line presenter's old `hurry_action` property has
+  `ui_cancel`/Escape. The Line Presenter's old `hurry_action` property has
   been removed; use a line advancer or `YarnLinePresenterButtonHandler`.
 - **Breaking:** `YarnLineProvider` is now a `Resource`, and can be set on
-  the dialogue runner in the inspector along with its text, asset and
+  the Dialogue Runner in the Inspector along with its text, asset and
   fallback locales.
 - Functions registered with `add_function` now take their argument count
   and types from the method's signature, and reject return values that
@@ -247,14 +254,14 @@ thats only declared and hasn't been set yet now checks the stored values first.
 - The virtual machine's instruction and call depth limits are now off by
   default, as Unity has no such limits.
 - Requesting the next line now also hurries up the current one, so a
-  presenter only needs to watch for one of them.
+  Presenter only needs to watch for one of them.
 - Variable change listeners fire every time a variable is set, and
   initial values are read from the program rather than copied into
   storage, as in Unity.
 - Added `YarnTypewriter`, with instant, letter and word typewriters, and a
-  custom typewriter option on the line presenter.
+  custom typewriter option on the Line Presenter.
 - Added `save_state_to_persistent_storage()` and
-  `load_state_from_persistent_storage()` to the dialogue runner.
+  `load_state_from_persistent_storage()` to the Dialogue Runner.
 - `format()` now follows .NET's format rules exactly, including padding,
   precision and custom numeric formats.
 - Added `get_line_ids_for_nodes()` to `YarnProjectResource` and
@@ -295,11 +302,11 @@ thats only declared and hasn't been set yet now checks the stored values first.
 
 - Calling `stop_dialogue()` from a `node_started` handler no longer fails.
   The runner now stops cleanly, whether the node was jumped to or was the 
-  one dialogue started on!
+  one dialogue started on.
 - Negative numbers now pick their plural form from the size of the number,
   ignoring the sign. `[plural value=-1 one="% apple" other="% apples"]` 
-  now reads "-1 apple" rather than "-1 apples". Only the operands changed!
-- Fixed bugs in CLDR plural rules!
+  now reads "-1 apple" rather than "-1 apples". Only the operands changed.
+- Fixed bugs in CLDR plural rules.
 - `[plural]` and `[ordinal]` markup now follows the active locale. The
   line's locale was being set after its text had already been parsed, so
   every line used English plural and ordinal rules regardless of what
@@ -336,7 +343,7 @@ thats only declared and hasn't been set yet now checks the stored values first.
 - Dividing zero by zero in a Yarn expression now produces NaN, matching
   Yarn Spinner for Unity. A hand-rolled guard was returning infinity.
 - A broken script now stops the dialogue with a clear error instead of
-  limping on with wrong values! Calling an unknown function, or reading a
+  limping on with wrong values. Calling an unknown function, or reading a
   variable that doesn't exist anywhere (storage, smart variables, or the
   program's initial values), used to log and continue with null on the
   VM stack, which sent the story down branches nobody wrote. All Yarn
@@ -346,7 +353,7 @@ thats only declared and hasn't been set yet now checks the stored values first.
   whichever value happened to be on top.
 - `round()` and `round_places()` now round half to even ("banker's
   rounding", so 2.5 rounds to 2 and 3.5 to 4), matching every other Yarn
-  Spinner runtime. Godot's own `roundf()` rounds half away from zero. Agian,
+  Spinner runtime. Godot's own `roundf()` rounds half away from zero. Again,
   important while folks are testing/using the TypeScript runner as part
   of their toolchain (e.g. VSCode).
 - A truncated or corrupt compiled program now fails to load with an error
@@ -369,7 +376,7 @@ thats only declared and hasn't been set yet now checks the stored values first.
   unpaused.
 - Command text is now split on every Unicode whitespace character, not
   just spaces and tabs.
-- Disabled presenters are now skipped, as in Unity.
+- Disabled Presenters are now skipped, as in Unity.
 - Calling `start_dialogue()` from a `dialogue_completed` handler now starts
   the new dialogue properly, instead of leaving the runner stuck.
 - Changing `yarn_project` while dialogue is running is now refused with an
@@ -382,12 +389,12 @@ thats only declared and hasn't been set yet now checks the stored values first.
   `_yarn_command_` or `_yarn_function_` method, instead of any script that
   mentions one.
 - Exported games no longer search every `class_name` script for commands
-  and functions when dialogue starts. (Sorry) Exported scripts don't include their
+  and functions when dialogue starts. Exported scripts don't include their
   source, so that search couldn't rule anything out and ended up loading
   every script. The plugin now records which scripts declare commands and
   functions when you export, much like Yarn Spinner for Unity generates its
   command registrations at build time, and the exported game loads only
-  those!
+  those.
 - Lines, options, plural rules and variable name hashing can now be used
   from more than one thread at once. Every line and option used to share a
   single markup parser, so reading line text from worker threads (for
@@ -399,14 +406,14 @@ thats only declared and hasn't been set yet now checks the stored values first.
   - `typewriter_words()` now reveals text a whole word at a time, instead
     of by overall proportion.
   - `typewriter_with_line()` now returns a signal that fires when the line
-    has finished, using the same typewriter as the line presenter, so
+    has finished, using the same typewriter as the Line Presenter, so
     pauses respect hurry-up and game pause.
   - Instant typewriters return a signal that can still be awaited.
   - `shake()` no longer divides by zero for very short shakes.
-- Registering several replacement marker processors on a line presenter no
+- Registering several replacement marker processors on a Line Presenter no
   longer logs "already registered" errors for the processors registered
   before it.
-- A dialogue runner that leaves the scene before its first command search
+- A Dialogue Runner that leaves the scene before its first command search
   runs no longer logs a script error.
 - When two different scripts declare the same command or function name,
   the second one is now reported as an error instead of being silently
@@ -414,7 +421,7 @@ thats only declared and hasn't been set yet now checks the stored values first.
 - Commands on nodes added to the scene after dialogue started are now
   found. If a command isn't registered and the scene has changed since it
   was last searched, the runner searches it again before giving up.
-- The voice over presenter now asks for a shadow line's audio using its
+- The Voice-Over Presenter now asks for a shadow line's audio using its
   source line's ID, so shadow lines get the source line's clip even when a
   custom line provider doesn't resolve shadow lines itself.
 - `set_content_saliency_strategy()` can now be called before the dialogue
@@ -433,9 +440,9 @@ thats only declared and hasn't been set yet now checks the stored values first.
 
 ### Documentation
 
-- The custom presenter example in the quick start now uses the new
-  presenter contract (`run_line(line, token) -> void`, await inside). The
-  old example still showed the pre-Alpha 7 return-a-Variant style!
+- The custom Presenter example in the quick start now uses the new
+  Presenter contract (`run_line(line, token) -> void`, await inside). The
+  old example still showed the pre-Alpha 7 return-a-Variant style.
 - Corrected signal and property names in the README and quick start:
   `command_unhandled` (not `unhandled_command`) and
   `show_selected_option_as_line` (not `run_selected_option_as_line`).
@@ -446,17 +453,17 @@ thats only declared and hasn't been set yet now checks the stored values first.
 
 ## Alpha 8 (2026-07-28)
 
-Lots of small quality of life changes. Scene-based options, some tweaks to boolean flag parameters (to match Yarn Spinner for Unity), and a word wrap fix in the line presenter. If you show options with the built-in presenter, note that
+Lots of small quality of life changes. Scene-based options, some tweaks to boolean flag parameters (to match Yarn Spinner for Unity), and a word wrap fix in the Line Presenter. If you show options with the built-in Presenter, note that
 option text no longer includes the character name prefix.
 
 ### Options are scene-based
 
-The options presenter now instantiates a scene per option, similar to the way Yarn
+The Options Presenter now instantiates a scene per option, similar to the way Yarn
 Spinner for Unity instantiates its Option Item prefab. The default is the
 new `ui/option_item.tscn` (a `YarnOptionItem` wrapping a focus-styled
 button); edit that scene or point `option_button_scene` at your own to
 restyle options. Plain `BaseButton` scenes still work. When
-every option in a group is unavailable, the presenter now declines
+every option in a group is unavailable, the Presenter now declines
 immediately instead of waiting on an empty screen. Option text no longer
 includes the character name prefix (an option written as
 `-> Tom: Who are you?` displays as "Who are you?"), the same as Yarn Spinner forUnity's option items; `YarnOption` gained `character_name` and
@@ -467,11 +474,11 @@ panel).
 
 ### Word wrap is precalculated
 
-The line presenter now lays out the whole line before the typewriter reveals
+The Line Presenter now lays out the whole line before the typewriter reveals
 any of it, so words no longer jump to the next line partway through being
 typed. A word that won't fit on the current line starts on the next one
 from its first character, which is what Yarn Spinner for Unity's TMP does with
-`maxVisibleCharacters`. Sorry about that. Shoutout if you're still having problems.
+`maxVisibleCharacters`. If you still see problems, please report them.
 
 ### Boolean parameters accept their name as a flag
 
@@ -497,14 +504,14 @@ already pass `true`/`false` explicitly, nothing should really change.
 
 ## Alpha 7 (2026-07-22)
 
-This alpha reworks how presenters and the dialogue runner talk to each
-other! If you implemented presenters or commands against an earlier alpha,
-read the Breaking changes, please! Most migrations _should_ be signature change and the deletion of boilerplate. Hopefully.
+This alpha reworks how Presenters and the Dialogue Runner talk to each
+other. If you implemented Presenters or commands against an earlier alpha,
+read the Breaking changes, please. Most migrations _should_ be signature change and the deletion of boilerplate. Hopefully.
 
-### Breaking: one presenter contract
+### Breaking: one Presenter contract
 
 `run_line` no longer returns a `Variant`. There is now exactly one way to
-write a presenter: **return when you're done, and await inside for anything
+write a Presenter: **return when you're done, and await inside for anything
 that takes time.** (In the previous alpha you couldn't await inside
 `run_line` at all. The whole pattern we were previously using is is gone.)
 
@@ -524,9 +531,9 @@ func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
 ```
 
 To migrate to the new API:
-- **Sync presenters** (`return null`): change the return type to `-> void`
-  and delete the `return null`s. Done! Amazing.
-- **Signal presenters** (`return my_signal`): change to `-> void` and
+- **Sync Presenters** (`return null`): change the return type to `-> void`
+  and delete the `return null`s. Done. Amazing.
+- **Signal Presenters** (`return my_signal`): change to `-> void` and
   replace `return my_signal` with `await my_signal`, or better, fold your
   detached helper's logic straight into `run_line`, which is usually
   simpler now that awaiting inside it works. If your dialogue can be
@@ -535,37 +542,37 @@ To migrate to the new API:
 
 `run_options` keeps its previous approach (`-> int`: the selected index, or
 -1 if you don't handle options) and may await the player's choice
-internally, as before!
+internally, as before.
 
-The runner starts every presenter in the same frame and advances only when
+The runner starts every Presenter in the same frame and advances only when
 all of them have returned. The cancellation token is the finish-up request:
 when it reports next-content, you should finish promptly.. the runner waits for you,
-and logs a warning naming your presenter after 5 seconds if you don't! Don't be bad.
+and logs a warning naming your Presenter after 5 seconds if you don't. Don't be bad.
 
 ### Breaking: `dispatch_command` is a coroutine
 
 `YarnLibrary.dispatch_command()` must now be awaited. Coroutine command
 handlers run to completion inside it. If you called it directly, add
-`await`; if you only write command handlers, nothing changes!
+`await`; if you only write command handlers, nothing changes.
 
 To be clear about who this affects: dispatch is the internal step where a
 `<<command>>` in a Yarn script gets routed to your registered handler. The
-dialogue runner is normally the only thing that calls it, and it already
+Dialogue Runner is normally the only thing that calls it, and it already
 awaits. So if your commands are ordinary `_yarn_command_*` methods or
 `add_command()` registrations, you have nothing to migrate as your handlers
 are called exactly as before, and a handler that awaits internally (like
-the the built-in `<<wait>>`) now correctly holds the dialogue until it
+the built-in `<<wait>>`) now correctly holds the dialogue until it
 finishes. Returning a Signal from a handler for async work also still
 works. 
 
 The only code that needs an `await` added is game code that was
 invoking `dispatch_command()` on the library by hand, for example, a
-debug console that runs Yarn commands outside of dialogue...
+debug console that runs Yarn commands outside of dialogue.
 
 ### Commands now receive typed parameters
 
 Declare real types on command handlers, and arguments are converted before
-the call! This includes `Node`-derived parameters, resolved by node name:
+the call. This includes `Node`-derived parameters, resolved by node name:
 
 ```gdscript
 func _yarn_command_give(item: String, count: int, loud: bool) -> void: ...
@@ -578,12 +585,12 @@ func _yarn_command_focus(target: Node3D) -> void: ...
 Supported: String, int, float, bool, Vector2, Vector3, Color, Node classes.
 A value that can't convert will spit out a command error naming the argument.
 Handlers registered as lambdas still receive raw strings (GDScript lambdas 
-expose no parameter metadata, so use a named method)...
+expose no parameter metadata, so use a named method).
 
 Note: in earlier alphas this conversion existed but never quite worked, and
 coroutine command handlers invoked via `callv` silently failed, so, e.g., 
 **`<<wait 2>>` did not actually wait in some configurations.** It does now;
-if your timing depended on waits being skipped, re-check pacing, please!
+if your timing depended on waits being skipped, re-check pacing, please.
 
 ### Behaviour changes
 
@@ -594,7 +601,7 @@ if your timing depended on waits being skipped, re-check pacing, please!
   token. A next-content request dismisses a line even mid-reveal, like
   Yarn Spinner for Unity. Two-stage "reveal, then advance" lives in
   `YarnLineAdvancer`, which was previously broken and now works, and in
-  the line presenter's own direct input handling, which is unchanged.
+  the Line Presenter's own direct input handling, which is unchanged.
 - `YarnVoiceOverPresenter`: `end_line_when_voice_complete` now defaults to
   **true** (again, same as we do in Unity) and now works; a missing audio clip logs an
   error and skips the line instead of stalling; hurry-up no longer
@@ -602,11 +609,11 @@ if your timing depended on waits being skipped, re-check pacing, please!
   runner's locale-aware pipeline first, so `set_locale()` switches voice as
   well as text.
 - `request_line_cancellation` now routes through `request_next_content()`,
-  so a presenter asking to end the line actually dismisses every presenter.
+  so a Presenter asking to end the line actually dismisses every Presenter.
 - All dialogue timing (typewriter, `<<wait>>`, option timeout,
-  auto-advance, fades) now respects the pause model! Paused nodes stop
-  their clocks per standard `process_mode` rules..!
-- Keyboard input for presenters and the advancer moved to
+  auto-advance, fades) now respects the pause model. Paused nodes stop
+  their clocks per standard `process_mode` rules...
+- Keyboard input for Presenters and the advancer moved to
   `_unhandled_input`, so UI controls get first look at focus and confirm
   presses. Click-to-continue stays in `_input` (a click over the dialogue
   panel or a fullscreen overlay would otherwise be eaten as GUI input),
@@ -623,16 +630,16 @@ as everyone should really be using the Godot one. Text goes through `Translation
 registered in Project Settings). Voice audio goes through **translation remaps** (Project
 Settings > Localization > Remaps): so just point the runner at your base-language
 folder with `set_audio_base_path()` and Godot substitutes the right file
-per locale on load. It's awesome.
+per locale on load.
 
 - `set_audio_path_template("...{locale}/")` is replaced by
   `set_audio_base_path("res://.../audio/en/")` — the `{locale}` folder
   templating no longer exists.
-- Live locale switching works! The lookup bypasses Godot's resource cache
+- Live locale switching works. The lookup bypasses Godot's resource cache
   (which pins a remapped resource to its first-loaded locale) and keeps
   its own per-locale cache
 
-### Voice presenter slimmed
+### Voice Presenter slimmed
 
 `YarnVoiceOverPresenter` no longer keeps its own audio cache:
 `max_cache_size`, `set_audio_for_line()` and `clear_cache()` are gone,
@@ -646,14 +653,14 @@ what Yarn Spinner for Unity does; they just say what the property does.
 Child auto-discovery is gone. The runner uses exactly what is in its
 Presenters array, plus anything registered at runtime with
 `add_presenter()` (which is how `YarnDialogueView` registers its two).
-A runner with an empty array and presenter children logs a warning naming
+A runner with an empty array and Presenter children logs a warning naming
 the first one, so a scene relying on the old discovery tells you what to
 fix.
 
 ### YarnDialogueView
 
 - Visuals now come from `ui/dialogue_view_ui.tscn` via the new `ui_scene` export,
-  swap in your own scene to reskin or do other funky stuff.
+  swap in your own scene to reskin it or change its layout.
 - `start_node` defaults to empty, meaning "use the runner's Start Node";
   set it only to override. `auto_start` is ignored when the runner's own
   Auto Start is on. People got confused by this, sorry.
@@ -664,7 +671,7 @@ fix.
   settlement is remembered, so late awaiters can't lose it. It's a bit
   like a Promise from other languages. Best we can do, anyway.
 - `YarnCancellationToken.wait_for_next_content()` — await for
-  coroutine presenters.
+  coroutine Presenters.
 - `YarnAsync.wait(node, seconds)` — pause-respecting timer.
 - `runner.are_options_active()`, `runner.get_presenters()`.
 - `line_dismissed` signal on `YarnLinePresenter`.
@@ -672,22 +679,22 @@ fix.
 
 ### Fixed
 
-- Lost-completion hangs... the runner joins presenters through
-  promises, so completion order can never strand the dialogue. Sorry.
+- Lost-completion hangs: the runner joins Presenters through
+  promises, so completion order can never strand the dialogue.
 - `show_selected_option_as_line` soft-locked dialogue after the first
   choice; synchronous option selection could skip the echoed line.
 - `option_timeout` with fallthrough disabled stopped dialogue with an error
   instead of falling through.
 - A force-advanced async command could end the wrong line later
-  (epoch guards now cover commands as well as lines)...
-- The built-in options presenter ignored its token: buttons survived
+  (epoch guards now cover commands as well as lines).
+- The built-in Options Presenter ignored its token: buttons survived
   timeouts and rival selections; it now winds down and returns -1.
-- A presenter freed mid-line hung dialogue permanently; it now counts as
-  finishedd
+- A Presenter freed mid-line hung dialogue permanently; it now counts as
+  finished.
 - External `select_option()` calls now route through the active options
-  round instead of desyncing it
+  round instead of desyncing it.
 - Voice-over fallback paths strip the `line:` prefix when deriving
-  filenames, matching the localisation resolver
+  filenames, matching the localisation resolver.
 
 ## Earlier alphas
 

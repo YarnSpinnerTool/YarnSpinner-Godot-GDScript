@@ -5,10 +5,10 @@
 
 Yarn Spinner for Godot (GDScript) is a pure-GDScript implementation of the Yarn Spinner dialogue system for the Godot engine. It runs compiled Yarn programs, with support for node groups, saliency, detours, smart variables, localisation, and voice over.
 
-Requires Godot 4.6 or later (not the .NET/Mono version).
+Requires Godot 4.6 or later. It works with either the standard or the .NET build of Godot.
 
 > [!IMPORTANT]
-> Yarn Spinner+ for Godot (GDScript) is available to buy at [yarnspinner.dev/godot](https://yarnspinner.dev/godot). It comes with the Classic RPG and Snaaake dialogue presenters, plus priority email support, and buying it supports the team behind Yarn Spinner. Yarn Spinner for Godot (GDScript) will always be available here for free, too. You can also support us on [GitHub Sponsors](https://github.com/sponsors/YarnSpinnerTool) or [Patreon](https://patreon.com/secretlab).
+> Yarn Spinner+ for Godot (GDScript) is available to buy at [yarnspinner.dev/godot](https://yarnspinner.dev/godot). It comes with the Classic RPG and Snaaake dialogue Presenters, plus priority email support, and buying it supports the team behind Yarn Spinner. Yarn Spinner for Godot (GDScript) will always be available here for free, too. You can also support us on [GitHub Sponsors](https://github.com/sponsors/YarnSpinnerTool) or [Patreon](https://patreon.com/secretlab).
 
 Visit the [documentation](https://yarnspinner.dev/docs/godot/gdscript/) and [Yarn Spinner site](https://yarnspinner.dev) for more information. New to Yarn itself? Start with [Writing Yarn](https://yarnspinner.dev/docs/yarn/). For a five minute setup, see [QUICKSTART.md](QUICKSTART.md). To compare the free version with Yarn Spinner+, see [What each version includes](https://yarnspinner.dev/docs/godot/gdscript/01-installation/#what-each-version-includes).
 
@@ -27,7 +27,7 @@ Yarn Spinner for Godot (C#) uses the core Yarn Spinner C# library directly.
 
 It requires the .NET-enabled build of Godot, a `.csproj`/`.sln`, and compiles Yarn scripts inside the editor via a C# import plugin. 
 
-This GDScript version is a complete reimplementation of the Yarn Spinner runtime in pure GDScript, with no .NET dependency, no DLLs, no C# project needed. It works with the standard (non-.NET) Godot editor and export templates, making it accessible to GDScript-only projects. 
+This GDScript version is a complete reimplementation of the Yarn Spinner runtime in pure GDScript, with no .NET dependency, no DLLs, no C# project needed. It works with the standard Godot editor and export templates as well as the .NET build, making it accessible to GDScript-only projects. 
 
 Yarn scripts are compiled with the Yarn Spinner compiler bundled with the addon (with `ysc` as a fallback), and both versions produce identical runtime behaviour from the same `.yarn` source files.
 
@@ -58,7 +58,7 @@ Full instructions are in [Installation](https://yarnspinner.dev/docs/godot/gdscr
 
 ## How It Works
 
-The Yarn Spinner compiler (bundled with the addon, or `ysc`) compiles `.yarn` scripts into a binary protobuf program. This plugin reads that binary at import time, parses it into an in-memory program representation, and executes it in a stack-based virtual machine. The VM handles control flow, variable storage, function calls, and content delivery. A dialogue runner orchestrates the VM and routes lines, options, and commands to presenter nodes in your scene tree.
+The Yarn Spinner compiler (bundled with the addon, or `ysc`) compiles `.yarn` scripts into a binary protobuf program. This plugin reads that binary at import time, parses it into an in-memory program representation, and executes it in a stack-based virtual machine. The VM handles control flow, Variable Storage, function calls, and content delivery. A Dialogue Runner orchestrates the VM and routes lines, options, and commands to Presenter nodes in your scene tree.
 
 You write dialogue in Yarn, and the plugin compiles and runs it. Compilation happens automatically when Godot imports the `.yarnproject` file, using the compiler binary bundled with the addon (or `ysc` from your PATH as a fallback). See [Understanding Yarn Spinner](https://yarnspinner.dev/docs/godot/gdscript/02-understanding-yarn-spinner/), [Yarn Projects](https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/01-yarn-projects/) and [Importing Yarn Files](https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/02-importing-yarn-files/).
 
@@ -66,11 +66,11 @@ You write dialogue in Yarn, and the plugin compiles and runs it. Compilation hap
 
 The plugin has three layers:
 
-**Core** (`addons/yarn_spinner/core/`) contains the runtime engine. The protobuf parser reads compiled `.yarnproject` binaries. The virtual machine executes instructions. The yarn library provides built-in functions and operators. Variable storage holds game state. The line provider resolves localised text and applies markup. The saliency system selects content when multiple candidates match.
+**Core** (`addons/yarn_spinner/core/`) contains the runtime engine. The protobuf parser reads compiled `.yarnproject` binaries. The virtual machine executes instructions. The yarn library provides built-in functions and operators. Variable Storage holds game state. The line provider resolves localised text and applies markup. The saliency system selects content when multiple candidates match.
 
-**Dialogue Runner** (`addons/yarn_spinner/dialogue_runner.gd`) is the main node you add to your scene. It owns the VM, discovers commands from your scene tree, coordinates presenters, and exposes signals for dialogue lifecycle events. All configuration is done through its exported properties in the inspector.
+**Dialogue Runner** (`addons/yarn_spinner/dialogue_runner.gd`) is the main node you add to your scene. It owns the VM, discovers commands from your scene tree, coordinates Presenters, and exposes signals for dialogue lifecycle events. All configuration is done through its exported properties in the Inspector.
 
-**Presenters** (`addons/yarn_spinner/ui/`) display content to the player. The line presenter shows dialogue text with typewriter effects. The options presenter shows choice buttons. The voice over presenter plays audio files synced to lines. You can subclass `YarnDialoguePresenter` to build your own.
+**Presenters** (`addons/yarn_spinner/ui/`) display content to the player. The Line Presenter shows dialogue text with typewriter effects. The Options Presenter shows choice buttons. The Voice-Over Presenter plays audio files synced to lines. You can subclass `YarnDialoguePresenter` to build your own.
 
 ## Components
 
@@ -107,7 +107,7 @@ Shows dialogue choices as buttons. Creates a button per option, handles keyboard
 
 ### YarnDialoguePresenter
 
-Base class for custom presenters. Override `run_line()` to handle lines and `run_options()` to handle choices. Multiple presenters can be active at once -- the runner coordinates them. See [Building Your Own Presenter](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/07-building-your-own-presenter/), [A Different Kind of Presenter](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/08-a-different-kind-of-presenter/) and [Async and Cancellation](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/08-async-and-cancellation/). For voice-over, see [Voice-Over](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/06-voice-over/).
+Base class for custom Presenters. Override `run_line()` to handle lines and `run_options()` to handle choices. Multiple Presenters can be active at once -- the runner coordinates them. See [Building Your Own Presenter](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/07-building-your-own-presenter/), [A Different Kind of Presenter](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/08-a-different-kind-of-presenter/) and [Async and Cancellation](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/08-async-and-cancellation/). For voice-over, see [Voice-Over](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/06-voice-over/).
 
 ### YarnVariableStorage
 
@@ -136,4 +136,4 @@ See [Commands](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your
 
 ### Localisation
 
-Localisation uses Godot's `TranslationServer`. Export your Yarn strings to CSV, translate them, and import them through Godot's standard localisation workflow (Project Settings > Localization > Translations). Set the `translation_prefix` on the dialogue runner to control the key prefix (default: `"YARN_"`). See [Localising Your Game](https://yarnspinner.dev/docs/godot/gdscript/06-localisation-and-assets/01-localising-your-game/) and [Line and Asset Providers](https://yarnspinner.dev/docs/godot/gdscript/06-localisation-and-assets/02-line-and-asset-providers/).
+Localisation uses Godot's `TranslationServer`. Export your Yarn strings to CSV, translate them, and import them through Godot's standard localisation workflow (Project Settings > Localization > Translations). Set the `translation_prefix` on the Dialogue Runner to control the key prefix (default: `"YARN_"`). See [Localising Your Game](https://yarnspinner.dev/docs/godot/gdscript/06-localisation-and-assets/01-localising-your-game/) and [Line and Asset Providers](https://yarnspinner.dev/docs/godot/gdscript/06-localisation-and-assets/02-line-and-asset-providers/).

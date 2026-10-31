@@ -28,7 +28,7 @@ const YarnCommandsPanel := preload("res://addons/yarn_spinner/editor/yarn_comman
 const YarnSyntaxHighlighter := preload("res://addons/yarn_spinner/editor/yarn_syntax_highlighter.gd")
 const YarnProjectImporter := preload("res://addons/yarn_spinner/editor/yarn_project_importer.gd")
 const YarnSpinnerScript := preload("res://addons/yarn_spinner/yarn_spinner.gd")
-const DOCS_URL := "https://docs.yarnspinner.dev"
+const DOCS_URL := "https://yarnspinner.dev/docs/godot/gdscript/"
 const HELP_URL := "https://yarnspinner.dev/help"
 const BANNER_PATH := "res://addons/yarn_spinner/icons/yarn_spinner_for_godot.png"
 const NEW_FILE_TEMPLATE := "title: Start\n---\n\n===\n"

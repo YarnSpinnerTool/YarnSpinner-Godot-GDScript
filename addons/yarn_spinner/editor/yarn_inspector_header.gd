@@ -70,7 +70,7 @@ static func create() -> VBoxContainer:
 
 	var parts: Array[String] = []
 	var links := [
-		["Docs", "https://docs.yarnspinner.dev/"],
+		["Docs", "https://yarnspinner.dev/docs/godot/gdscript/"],
 		["Samples", "https://github.com/YarnSpinnerTool/YarnSpinner-Godot-GDScript/tree/main/samples"],
 		["Discord", "https://discord.com/invite/yarnspinner"],
 		["Tell us about your game!", "https://yarnspinner.dev/tell-us"],
