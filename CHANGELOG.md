@@ -9,7 +9,7 @@ The inspector for `.yarnproject` files now matches Yarn Spinner for Unity's!
 - The Yarn Spinner header (logo and links) from the dialogue runner's
   inspector now appears on Yarn Projects, Yarn scripts, and `.ysls.json`
   files too!
-- Compile errors are listed in the inspector, grouped b y script. Projects that 
+- Compile errors are listed in the inspector, grouped by script. Projects that 
   fail to compile still import, so their errors are shown!
 - The project's source file patterns can be edited, added, and removed
   directly in the inspector. Patterns now support folders and `**` anywhere
@@ -18,7 +18,7 @@ The inspector for `.yarnproject` files now matches Yarn Spinner for Unity's!
   line, using either the random or the descriptive line tagger!
 - **Export Strings and Metadata as CSV** writes a Godot translation CSV
   using the project's base language, plus a `-metadata.csv` file with each
-  line's file, node, line number and tags. Aw yeah.
+  line's file, node, line number and tags.
 - **Update Existing Strings Files** finds the translation CSVs that contain
   the project's lines, adds new lines, removes deleted ones, and marks
   translations whose source text has changed with `(NEEDS UPDATE)`!
@@ -42,7 +42,7 @@ settings!
 ### Yarn node picker for your own scripts
 
 The node dropdown used by the Dialogue Runner's `start_node` can now be
-used on your own exported properties!! Export a `String` or `StringName`
+used on your own exported properties. Export a `String` or `StringName`
 with the `yarn_node` hint and name the property that holds the Yarn Project
 or Dialogue Runner:
 
@@ -54,7 +54,7 @@ or Dialogue Runner:
 The source property can hold a `YarnProjectResource` or anything with a
 `yarn_project` property, such as a Dialogue Runner. Plain `"yarn_node"`
 reads a `yarn_project` property on the same object... The dropdown refreshes
-when the source property is changed in the inspector! Magic.
+when the source property is changed in the inspector.
 
 ### Yarn Projects work in `@tool` scripts
 
@@ -85,7 +85,7 @@ unaffected!
 ### Functions can be used inside lines
 
 A function call inside a line, like `Rosa: You have {coin_count()} coins.`,
-used to fail to compille with "Can't determine the type of the expression".
+used to fail to compile with "Can't determine the type of the expression".
 This was because compiler was never told what your functions return, so it 
 could only guess from where each call was used, and a line doesn't say.
 
@@ -93,13 +93,13 @@ Now, before compiling, the importer it scans your scripts for functions
 (the same scan that writes the `.ysls.json`, so `_yarn_function_`
 methods and functions added with `add_function()` are both found) and passes
 each one's parameter and return types to the compiler. It also declares the
-built-in functions teh compiler didn't know about: `visited`,
+built-in functions the compiler didn't know about: `visited`,
 `visited_count`, `has_any_content`, `abs`, `sign`, `clamp`, `lerp`,
 `inverse_lerp`, `smoothstep`, `pow`, `sqrt`, `wrap`, `mod`, `plural`,
 `ordinal`, `length`, `uppercase` and `lowercase`.
 
 Calling a function with the wrong type of argument, or using its result as
-the wrong type, is now a compile error instead of a problem at runtime! Hooray.
+the wrong type, is now a compile error instead of a problem at runtime.
 Functions are found in the same files the `.ysls.json` is written from: the
 Yarn Project's folder and the scenes that use it, or the folder set in the
 Yarn Project's **Ysls Scan Path** import option.
@@ -110,18 +110,18 @@ gets them from the project's `"definitions"` instead:
 
 - The importer adds the project's `.ysls.json` to the `.yarnproject`'s
   `"definitions"` if it isn't already listed. Anything already there is
-  kept, and teh file is only written when the entry is
+  kept, and the file is only written when the entry is
   missing. If `"definitions"` holds something other than a path or a list
   of paths, it's left alone and you'll get a warning.
 - Functions in the `.ysls.json` are now written under `"Functions"`, in the
   PascalCase shape `ysc` reads. Commands are unchanged. The VS Code
-  extension reads both no problemo.
+  extension reads both.
 - `ysc` only reads the first file in `"definitions"`, so if your project
   already listed another definitions file first, that's the one it uses..
 
 ### Faster function calls and numbers
 
-Alll the operators in Yarn (`+`, `<`, `==` et al) are a function call, so
+All the operators in Yarn (`+`, `<`, `==` et al) are a function call, so
 the virtual machine calls functions a lot! Each call used to build a
 Dictionary for every argument, which was just used to report whether
 converting it worked... Arguments that already have the type the function 
@@ -132,7 +132,7 @@ e.g. Whole numbers up to 2^24 are exact as 32-bit floats, so they now skip the
 slow paths:
 
 - `YarnNumber.to_f32` returns them as they are, instead of round-tripping
-  through a `PackedFloat32Array`... oops.
+  through a `PackedFloat32Array`.
 - `YarnNumber.to_display_string` prints them with `str(int(v))`, which makes
   turning a whole number into text much faster...
 - `YarnNumber.to_int32` skips banker's rounding for them.. :)
@@ -144,13 +144,13 @@ thats only declared and hasn't been set yet now checks the stored values first.
 
 ### Changed
 
-- Gamepads can work with the Presenters out of the box!! Godot's default
-  `ui_accept` and `ui_cancel` have no gamepad buttonsso a gamepad couldn't
+- Gamepads can work with the Presenters out of the box. Godot's default
+  `ui_accept` and `ui_cancel` have no gamepad buttons, so a gamepad couldn't
   advance dialogue or choose an option. At startup, the `YarnSpinner`
   autoload now adds the A button to `ui_accept` and the B button to
   `ui_cancel`, but only when that action has no gamepad buttons, so projects
   with their own gamepad bindings are left alone :)
-- The error for a commnd called with the wrong number of parameters now
+- The error for a command called with the wrong number of parameters now
   names the handler plus its signature and script, and tells you which 
   parameters have no default value. If the handler is a lambda, it says 
   that lambdas can't have optional parameters. If a project's `.ysls.json` 
@@ -162,7 +162,7 @@ thats only declared and hasn't been set yet now checks the stored values first.
   `ysc-native-linux-x64`, and the `arm64` builds for Windows and Linux. The
   importer chooses the binary that matches the editor's platform and
   architecture. Rebuild with `native/build.sh` to get the new names!
-- The bundled compiler is nowrun directly instead of through `cmd.exe` or
+- The bundled compiler is now run directly instead of through `cmd.exe` or
   `/bin/sh` etc., and reads its job from a file passed with `--input`. This
   fixes the compiler failing on Windows, where `cmd` seemed to misread Godot's
   forward-slash paths... 
@@ -186,7 +186,7 @@ thats only declared and hasn't been set yet now checks the stored values first.
   another backslash. Wrap arguments that ned spaces in double quotes
   instead, and expect a literal backslash wherever your command text has
   one...
-- `bool()` and `number()` now stop the dialoue with a clear error when
+- `bool()` and `number()` now stop the dialogue with a clear error when
   given input they can't convert, instead of logging a warning and
   quietly substituting `false` or `0`. `bool()` also no longer accepts
   `"1"` as a stand-in for `"true"` — only `"true"` and `"false"`
@@ -211,7 +211,7 @@ thats only declared and hasn't been set yet now checks the stored values first.
   `show_character_name_in_line` option for when there's no separate
   character name label.
 - **Breaking:** `allow_option_fallthrough` on the dialogue runner now
-  defaults to `true` (alsoo matching Unity). An option group with no available
+  defaults to `true` (also matching Unity). An option group with no available
   options now continues past the options instead of stopping the dialogue!
 - **Breaking:** the in-memory variable storage now rejects variable names
   that don't start with `$`, as Unity does. Set `validate_variable_names`
@@ -285,10 +285,10 @@ thats only declared and hasn't been set yet now checks the stored values first.
   `res://`, the old default, is stored in the import settings of existing
   projects, so it's now treated the same as empty. Any other folder is
   still used as it is.
-- The `.ysls.json` rewritten when you save ascriipt, and the Commands
+- The `.ysls.json` rewritten when you save a script, and the Commands
   palette in the Yarn Spinner tab, now use each project's Ysls Scan Path
   import option, and the rewrite is skipped for projects with Generate Ysls
-  turned off. The Dialogue Runner's Regenerregte YSLS button uses the same
+  turned off. The Dialogue Runner's Regenerate YSLS button uses the same
   search when its own Ysls Scan Path is empty.
 
 ### Fixed
@@ -340,7 +340,7 @@ thats only declared and hasn't been set yet now checks the stored values first.
   variable that doesn't exist anywhere (storage, smart variables, or the
   program's initial values), used to log and continue with null on the
   VM stack, which sent the story down branches nobody wrote. All Yarn
-  Spinner runtimes now fail identically here hooray.
+  Spinner runtimes now fail identically here.
 - A smart variable whose expression leaves the wrong number of values on
   the stack is now reported as an error instead of silently returning
   whichever value happened to be on top.
@@ -446,7 +446,7 @@ thats only declared and hasn't been set yet now checks the stored values first.
 
 ## Alpha 8 (2026-07-28)
 
-Lots of nice little qualkity of life changes! Scene-based options, some tweaks to boolean flag parameters (to match Yarn Spinner for Unity), and a word wrap fix in the line presenter. If you show options with the built-in presenter, note that
+Lots of small quality of life changes. Scene-based options, some tweaks to boolean flag parameters (to match Yarn Spinner for Unity), and a word wrap fix in the line presenter. If you show options with the built-in presenter, note that
 option text no longer includes the character name prefix.
 
 ### Options are scene-based
@@ -469,7 +469,7 @@ panel).
 
 The line presenter now lays out the whole line before the typewriter reveals
 any of it, so words no longer jump to the next line partway through being
-typed! Hooray. A word that won't fit on the current line starts on the next one
+typed. A word that won't fit on the current line starts on the next one
 from its first character, which is what Yarn Spinner for Unity's TMP does with
 `maxVisibleCharacters`. Sorry about that. Shoutout if you're still having problems.
 
@@ -524,7 +524,7 @@ func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
 ```
 
 To migrate to the new API:
-- **Sync presenters** (`return null`): change teh return type to `-> void`
+- **Sync presenters** (`return null`): change the return type to `-> void`
   and delete the `return null`s. Done! Amazing.
 - **Signal presenters** (`return my_signal`): change to `-> void` and
   replace `return my_signal` with `await my_signal`, or better, fold your
@@ -596,7 +596,7 @@ if your timing depended on waits being skipped, re-check pacing, please!
   `YarnLineAdvancer`, which was previously broken and now works, and in
   the line presenter's own direct input handling, which is unchanged.
 - `YarnVoiceOverPresenter`: `end_line_when_voice_complete` now defaults to
-  **true** (again, same as we do in Unity) and actually works, lol; a missing audio clip logs an
+  **true** (again, same as we do in Unity) and now works; a missing audio clip logs an
   error and skips the line instead of stalling; hurry-up no longer
   interrupts audio (only next-content does); audio is looked up through the
   runner's locale-aware pipeline first, so `set_locale()` switches voice as
@@ -608,7 +608,7 @@ if your timing depended on waits being skipped, re-check pacing, please!
   their clocks per standard `process_mode` rules..!
 - Keyboard input for presenters and the advancer moved to
   `_unhandled_input`, so UI controls get first look at focus and confirm
-  presses. Click-to-continue stays in `_input` (a click over ttehe dialogue
+  presses. Click-to-continue stays in `_input` (a click over the dialogue
   panel or a fullscreen overlay would otherwise be eaten as GUI input),
   gated to "line showing, no options up", with a new
   `click_anywhere_to_continue` export to turn it off. Use
@@ -618,7 +618,7 @@ if your timing depended on waits being skipped, re-check pacing, please!
 
 The parallel Yarn localisation layer is gone; the single system is Godot's
 own. We don't need a parallel one here, like we do in Yarn Spinner for Unity, 
-as eveyrone should really be using the Godot one. Text goes through `TranslationServer` 
+as everyone should really be using the Godot one. Text goes through `TranslationServer` 
 (keys are the line id prefixed with `YARN_` by default, and `.translation` resources 
 registered in Project Settings). Voice audio goes through **translation remaps** (Project
 Settings > Localization > Remaps): so just point the runner at your base-language
@@ -677,7 +677,7 @@ fix.
 - `show_selected_option_as_line` soft-locked dialogue after the first
   choice; synchronous option selection could skip the echoed line.
 - `option_timeout` with fallthrough disabled stopped dialogue with an error
-  instead of faling through.
+  instead of falling through.
 - A force-advanced async command could end the wrong line later
   (epoch guards now cover commands as well as lines)...
 - The built-in options presenter ignored its token: buttons survived
@@ -691,4 +691,4 @@ fix.
 
 ## Earlier alphas
 
-See git history.
+Earlier alpha releases aren't listed here.
