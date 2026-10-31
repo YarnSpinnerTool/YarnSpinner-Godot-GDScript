@@ -1,31 +1,29 @@
 # Yarn Spinner for Godot (GDScript)
 
-> [!CAUTION]
-> This is Yarn Spinner for Godot (GDScript) Early Access 3.2. There will be bugs, we might change the API or features with an update, or something may break. We do not recommend you use this to ship a game just yet. 
+> [!NOTE]
+> This is Yarn Spinner for Godot (GDScript) Early Access 3.3.
 
-Yarn Spinner for Godot (GDScript) is a pure-GDScript implementation of the Yarn Spinner dialogue system for the Godot engine. It runs compiled Yarn programs and aims for full feature parity with Yarn Spinner for Unity 3.2, including node groups, saliency, detours, smart variables, localisation, and voice over support.
+Yarn Spinner for Godot (GDScript) is a pure-GDScript implementation of the Yarn Spinner dialogue system for the Godot engine. It runs compiled Yarn programs, with support for node groups, saliency, detours, smart variables, localisation, and voice over.
 
 Requires Godot 4.6 or later (not the .NET/Mono version).
 
 > [!IMPORTANT]
-> Yarn Spinner for Godot (GDScript) is not yet for sale (it will always be available here for free, too). We rely on your support to keep everything free and accessible. If you want to support us during Early Access, you can support us on [GitHub Sponsors](https://github.com/sponsors/YarnSpinnerTool) or [Patreon](https://patreon.com/secretlab). GitHub sponsors of $25 and above, and Patreon members of the "Scribe" or above tier will receive a license to the paid version when it is released.
+> Yarn Spinner+ for Godot (GDScript) is available to buy at [yarnspinner.dev/godot](https://yarnspinner.dev/godot). It comes with the Classic RPG and Snaaake dialogue presenters, plus priority email support, and buying it supports the team behind Yarn Spinner. Yarn Spinner for Godot (GDScript) will always be available here for free, too. You can also support us on [GitHub Sponsors](https://github.com/sponsors/YarnSpinnerTool) or [Patreon](https://patreon.com/secretlab).
 
-Visit the [documentation](https://docs.yarnspinner.dev/yarn-spinner-for-godot/godot-gdscript) and [Yarn Spinner site](https://yarnspinner.dev) for more information.
+Visit the [documentation](https://yarnspinner.dev/docs/godot/gdscript/) and [Yarn Spinner site](https://yarnspinner.dev) for more information. New to Yarn itself? Start with [Writing Yarn](https://yarnspinner.dev/docs/yarn/). For a five minute setup, see [QUICKSTART.md](QUICKSTART.md). To compare the free version with Yarn Spinner+, see [What each version includes](https://yarnspinner.dev/docs/godot/gdscript/01-installation/#what-each-version-includes).
 
 > [!TIP]
-> **Please submit issues or feature requests here:** https://github.com/YarnSpinnerTool/IssuesDiscussion/issues
+> **Please submit bug reports and feature requests here:** https://github.com/YarnSpinnerTool/IssuesDiscussion/issues
 
 ## Samples
 
 The samples live in their own project in the [YarnSpinner-Godot-Samples](https://github.com/YarnSpinnerTool/YarnSpinner-Godot-Samples) repository. 
 
-The samples project ships without this addon: copy this repository's `addons/yarn_spinner/` folder into the samples project's `addons/` directory first (the samples README has step-by-step instructions), then open the project in Godot 4.6+, open the scene for the sample you want, and run it with "Run Current Scene" (F6).
-
-The intention is that Yarn Spinner for Godot (C#) and Godot (GDScript) will ship with a full suite of samples on par with the samples supplied as part of Yarn Spinner for Unity.
+The samples project ships without this addon: copy this repository's `addons/yarn_spinner/` folder into the samples project's `addons/` directory first (the samples README has step-by-step instructions), then open the project in Godot 4.6+, open the scene for the sample you want, and run it with "Run Current Scene" (F6). The [Samples](https://yarnspinner.dev/docs/godot/gdscript/07-samples/) docs walk through each one.
 
 ## Differences from Yarn Spinner for Godot (C#)
 
-Yarn Spinner for Godot (C#) is a port of Yarn Spinner for Unity that uses the core Yarn Spinner C# library directly. 
+Yarn Spinner for Godot (C#) uses the core Yarn Spinner C# library directly. 
 
 It requires the .NET-enabled build of Godot, a `.csproj`/`.sln`, and compiles Yarn scripts inside the editor via a C# import plugin. 
 
@@ -33,19 +31,11 @@ This GDScript version is a complete reimplementation of the Yarn Spinner runtime
 
 Yarn scripts are compiled with the Yarn Spinner compiler bundled with the addon (with `ysc` as a fallback), and both versions produce identical runtime behaviour from the same `.yarn` source files.
 
-## Differences from Yarn Spinner for Unity
+## Good to know
 
-The VM, protobuf parser, library, and markup system were all written to match Unity's behaviour, and the runtime is checked against Yarn Spinner's own test plans, but there are some differences:
-
-- **CLDR plural rules** -- `[plural]` and `[ordinal]` use the same CLDR plural rules as Yarn Spinner, for every locale it supports.
-- **Culture** -- Unity formats the results of `string()`, `number()`, `bool()` and `format()` using the player's current culture. This implementation always uses the invariant culture, so `string(3.5)` is `3.5` on every device.
-- **Extra built-in functions** -- As well as Yarn Spinner's built-in functions, this implementation provides `abs`, `clamp`, `lerp`, `inverse_lerp`, `smoothstep`, `pow`, `sqrt`, `sign`, `wrap`, `mod`, `length`, `uppercase`, `lowercase`, `first_letter_caps`, `plural` and `ordinal`. Unity doesn't have these, so scripts that call them won't run there unless you register matching functions.
-- **Async model** -- Unity uses C# `async`/`await` with `YarnTask` and `CancellationTokenSource` chains. This implementation uses Godot signals and `await` with a simpler `YarnCancellationToken`. The behaviour is largely the same, but the presenter API signatures are different (signals instead of tasks).
-- **Command discovery** -- Unity uses `[YarnCommand]` and `[YarnFunction]` attributes on methods. This implementation uses a naming convention (`_yarn_command_<name>` and `_yarn_function_<name>`), registering methods from `class_name` scripts when the dialogue runner starts, and from the rest of the scene tree once the scene is ready. When you export your game, the plugin records which scripts declare these methods, so the exported game doesn't need to search for them.
-- **Error handling** -- Unity throws exceptions for invalid states (missing variables, bad option indices, etc.). This implementation reports them with `push_error`, and stops the dialogue when it can't safely continue.
-- **Markup rendering** -- The built-in line presenter renders `[b]`, `[i]`, `[u]`, `[s]`, `[code]`, `[style]` and palette markers as BBCode. In Unity these are rendered by TextMesh Pro.
-- **Execution limits** -- The virtual machine can optionally stop runaway scripts with `max_instructions_per_step` and `max_call_stack_depth`. Both are off by default; Unity has no equivalent.
-- **Localisation** -- Unity has multiple line provider backends (built-in, Unity Localization package, Addressables). This implementation uses Godot's `TranslationServer` directly, with the text, asset and fallback locales set on the line provider.
+- **Culture** -- `string()`, `number()`, `bool()` and `format()` always use the invariant culture, so `string(3.5)` is `3.5` on every device.
+- **Extra built-in functions** -- As well as Yarn Spinner's built-in functions, this implementation provides `abs`, `clamp`, `lerp`, `inverse_lerp`, `smoothstep`, `pow`, `sqrt`, `sign`, `wrap`, `mod`, `length`, `uppercase`, `lowercase`, `first_letter_caps`, `plural` and `ordinal`. Other Yarn Spinner runtimes don't have these, so scripts that call them won't run there unless you register matching functions.
+- **Execution limits** -- The virtual machine can optionally stop runaway scripts with `max_instructions_per_step` and `max_call_stack_depth`. Both are off by default.
 
 ## License
 
@@ -64,17 +54,19 @@ The addon is the `addons/yarn_spinner/` folder inside this repository. That fold
 
 If Godot reports missing dependencies on `res://addons/yarn_spinner/...` paths, or scripts fail to parse with `Could not find type "YarnDialogueRunner"`, the addon isn't at the path the project expects. The usual cause is copying the whole repository into `addons/`, which puts the addon at `addons/YarnSpinner-Godot-GDScript/addons/yarn_spinner`. Move the inner `yarn_spinner` folder so it sits directly under `addons/`, then reload the project.
 
+Full instructions are in [Installation](https://yarnspinner.dev/docs/godot/gdscript/01-installation/), including [turning on the plugin](https://yarnspinner.dev/docs/godot/gdscript/01-installation/#turning-on-the-plugin), [the compiler](https://yarnspinner.dev/docs/godot/gdscript/01-installation/#the-compiler) and [what to do if something's not right](https://yarnspinner.dev/docs/godot/gdscript/01-installation/#if-somethings-not-right). For setting up Yarn Projects, see [Setting Up Your Godot Project](https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/).
+
 ## How It Works
 
 The Yarn Spinner compiler (bundled with the addon, or `ysc`) compiles `.yarn` scripts into a binary protobuf program. This plugin reads that binary at import time, parses it into an in-memory program representation, and executes it in a stack-based virtual machine. The VM handles control flow, variable storage, function calls, and content delivery. A dialogue runner orchestrates the VM and routes lines, options, and commands to presenter nodes in your scene tree.
 
-You write dialogue in Yarn, and the plugin compiles and runs it. Compilation happens automatically when Godot imports the `.yarnproject` file, using the compiler binary bundled with the addon (or `ysc` from your PATH as a fallback).
+You write dialogue in Yarn, and the plugin compiles and runs it. Compilation happens automatically when Godot imports the `.yarnproject` file, using the compiler binary bundled with the addon (or `ysc` from your PATH as a fallback). See [Understanding Yarn Spinner](https://yarnspinner.dev/docs/godot/gdscript/02-understanding-yarn-spinner/), [Yarn Projects](https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/01-yarn-projects/) and [Importing Yarn Files](https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/02-importing-yarn-files/).
 
 ## Architecture
 
 The plugin has three layers:
 
-**Core** (`addons/yarn_spinner/core/`) contains the rntime engine. The protobuf parser reads compiled `.yarnproject` binaries. The virtual machine executes instructions. The yarn library provides built-in functions and operators. Variable storage holds game state. The line provider resolves localised text and applies markup. The saliency system selects content when multiple candidates match
+**Core** (`addons/yarn_spinner/core/`) contains the runtime engine. The protobuf parser reads compiled `.yarnproject` binaries. The virtual machine executes instructions. The yarn library provides built-in functions and operators. Variable storage holds game state. The line provider resolves localised text and applies markup. The saliency system selects content when multiple candidates match.
 
 **Dialogue Runner** (`addons/yarn_spinner/dialogue_runner.gd`) is the main node you add to your scene. It owns the VM, discovers commands from your scene tree, coordinates presenters, and exposes signals for dialogue lifecycle events. All configuration is done through its exported properties in the inspector.
 
@@ -84,7 +76,7 @@ The plugin has three layers:
 
 ### YarnDialogueRunner
 
-The central node. Add it to your scene, assign a `.yarnproject`, an call `start_dialogue()`. Key properties:
+The central node. Add it to your scene, assign a `.yarnproject`, and call `start_dialogue()`. Key properties:
 
 - `yarn_project` -- the compiled Yarn project to run
 - `start_node` -- which node to begin from (default: `"Start"`)
@@ -96,6 +88,8 @@ The central node. Add it to your scene, assign a `.yarnproject`, an call `start_
 
 Signals: `dialogue_started`, `dialogue_completed`, `dialogue_cancelled`, `node_started`, `node_completed`, `command_unhandled`, `command_received`.
 
+See [Dialogue Runner](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/01-dialogue-runner/).
+
 To choose a Yarn node from a dropdown on your own scripts, export a `String` with the `yarn_node` hint, naming the property that holds the Dialogue Runner or Yarn Project:
 
 ```gdscript
@@ -105,19 +99,19 @@ To choose a Yarn node from a dropdown on your own scripts, export a `String` wit
 
 ### YarnLinePresenter
 
-Displays a line of dialogue with optional typewriter animation (letter-by-letter or word-by-word). Expects a `RichTextLabel` for text and an optional `Label` for character names. Shows a continue indicator when the line is fully revealed.
+Displays a line of dialogue with optional typewriter animation (letter-by-letter or word-by-word). Expects a `RichTextLabel` for text and an optional `Label` for character names. Shows a continue indicator when the line is fully revealed. See [Line Presenter](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/02-line-presenter/), [Typewriter and Effects](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/04-typewriter-and-effects/) and [Markup](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/05-markup/).
 
 ### YarnOptionsPresenter
 
-Shows dialogue choices as buttons. Creates a button per option, handles keyboard and mouse selection, and can hide or disable unavailable options.
+Shows dialogue choices as buttons. Creates a button per option, handles keyboard and mouse selection, and can hide or disable unavailable options. See [Options Presenter](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/03-options-presenter/).
 
 ### YarnDialoguePresenter
 
-Base class for custom presenters. Override `run_line()` to handle lines and `run_options()` to handle choices. Multiple presenters can be active at once -- the runner coordinates them.
+Base class for custom presenters. Override `run_line()` to handle lines and `run_options()` to handle choices. Multiple presenters can be active at once -- the runner coordinates them. See [Building Your Own Presenter](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/07-building-your-own-presenter/), [A Different Kind of Presenter](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/08-a-different-kind-of-presenter/) and [Async and Cancellation](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/08-async-and-cancellation/). For voice-over, see [Voice-Over](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/06-voice-over/).
 
 ### YarnVariableStorage
 
-Base class for game state storage. The built-in `YarnInMemoryVariableStorage` stores variables in a dictionary. Subclass it to save to disk or sync with your game systems. Supports typed access (`get_float`, `get_bool`, `get_string`) and change subscriptions with automatic cleanup.
+Base class for game state storage. The built-in `YarnInMemoryVariableStorage` stores variables in a dictionary. Subclass it to save to disk or sync with your game systems. Supports typed access (`get_float`, `get_bool`, `get_string`) and change subscriptions with automatic cleanup. See [Variables and Storage](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/04-variables-and-storage/) and [Smart Variables](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/05-smart-variables/).
 
 ### Custom Commands
 
@@ -138,6 +132,8 @@ func _yarn_command_fade(duration: float) -> Signal:
     return tween.finished
 ```
 
+See [Commands](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/01-commands/), [Functions](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/02-functions/) and [Putting It Together](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/03-putting-it-together/). For choosing between node group variants, see [Saliency and Storylets](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/06-saliency-and-storylets/) and [Custom Saliency Strategies](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/07-custom-saliency-strategies/).
+
 ### Localisation
 
-Localisation uses Godot's `TranslationServer`. Export your Yarn strings to CSV, translate them, and import them through Godot's standard localisation workflow (Project Settings > Localization > Translations). Set the `translation_prefix` on the dialogue runner to control the key prefix (default: `"YARN_"`).
+Localisation uses Godot's `TranslationServer`. Export your Yarn strings to CSV, translate them, and import them through Godot's standard localisation workflow (Project Settings > Localization > Translations). Set the `translation_prefix` on the dialogue runner to control the key prefix (default: `"YARN_"`). See [Localising Your Game](https://yarnspinner.dev/docs/godot/gdscript/06-localisation-and-assets/01-localising-your-game/) and [Line and Asset Providers](https://yarnspinner.dev/docs/godot/gdscript/06-localisation-and-assets/02-line-and-asset-providers/).

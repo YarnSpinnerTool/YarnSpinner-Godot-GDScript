@@ -3,18 +3,20 @@
 This gets you from zero to running dialogue in about five minutes. It assumes you already know how to write Yarn, and how to use Godot.
 
 > [!IMPORTANT]
-> To get Yarn Spinner for Godot (GDScript), and support the team behind it, buy a copy for Godot from the Yarn Spinner Itch.io Store or from the Godot Asset Store (coming soon), or check out the Yarn Spinner Documentation to install other ways.
+> Yarn Spinner+ for Godot (GDScript), with the Classic RPG and Snaaake dialogue presenters and priority email support, is available to buy at [yarnspinner.dev/godot](https://yarnspinner.dev/godot). Buying it supports the team behind Yarn Spinner. See the [Installation](https://yarnspinner.dev/docs/godot/gdscript/01-installation/) docs for every way to install.
 
 > [!TIP]
-> **Please submit support or feature requests via this form during Early Access:** http://yarnspinner.dev/pre-release-feedback
+> **Please submit bug reports and feature requests here:** https://github.com/YarnSpinnerTool/IssuesDiscussion/issues
 
-Visit the [documentation](https://yarnspinner.dev/docs/) and [Yarn Spinner site](https://yarnspinner.dev) for more information.
+Visit the [documentation](https://yarnspinner.dev/docs/godot/gdscript/) and [Yarn Spinner site](https://yarnspinner.dev) for more information. If you're new to Yarn, start with [Writing Yarn](https://yarnspinner.dev/docs/yarn/).
 
 ## Install the Plugin
 
 1. Clone or download [YarnSpinner-Godot-GDScript](https://github.com/YarnSpinnerTool/YarnSpinner-Godot-GDScript). The addon is the `addons/yarn_spinner/` folder inside it.
 2. Copy that folder into your Godot project's `addons/` directory, so the plugin config is at `res://addons/yarn_spinner/plugin.cfg`. Don't copy the whole repository in; that nests the addon one level too deep.
 3. Go to **Project > Project Settings > Plugins** and enable **Yarn Spinner**.
+
+More detail: [Installation](https://yarnspinner.dev/docs/godot/gdscript/01-installation/).
 
 ## Add Your Yarn Files
 
@@ -47,9 +49,11 @@ ysc compile your_project.yarnproject
 
 You can also set the path to `ysc` in the import options for the `.yarnproject` file in the Godot inspector, or in **Project Settings > Yarn Spinner > YSC Path**.
 
+More detail: [The compiler](https://yarnspinner.dev/docs/godot/gdscript/01-installation/#the-compiler), [Yarn Projects](https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/01-yarn-projects/), [Importing Yarn Files](https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/02-importing-yarn-files/) and [Editor Tools](https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/03-editor-tools/).
+
 ## Set Up the Scene
 
-Here's a minimal scene tree exmple:
+Here's a minimal scene tree example:
 
 ```
 Game (Node2D)
@@ -90,6 +94,8 @@ func _ready():
 ```
 
 That's it. Run the scene and your dialogue plays.
+
+More detail: [Showing Dialogue](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/), [Dialogue Runner](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/01-dialogue-runner/), [Line Presenter](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/02-line-presenter/) and [Options Presenter](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/03-options-presenter/).
 
 ## Commands
 
@@ -145,6 +151,8 @@ func _give_item(item_name: String, count: int) -> void:
 
 `<<wait>>` and `<<stop>>` are built in, so don't use those names for your own commands.
 
+More detail: [Commands](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/01-commands/).
+
 ## Functions
 
 Functions let Yarn read values from your game. Register them with a name and parameter count:
@@ -177,6 +185,8 @@ You have {format("{0}", player_health())} health remaining.
 
 Or use the naming convention with `_yarn_function_` prefix for auto-discovery.
 
+More detail: [Functions](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/02-functions/) and [Putting It Together](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/03-putting-it-together/).
+
 ## Variables
 
 Yarn variables work automatically. Declare them in your `.yarn` files and they're stored in an in-memory dictionary:
@@ -199,6 +209,8 @@ dialogue_runner.variable_storage.set_value("$player_name", "Hero")
 
 The runner creates a `YarnInMemoryVariableStorage` automatically. If you need persistence, subclass `YarnVariableStorage` and assign it in the inspector.
 
+More detail: [Variables and Storage](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/04-variables-and-storage/) and [Smart Variables](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/05-smart-variables/).
+
 ## Signals
 
 The dialogue runner emits signals for lifecycle events:
@@ -208,8 +220,12 @@ dialogue_runner.dialogue_started.connect(func(): show_dialogue_ui())
 dialogue_runner.dialogue_completed.connect(func(): hide_dialogue_ui())
 dialogue_runner.node_started.connect(func(name): print("Entered: ", name))
 dialogue_runner.node_completed.connect(func(name): print("Left: ", name))
-dialogue_runner.command_unhandled.connect(func(text): print("Unknown: ", text))
+dialogue_runner.command_unhandled.connect(func(text):
+	print("Unknown: ", text)
+	dialogue_runner.signal_content_complete())
 ```
+
+Once you connect `command_unhandled`, the dialogue waits on each unknown Command until you call `signal_content_complete()`. See [Dialogue Runner](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/01-dialogue-runner/) for every signal.
 
 ## Useful Settings
 
@@ -217,12 +233,12 @@ On the `YarnDialogueRunner` in the inspector:
 
 - **Start Node** -- which Yarn node to begin from (default: `"Start"`)
 - **Auto Start** -- begin dialogue when the scene loads
-- **Run Selected Option As Line** -- after the player picks an option, show it as a line of dialogue before continuing
+- **Show Selected Option As Line** -- after the player picks an option, show it as a line of dialogue before continuing
 - **Auto Discover Commands** -- scan the scene tree for `_yarn_command_*` and `_yarn_function_*` methods
 
 On `YarnLinePresenter`:
 
-- **Typewriter Mode** -- `INSTANT`, `LETTER` (character by character), or `WORD`
+- **Typewriter Mode** -- `INSTANT`, `LETTER` (character by character), `WORD`, or `CUSTOM`
 - **Characters Per Second** / **Words Per Second** -- typewriter speed
 - **Auto Advance** -- automatically continue after a delay
 - **Use Markup** -- enable BBCode rendering in the text label
@@ -231,32 +247,50 @@ On `YarnOptionsPresenter`:
 
 - **Hide Unavailable** -- hide options the player can't pick (vs showing them greyed out)
 
+More detail: [Typewriter and Effects](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/04-typewriter-and-effects/), [Markup](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/05-markup/) and [Voice-Over](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/06-voice-over/).
+
 ## Custom Presenters
 
 To make your own presenter UI, subclass `YarnDialoguePresenter`. `run_line`
 returns nothing: hold the line open by awaiting inside it, and return when
-the line is done. The token tells you when the player wants to hurry up or
-skip.
+the line is done. The token tells you when the runner wants the line to end,
+so wait on it and ask the runner to move on when the player clicks.
+
+`run_options` returns the index of the chosen option. Return `-1` if the
+token fires first, which happens when another presenter chose or the options
+timed out.
 
 ```gdscript
 extends YarnDialoguePresenter
 
+signal _option_chosen(index: int)
+
+
+func _ready() -> void:
+	$Button.pressed.connect(func(): dialogue_runner.request_next_content())
+
+
 func run_line(line: YarnLine, token: YarnCancellationToken = null) -> void:
-	$Label.text = line.get_plain_text()
-	visible = true
-	# Wait for player to click (or the runner asking us to move on)
-	await $Button.pressed
-	visible = false
+	$Label.text = line.text
+	$Label.show()
+	await token.wait_for_next_content()
+	$Label.hide()
+
 
 func run_options(options: Array[YarnOption], token: YarnCancellationToken = null) -> int:
-	# Build your own UI, return the index of the selected option
 	for i in options.size():
-		var btn = Button.new()
-		btn.text = options[i].get_plain_text()
-		btn.pressed.connect(func(): selected = i)
-		$Container.add_child(btn)
-	await $Container.get_child(0).pressed  # Simplified
-	return selected
+		var button := Button.new()
+		button.text = options[i].text
+		button.disabled = not options[i].is_available
+		button.pressed.connect(_option_chosen.emit.bind(i))
+		$Container.add_child(button)
+	var on_cancel := func(): _option_chosen.emit(-1)
+	token.next_content_requested.connect(on_cancel)
+	var chosen: int = await _option_chosen
+	token.next_content_requested.disconnect(on_cancel)
+	for button in $Container.get_children():
+		button.queue_free()
+	return chosen
 ```
 
 Register it the same way:
@@ -264,6 +298,8 @@ Register it the same way:
 ```gdscript
 dialogue_runner.add_presenter(my_custom_presenter)
 ```
+
+More detail: [Building Your Own Presenter](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/07-building-your-own-presenter/), [A Different Kind of Presenter](https://yarnspinner.dev/docs/godot/gdscript/04-showing-dialogue/08-a-different-kind-of-presenter/) and [Async and Cancellation](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/08-async-and-cancellation/).
 
 ## Node Groups and Saliency
 
@@ -275,6 +311,15 @@ To use your own strategy, extend `YarnSaliencyStrategy` and set it from code:
 dialogue_runner.set_content_saliency_strategy(MySaliencyStrategy.new())
 ```
 
+More detail: [Saliency and Storylets](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/06-saliency-and-storylets/) and [Custom Saliency Strategies](https://yarnspinner.dev/docs/godot/gdscript/05-connecting-to-your-game/07-custom-saliency-strategies/).
+
 ## VS Code Autocomplete
 
-The plugin generates a `.ysls.json` file next to each `.yarnproject` for the next version of the Yarn Spinner for Visual Studio Code Extension to know about your commands and functions. This happens automatically when you save `.gd` files. 
+The plugin generates a `.ysls.json` file next to each `.yarnproject` for the next version of the Yarn Spinner for Visual Studio Code Extension to know about your commands and functions. This happens automatically when you save `.gd` files. See [The .ysls.json file](https://yarnspinner.dev/docs/godot/gdscript/03-setting-up-your-godot-project/01-yarn-projects/#the-yslsjson-file) and [Writing Yarn in VS Code](https://yarnspinner.dev/docs/yarn-spinner-editor/01-writing-yarn-in-vs-code/).
+
+## Next Steps
+
+- [Localising Your Game](https://yarnspinner.dev/docs/godot/gdscript/06-localisation-and-assets/01-localising-your-game/): export your lines, translate them, and switch language.
+- [Samples](https://yarnspinner.dev/docs/godot/gdscript/07-samples/): a walkthrough of every sample in the [YarnSpinner-Godot-Samples](https://github.com/YarnSpinnerTool/YarnSpinner-Godot-Samples) project.
+- [Yarn Spinner+ and Add-Ons](https://yarnspinner.dev/docs/godot/gdscript/08-yarn-spinner-plus-and-add-ons/): the paid version, with the Classic RPG and Snaaake presenters.
+- [Writing Yarn](https://yarnspinner.dev/docs/yarn/): the Yarn language itself.
