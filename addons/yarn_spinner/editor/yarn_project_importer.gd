@@ -141,7 +141,7 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 	# Try native compiler first
 	if YarnNativeCompiler.is_available():
-		var result := _compile_native(source_file, abs_path, source_files, _function_declarations(generator))
+		var result := _compile_native(source_file, abs_path, source_files, _function_declarations(generator, abs_path))
 		resource = result.resource
 		if resource != null and resource.diagnostics.is_empty():
 			_generate_variables_source(source_file, options, result.declarations, result.enums)
@@ -565,7 +565,7 @@ static func ysls_import_option(yarn_project_path: String, option: String, defaul
 ## already know about, then every function the scan found. Without these the
 ## compiler can only work out a function's types from where it's used, so a
 ## call inside a line, like {coin_count()}, wouldn't compile.
-func _function_declarations(generator: YarnYSLSGenerator) -> Array[Dictionary]:
+func _function_declarations(generator: YarnYSLSGenerator, abs_project_path: String) -> Array[Dictionary]:
 	var declarations: Array[Dictionary] = []
 	var declared: Dictionary[String, bool] = {}
 
@@ -592,7 +592,176 @@ func _function_declarations(generator: YarnYSLSGenerator) -> Array[Dictionary]:
 		declarations.append(declaration)
 		declared[yarn_name] = true
 
+	for declaration: Dictionary in definitions_function_declarations(abs_project_path):
+		if declared.has(declaration["name"]):
+			continue
+		declarations.append(declaration)
+		declared[declaration["name"]] = true
+
 	return declarations
+
+
+const WORKSPACE_ROOT_PLACEHOLDER := "${workspaceRoot}"
+
+
+static func workspace_root() -> String:
+	return ProjectSettings.globalize_path("res://").trim_suffix("/")
+
+
+static func definition_entries(data: Dictionary) -> PackedStringArray:
+	var entries := PackedStringArray()
+	var raw: Variant = data.get("definitions", null)
+	if raw is String:
+		if not (raw as String).strip_edges().is_empty():
+			entries.append(raw)
+	elif raw is Array:
+		for entry: Variant in raw:
+			if entry is String and not (entry as String).strip_edges().is_empty():
+				entries.append(entry)
+	return entries
+
+
+static func resolve_definitions_files(abs_project_path: String, warn: bool = false) -> PackedStringArray:
+	var results := PackedStringArray()
+	var data := YarnProjectUtility.read_project_json(abs_project_path)
+	if data.is_empty():
+		return results
+	var project_dir := abs_project_path.get_base_dir()
+	var root := workspace_root()
+	var seen := {}
+	for entry in definition_entries(data):
+		var unknown := RegEx.create_from_string("\\$\\{[^}]*\\}").search_all(entry.replace(WORKSPACE_ROOT_PLACEHOLDER, ""))
+		if warn and not unknown.is_empty():
+			push_warning("yarn project importer: \"%s\" in the definitions of %s uses %s, which isn't supported. Only %s is." % [entry, abs_project_path, unknown[0].get_string(), WORKSPACE_ROOT_PLACEHOLDER])
+		var matches := _resolve_definition_entry(entry, project_dir, root)
+		if matches.is_empty() and warn and not _is_glob(entry):
+			push_warning("yarn project importer: couldn't find the definitions file \"%s\" listed in %s" % [entry, abs_project_path])
+		for path in matches:
+			if not seen.has(path):
+				seen[path] = true
+				results.append(path)
+	return results
+
+
+static func _is_glob(text: String) -> bool:
+	return text.replace(WORKSPACE_ROOT_PLACEHOLDER, "").contains("*") or text.contains("?")
+
+
+static func _resolve_definition_entry(entry: String, project_dir: String, root: String) -> PackedStringArray:
+	var expanded := entry.strip_edges().replace(WORKSPACE_ROOT_PLACEHOLDER, root).replace("\\", "/")
+	if expanded.begins_with("res://") or expanded.begins_with("user://"):
+		expanded = ProjectSettings.globalize_path(expanded)
+	elif not expanded.is_absolute_path():
+		expanded = project_dir.path_join(expanded.trim_prefix("./"))
+
+	var segments := expanded.split("/")
+	var first_glob := -1
+	for i in segments.size():
+		if segments[i].contains("*") or segments[i].contains("?"):
+			first_glob = i
+			break
+
+	if first_glob == -1:
+		var path := expanded.simplify_path()
+		return PackedStringArray([path]) if FileAccess.file_exists(path) else PackedStringArray()
+
+	var prefix := "/".join(segments.slice(0, first_glob))
+	if prefix.is_empty():
+		prefix = "/"
+	elif prefix.ends_with(":"):
+		prefix += "/"
+	var remainder := "/".join(segments.slice(first_glob))
+	var found := PackedStringArray()
+	for path in resolve_glob(prefix.simplify_path(), remainder):
+		if path.ends_with(".ysls.json"):
+			found.append(path.simplify_path())
+	return found
+
+
+static func definitions_function_declarations(abs_project_path: String) -> Array[Dictionary]:
+	var declarations: Array[Dictionary] = []
+	var declared := {}
+	for path in resolve_definitions_files(abs_project_path, true):
+		var file := FileAccess.open(path, FileAccess.READ)
+		if file == null:
+			push_warning("yarn project importer: couldn't open the definitions file %s: %s" % [path, error_string(FileAccess.get_open_error())])
+			continue
+		var json := JSON.new()
+		var err := json.parse(file.get_as_text())
+		file.close()
+		if err != OK:
+			push_warning("yarn project importer: couldn't read the definitions file %s: %s at line %d" % [path, json.get_error_message(), json.get_error_line()])
+			continue
+		if not json.data is Dictionary:
+			push_warning("yarn project importer: the definitions file %s doesn't contain a JSON object" % path)
+			continue
+		var functions: Variant = _get_key(json.data as Dictionary, "functions")
+		if functions == null:
+			continue
+		if not functions is Array:
+			push_warning("yarn project importer: \"functions\" in %s isn't a list" % path)
+			continue
+		for info: Variant in functions as Array:
+			if not info is Dictionary:
+				continue
+			var declaration := _declaration_from_definition(info as Dictionary)
+			if declaration.is_empty() or declared.has(declaration["name"]):
+				continue
+			declared[declaration["name"]] = true
+			declarations.append(declaration)
+	return declarations
+
+
+static func _declaration_from_definition(info: Dictionary) -> Dictionary:
+	var yarn_name := str(_get_key(info, "yarnName", ""))
+	if yarn_name.is_empty():
+		return {}
+
+	var return_type := ""
+	var return_info: Variant = _get_key(info, "return")
+	if return_info is Dictionary:
+		return_type = str(_get_key(return_info as Dictionary, "type", ""))
+	elif return_info is String:
+		return_type = return_info as String
+	if return_type.is_empty():
+		return_type = str(_get_key(info, "returnType", ""))
+	if return_type.is_empty():
+		return {}
+
+	var declaration := {
+		"name": yarn_name,
+		"returnType": return_type.to_lower(),
+		"parameters": [],
+	}
+	var documentation: Variant = _get_key(info, "documentation")
+	if documentation is String and not (documentation as String).is_empty():
+		declaration["description"] = documentation as String
+
+	var parameters: Variant = _get_key(info, "parameters", [])
+	if not parameters is Array:
+		return declaration
+	var parameter_list := parameters as Array
+	for i in parameter_list.size():
+		if not parameter_list[i] is Dictionary:
+			return {}
+		var parameter := parameter_list[i] as Dictionary
+		if _get_key(parameter, "defaultValue") != null:
+			return {}
+		var parameter_type := str(_get_key(parameter, "type", "any")).to_lower()
+		if _get_key(parameter, "isParamsArray", false) == true and i == parameter_list.size() - 1:
+			declaration["variadicParameterType"] = parameter_type
+		else:
+			declaration["parameters"].append(parameter_type)
+	return declaration
+
+
+static func _get_key(dict: Dictionary, key: String, default_value: Variant = null) -> Variant:
+	if dict.has(key):
+		return dict[key]
+	for existing: Variant in dict.keys():
+		if existing is String and (existing as String).nocasecmp_to(key) == 0:
+			return dict[existing]
+	return default_value
 
 
 ## Lists the project's generated .ysls.json in its "definitions" so ysc and
@@ -614,8 +783,19 @@ func _add_ysls_to_definitions(yarn_project_path: String) -> void:
 		push_warning("yarn project importer: %s has a \"definitions\" entry that isn't a path or a list of paths, so %s wasn't added to it" % [yarn_project_path, ysls_name])
 		return
 
+	var project_dir := ProjectSettings.globalize_path(yarn_project_path).get_base_dir()
+	var target := project_dir.path_join(ysls_name).simplify_path()
+	var workspace_root := ProjectSettings.globalize_path("res://").trim_suffix("/")
+	var fold_case := OS.get_name() in ["Windows", "macOS"]
 	for entry: Variant in definitions:
-		if entry is String and (entry as String).simplify_path().trim_prefix("./") == ysls_name:
+		if not entry is String:
+			continue
+		var text := entry as String
+		if text.simplify_path().trim_prefix("./") == ysls_name:
+			return
+		var expanded := text.replace("${workspaceRoot}", workspace_root)
+		var resolved := (expanded if expanded.is_absolute_path() else project_dir.path_join(expanded)).simplify_path()
+		if resolved == target or (fold_case and resolved.nocasecmp_to(target) == 0):
 			return
 
 	definitions.append(ysls_name)

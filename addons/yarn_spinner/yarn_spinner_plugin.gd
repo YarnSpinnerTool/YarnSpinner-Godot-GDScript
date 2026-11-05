@@ -47,6 +47,7 @@ var _ysls_needs_regenerate: bool = false
 var _reimport_timer: Timer
 var _pending_reimport_projects: Dictionary = {}
 var _startup_check_done: bool = false
+var _definitions_snapshot: Dictionary = {}
 
 
 func _enter_tree() -> void:
@@ -234,6 +235,7 @@ func _edit(object: Object) -> void:
 
 func _on_filesystem_changed() -> void:
 	_schedule_ysls_regenerate()
+	_schedule_reimport_for_changed_definitions()
 	if not _startup_check_done:
 		_startup_check_done = true
 		_check_stale_yarnprojects_at_startup.call_deferred()
@@ -281,6 +283,30 @@ func _schedule_yarnproject_reimport_for(changed_yarns: PackedStringArray) -> voi
 		return
 	if _reimport_timer and not _reimport_timer.is_stopped():
 		return  # already scheduled
+	if _reimport_timer:
+		_reimport_timer.start()
+
+
+func _schedule_reimport_for_changed_definitions() -> void:
+	var snapshot := {}
+	var changed := false
+	for project_path in _find_yarn_projects("res://"):
+		var abs_project := ProjectSettings.globalize_path(project_path)
+		var own_ysls := abs_project.get_basename() + ".ysls.json"
+		var files := {}
+		for path in YarnProjectImporter.resolve_definitions_files(abs_project):
+			if path != own_ysls:
+				files[path] = FileAccess.get_modified_time(path)
+		snapshot[project_path] = files
+		if _definitions_snapshot.has(project_path) and _definitions_snapshot[project_path] != files:
+			_pending_reimport_projects[project_path] = true
+			changed = true
+	_definitions_snapshot = snapshot
+
+	if not changed:
+		return
+	if _reimport_timer and not _reimport_timer.is_stopped():
+		return
 	if _reimport_timer:
 		_reimport_timer.start()
 
