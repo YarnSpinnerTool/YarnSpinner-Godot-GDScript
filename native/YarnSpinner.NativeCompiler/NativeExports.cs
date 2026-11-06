@@ -11,6 +11,7 @@ using System;
 using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -73,15 +74,16 @@ public static unsafe class NativeExports
             {
                 var fileName = file.GetProperty("fileName").GetString() ?? "input.yarn";
                 var source = file.GetProperty("source").GetString() ?? "";
-                inputs.Add(new CompilationJob.File { FileName = fileName, Source = source });
+                inputs.Add(new CompilationJob.Raw { Name = fileName, Source = source });
             }
         }
 
         if (inputs.Count == 0)
             return WriteErrorJson("No input files provided");
 
-        var job = CompilationJob.CreateFromInputs(inputs);
-        var functionDeclarations = ReadFunctionDeclarations(root);
+        var languageVersion = ReadLanguageVersion(root);
+        var job = CompilationJob.CreateFromInputs(inputs, null, languageVersion);
+        var functionDeclarations = ReadFunctionDeclarations(root, languageVersion);
         if (functionDeclarations.Count > 0)
             job.Declarations = functionDeclarations;
         var compilationResult = Yarn.Compiler.Compiler.Compile(job);
@@ -92,65 +94,123 @@ public static unsafe class NativeExports
     // Optional "declarations": functions the game provides, so the compiler
     // knows their types even where it can't infer them. Same format as the
     // CLI: {"name": ..., "parameters": [...], "returnType": ...}.
-    private static List<Declaration> ReadFunctionDeclarations(JsonElement root)
+    private static int ReadLanguageVersion(JsonElement root)
+    {
+        return root.TryGetProperty("languageVersion", out var element)
+            && element.ValueKind == JsonValueKind.Number
+            && element.TryGetInt32(out var version)
+            && version > 0
+            ? version
+            : Project.CurrentProjectFileVersion;
+    }
+
+    private static List<Declaration> ReadFunctionDeclarations(JsonElement root, int languageVersion)
     {
         var declarations = new List<Declaration>();
         if (!root.TryGetProperty("declarations", out var element) || element.ValueKind != JsonValueKind.Array)
             return declarations;
 
+        var builtIns = StandardLibrary.AllFunctions();
         foreach (var entry in element.EnumerateArray())
         {
-            if (entry.ValueKind != JsonValueKind.Object)
-                continue;
-
-            var name = entry.TryGetProperty("name", out var nameElement) && nameElement.ValueKind == JsonValueKind.String
-                ? nameElement.GetString()
-                : null;
-            if (string.IsNullOrEmpty(name))
-                continue;
-
-            var returnType = entry.TryGetProperty("returnType", out var returnElement) ? ParseYarnType(returnElement) : null;
-            if (returnType == null || returnType == Types.Any)
-                continue;
-
-            var functionType = new FunctionTypeBuilder().WithReturnType(returnType);
-            if (entry.TryGetProperty("parameters", out var parameters) && parameters.ValueKind == JsonValueKind.Array)
-            {
-                foreach (var parameter in parameters.EnumerateArray())
-                    functionType.WithParameter(ParseYarnType(parameter) ?? Types.Any);
-            }
-
-            if (entry.TryGetProperty("variadicParameterType", out var variadicElement))
-            {
-                var variadicType = ParseYarnType(variadicElement);
-                if (variadicType != null)
-                    functionType.WithVariadicParameterType(variadicType);
-            }
-
-            var declaration = new DeclarationBuilder()
-                .WithName(name)
-                .WithType(functionType.FunctionType);
-            if (entry.TryGetProperty("description", out var descriptionElement) && descriptionElement.ValueKind == JsonValueKind.String)
-                declaration.WithDescription(descriptionElement.GetString());
-
-            declarations.Add(declaration.Declaration);
+            var declaration = DeclarationFromEntry(entry, languageVersion);
+            if (declaration != null && !builtIns.ContainsKey(declaration.Name))
+                declarations.Add(declaration);
         }
 
         return declarations;
     }
 
-    private static IType? ParseYarnType(JsonElement element)
+    private static Declaration? DeclarationFromEntry(JsonElement entry, int languageVersion)
     {
-        if (element.ValueKind != JsonValueKind.String)
+        if (entry.ValueKind != JsonValueKind.Object)
             return null;
-        return element.GetString()?.ToLowerInvariant() switch
+        var name = entry.TryGetProperty("name", out var nameElement) && nameElement.ValueKind == JsonValueKind.String
+            ? nameElement.GetString()
+            : null;
+        if (string.IsNullOrEmpty(name))
+            return null;
+        var returnType = entry.TryGetProperty("returnType", out var returnElement) && returnElement.ValueKind == JsonValueKind.String
+            ? returnElement.GetString()!.ToLowerInvariant()
+            : "any";
+        if (returnType == "boolean")
+            returnType = "bool";
+
+        using var stream = new MemoryStream();
+        using (var w = new Utf8JsonWriter(stream))
         {
-            "string" => Types.String,
-            "number" => Types.Number,
-            "bool" or "boolean" => Types.Boolean,
-            "any" => Types.Any,
-            _ => null,
-        };
+            w.WriteStartObject();
+            w.WriteStartArray("functions");
+            w.WriteStartObject();
+            w.WriteString("yarnName", name);
+            w.WriteStartObject("return");
+            w.WriteString("type", returnType);
+            w.WriteEndObject();
+            w.WriteStartArray("parameters");
+            var index = 0;
+            if (entry.TryGetProperty("parameters", out var parameters) && parameters.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var parameter in parameters.EnumerateArray())
+                {
+                    WriteParameter(w, parameter, $"p{index++}", false);
+                }
+            }
+            if (entry.TryGetProperty("variadicParameterType", out var variadic))
+                WriteParameter(w, variadic, $"p{index}", true);
+            w.WriteEndArray();
+            w.WriteEndObject();
+            w.WriteEndArray();
+            w.WriteStartArray("commands");
+            w.WriteEndArray();
+            w.WriteEndObject();
+        }
+
+        Declaration? parsed;
+        try
+        {
+            parsed = new Definitions(new ReadOnlyMemory<byte>(stream.ToArray()), languageVersion).functions.FirstOrDefault();
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+        if (parsed == null)
+            return null;
+
+        var builder = new DeclarationBuilder()
+            .WithName(parsed.Name)
+            .WithType(parsed.Type)
+            .WithSourceFileName(Declaration.ExternalDeclaration);
+        if (entry.TryGetProperty("description", out var descriptionElement) && descriptionElement.ValueKind == JsonValueKind.String)
+            builder = builder.WithDescription(descriptionElement.GetString());
+        return builder.Declaration;
+    }
+
+    private static void WriteParameter(Utf8JsonWriter w, JsonElement parameter, string fallbackName, bool isParamsArray)
+    {
+        w.WriteStartObject();
+        if (parameter.ValueKind == JsonValueKind.Object)
+        {
+            var type = parameter.TryGetProperty("type", out var typeElement) && typeElement.ValueKind == JsonValueKind.String
+                ? typeElement.GetString()!.ToLowerInvariant()
+                : "any";
+            w.WriteString("name", parameter.TryGetProperty("name", out var nameElement) && nameElement.ValueKind == JsonValueKind.String ? nameElement.GetString() : fallbackName);
+            w.WriteString("type", type == "boolean" ? "bool" : type);
+            if (parameter.TryGetProperty("subtype", out var subtypeElement) && subtypeElement.ValueKind == JsonValueKind.String)
+                w.WriteString("subtype", subtypeElement.GetString());
+            var paramsArray = isParamsArray || (parameter.TryGetProperty("isParamsArray", out var arrayElement) && arrayElement.ValueKind == JsonValueKind.True);
+            w.WriteBoolean("isParamsArray", paramsArray);
+            if (parameter.TryGetProperty("defaultValue", out var defaultElement) && defaultElement.ValueKind != JsonValueKind.Null)
+                w.WriteString("defaultValue", "");
+        }
+        else
+        {
+            var type = parameter.ValueKind == JsonValueKind.String ? parameter.GetString()!.ToLowerInvariant() : "any";
+            w.WriteString("name", fallbackName);
+            w.WriteString("type", type == "boolean" ? "bool" : type);
+            w.WriteBoolean("isParamsArray", isParamsArray);
+        }
+        w.WriteEndObject();
     }
 
     // Manual JSON writing — NativeAOT doesn't support reflection-based JsonSerializer

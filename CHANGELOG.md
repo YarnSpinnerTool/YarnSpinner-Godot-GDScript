@@ -10,6 +10,11 @@
 - When a function is declared both in the project's GDScript and in a definitions file, the GDScript declaration is used.
 - The importer warns about definitions files it can't find or read, and about placeholders other than `${workspaceRoot}`.
 - Editing a `.ysls.json` that a Yarn Project lists in its `definitions` now recompiles that Yarn Project.
+- The native compiler is built against Yarn Spinner 3.3! And compiles each Yarn Project at its own `projectFileVersion`. In a version 4 project, using a function that isn't declared is a warning. In version 5, it's gonna be an error.
+- Functions in definitions files with `enum` or `instance` parameters need project file version 5. In a version 4 project the importer warns and leaves the function undeclared. In version 5, enum parameters are checked against the enum's real type.
+- It's version 5 of the file all the way for this version.
+- Functions in definitions files with default-valued parameters are now declared, and can be called with or without those arguments.
+- Fixed the native compiler failing on every Yarn Project that otherwise compiled, under Yarn Spinner 3.3!
 - The importer no longer adds its generated `.ysls.json` to `definitions` again when the project already lists it under a different path, such as through `${workspaceRoot}`.
 
 ## Early Access 3.2

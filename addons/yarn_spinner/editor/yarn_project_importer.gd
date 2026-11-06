@@ -141,7 +141,8 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 
 	# Try native compiler first
 	if YarnNativeCompiler.is_available():
-		var result := _compile_native(source_file, abs_path, source_files, _function_declarations(generator, abs_path))
+		var language_version := project_language_version(abs_path)
+		var result := _compile_native(source_file, abs_path, source_files, _function_declarations(generator, abs_path, language_version), language_version)
 		resource = result.resource
 		if resource != null and resource.diagnostics.is_empty():
 			_generate_variables_source(source_file, options, result.declarations, result.enums)
@@ -269,7 +270,7 @@ func _compile_ysc(source_file: String, abs_path: String, source_files: PackedStr
 
 
 ## Compile using the bundled native compiler (no .NET required).
-func _compile_native(source_file: String, abs_path: String, source_files: PackedStringArray, function_declarations: Array[Dictionary] = []) -> Dictionary:
+func _compile_native(source_file: String, abs_path: String, source_files: PackedStringArray, function_declarations: Array[Dictionary] = [], language_version: int = 0) -> Dictionary:
 	print("yarn project importer: using native compiler at '%s'" % YarnNativeCompiler.get_native_bin_path())
 
 	var failed := {"resource": null, "declarations": [], "enums": []}
@@ -309,7 +310,7 @@ func _compile_native(source_file: String, abs_path: String, source_files: Packed
 	if files.is_empty():
 		return failed
 
-	var result := YarnNativeCompiler.compile(files, function_declarations)
+	var result := YarnNativeCompiler.compile(files, function_declarations, language_version)
 
 	if result.get("compiler_failed", false):
 		for diag in result.diagnostics:
@@ -565,7 +566,7 @@ static func ysls_import_option(yarn_project_path: String, option: String, defaul
 ## already know about, then every function the scan found. Without these the
 ## compiler can only work out a function's types from where it's used, so a
 ## call inside a line, like {coin_count()}, wouldn't compile.
-func _function_declarations(generator: YarnYSLSGenerator, abs_project_path: String) -> Array[Dictionary]:
+func _function_declarations(generator: YarnYSLSGenerator, abs_project_path: String, language_version: int = 0) -> Array[Dictionary]:
 	var declarations: Array[Dictionary] = []
 	var declared: Dictionary[String, bool] = {}
 
@@ -592,7 +593,7 @@ func _function_declarations(generator: YarnYSLSGenerator, abs_project_path: Stri
 		declarations.append(declaration)
 		declared[yarn_name] = true
 
-	for declaration: Dictionary in definitions_function_declarations(abs_project_path):
+	for declaration: Dictionary in definitions_function_declarations(abs_project_path, language_version):
 		if declared.has(declaration["name"]):
 			continue
 		declarations.append(declaration)
@@ -602,6 +603,8 @@ func _function_declarations(generator: YarnYSLSGenerator, abs_project_path: Stri
 
 
 const WORKSPACE_ROOT_PLACEHOLDER := "${workspaceRoot}"
+const CURRENT_PROJECT_FILE_VERSION := 5
+const ENUM_AND_INSTANCE_MIN_VERSION := 5
 
 
 static func workspace_root() -> String:
@@ -678,7 +681,14 @@ static func _resolve_definition_entry(entry: String, project_dir: String, root: 
 	return found
 
 
-static func definitions_function_declarations(abs_project_path: String) -> Array[Dictionary]:
+static func project_language_version(abs_project_path: String) -> int:
+	var version: Variant = YarnProjectUtility.read_project_json(abs_project_path).get("projectFileVersion", null)
+	if (version is int or version is float) and int(version) > 0:
+		return int(version)
+	return 0
+
+
+static func definitions_function_declarations(abs_project_path: String, language_version: int = 0) -> Array[Dictionary]:
 	var declarations: Array[Dictionary] = []
 	var declared := {}
 	for path in resolve_definitions_files(abs_project_path, true):
@@ -704,7 +714,7 @@ static func definitions_function_declarations(abs_project_path: String) -> Array
 		for info: Variant in functions as Array:
 			if not info is Dictionary:
 				continue
-			var declaration := _declaration_from_definition(info as Dictionary)
+			var declaration := _declaration_from_definition(info as Dictionary, language_version, path)
 			if declaration.is_empty() or declared.has(declaration["name"]):
 				continue
 			declared[declaration["name"]] = true
@@ -712,7 +722,7 @@ static func definitions_function_declarations(abs_project_path: String) -> Array
 	return declarations
 
 
-static func _declaration_from_definition(info: Dictionary) -> Dictionary:
+static func _declaration_from_definition(info: Dictionary, language_version: int = 0, path: String = "") -> Dictionary:
 	var yarn_name := str(_get_key(info, "yarnName", ""))
 	if yarn_name.is_empty():
 		return {}
@@ -745,13 +755,22 @@ static func _declaration_from_definition(info: Dictionary) -> Dictionary:
 		if not parameter_list[i] is Dictionary:
 			return {}
 		var parameter := parameter_list[i] as Dictionary
-		if _get_key(parameter, "defaultValue") != null:
-			return {}
 		var parameter_type := str(_get_key(parameter, "type", "any")).to_lower()
+		if parameter_type == "enum" or parameter_type == "instance":
+			var effective_version := language_version if language_version > 0 else CURRENT_PROJECT_FILE_VERSION
+			if effective_version < ENUM_AND_INSTANCE_MIN_VERSION:
+				push_warning("yarn project importer: %s in %s has an %s parameter, which needs project file version %d or later. This project is version %d, so %s isn't declared." % [yarn_name, path, parameter_type, ENUM_AND_INSTANCE_MIN_VERSION, effective_version, yarn_name])
+				return {}
+		var entry := {"type": parameter_type}
+		var subtype: Variant = _get_key(parameter, "subtype")
+		if subtype is String:
+			entry["subtype"] = subtype
+		if _get_key(parameter, "defaultValue") != null:
+			entry["defaultValue"] = true
 		if _get_key(parameter, "isParamsArray", false) == true and i == parameter_list.size() - 1:
-			declaration["variadicParameterType"] = parameter_type
+			declaration["variadicParameterType"] = entry
 		else:
-			declaration["parameters"].append(parameter_type)
+			declaration["parameters"].append(entry)
 	return declaration
 
 

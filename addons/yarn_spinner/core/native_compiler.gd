@@ -83,7 +83,7 @@ static func is_available() -> bool:
 ##   declarations: Array of { name, type, isEnum, description, isInlineExpansion, sourceFileName, defaultValue }
 ##   enums: Array of { name, description, rawType, cases: [{ name, description, value }] }
 ##   diagnostics: Array of { message, severity, fileName, line, column, code }
-static func compile(files: Array[Dictionary], declarations: Array[Dictionary] = []) -> Dictionary:
+static func compile(files: Array[Dictionary], declarations: Array[Dictionary] = [], language_version: int = 0) -> Dictionary:
 	if not is_available():
 		return _error_result("Native compiler not available for this platform")
 
@@ -93,6 +93,8 @@ static func compile(files: Array[Dictionary], declarations: Array[Dictionary] = 
 	var input := {"files": files}
 	if not declarations.is_empty():
 		input["declarations"] = declarations
+	if language_version > 0:
+		input["languageVersion"] = language_version
 	var input_json := JSON.stringify(input)
 
 	return _parse_result(_run_compiler(bin_path, input_json))
