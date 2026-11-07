@@ -381,6 +381,33 @@ func edit_file(path: String) -> void:
 	_select_current_in_file_list()
 
 
+## Opens [param path] with the caret on the title line of a node. If
+## [param line] (counted from 1) is given, the node is the one that contains
+## that line. Otherwise it's the first node titled [param node_name].
+func edit_file_at_node(path: String, node_name: String, line: int = 0) -> void:
+	edit_file(path)
+	if _code_edit == null:
+		return
+	var target := -1
+	if line > 0:
+		for index in range(mini(line - 1, _code_edit.get_line_count() - 1), -1, -1):
+			if _code_edit.get_line(index).strip_edges().begins_with("title:"):
+				target = index
+				break
+	if target < 0 and not node_name.is_empty():
+		for index in _code_edit.get_line_count():
+			var text := _code_edit.get_line(index).strip_edges()
+			if text.begins_with("title:") and text.substr(6).strip_edges() == node_name:
+				target = index
+				break
+	if target < 0:
+		return
+	_code_edit.set_caret_line(target)
+	_code_edit.set_caret_column(0)
+	_code_edit.center_viewport_to_caret()
+	_code_edit.grab_focus()
+
+
 ## Called by the plugin when the tab becomes visible, so the file list stays fresh.
 func notify_shown() -> void:
 	_refresh_file_list()
