@@ -117,6 +117,10 @@ func _get_import_order() -> int:
 	return 0
 
 
+func _get_format_version() -> int:
+	return 1
+
+
 func _get_icon() -> Texture2D:
 	return preload("res://addons/yarn_spinner/icons/yarn_project.svg")
 
@@ -365,8 +369,40 @@ func _compile_native(source_file: String, abs_path: String, source_files: Packed
 	resource.string_table = string_table
 	resource.line_metadata = line_metadata
 	resource.line_info = line_info
+	resource.enums = _enums_from_result(result.enums)
+	resource.variable_types = _variable_types_from_result(result.declarations)
 
 	return {"resource": resource, "declarations": result.declarations, "enums": result.enums}
+
+
+static func _enums_from_result(compiled_enums: Array) -> Dictionary:
+	var enums := {}
+	for info: Dictionary in compiled_enums:
+		var cases: Array = []
+		for entry: Dictionary in info.get("cases", []):
+			var value: Variant = entry.get("value")
+			if value is int:
+				value = float(value)
+			cases.append({
+				"name": str(entry.get("name", "")),
+				"value": value,
+				"description": str(entry.get("description", "")),
+			})
+		enums[str(info.get("name", ""))] = {
+			"raw_type": str(info.get("rawType", "")),
+			"description": str(info.get("description", "")),
+			"cases": cases,
+		}
+	return enums
+
+
+static func _variable_types_from_result(declarations: Array) -> Dictionary:
+	var types := {}
+	for declaration: Dictionary in declarations:
+		var variable_name := str(declaration.get("name", ""))
+		if variable_name.begins_with("$"):
+			types[variable_name] = str(declaration.get("type", ""))
+	return types
 
 
 func _generate_variables_source(source_file: String, options: Dictionary, declarations: Array, enums: Array) -> void:
@@ -605,6 +641,8 @@ func _function_declarations(generator: YarnYSLSGenerator, abs_project_path: Stri
 const WORKSPACE_ROOT_PLACEHOLDER := "${workspaceRoot}"
 const CURRENT_PROJECT_FILE_VERSION := 5
 const ENUM_AND_INSTANCE_MIN_VERSION := 5
+const WORKSPACE_ROOT_MIN_VERSION := 5
+const SINGLE_DEFINITION_MAX_VERSION := 3
 
 
 static func workspace_root() -> String:
@@ -817,13 +855,24 @@ func _add_ysls_to_definitions(yarn_project_path: String) -> void:
 		if resolved == target or (fold_case and resolved.nocasecmp_to(target) == 0):
 			return
 
-	definitions.append(ysls_name)
-	data["definitions"] = definitions
+	var version := project_language_version(ProjectSettings.globalize_path(yarn_project_path))
+	var entry_to_add := ysls_name
+	if version >= WORKSPACE_ROOT_MIN_VERSION:
+		entry_to_add = WORKSPACE_ROOT_PLACEHOLDER + "/" + (yarn_project_path.get_basename() + ".ysls.json").trim_prefix("res://")
+
+	if version > 0 and version <= SINGLE_DEFINITION_MAX_VERSION and not existing is Array:
+		if not definitions.is_empty() and not (definitions[0] as String).strip_edges().is_empty():
+			push_warning("yarn project importer: %s is a version %d Yarn Project, which can list only one definitions file, and it already lists %s, so %s wasn't added. To list more than one, upgrade the project to version 4 or later." % [yarn_project_path, version, definitions[0], ysls_name])
+			return
+		data["definitions"] = entry_to_add
+	else:
+		definitions.append(entry_to_add)
+		data["definitions"] = definitions
 	var err := YarnProjectUtility.write_project_json(yarn_project_path, data)
 	if err != OK:
-		push_warning("yarn project importer: couldn't add %s to the definitions in %s: %s" % [ysls_name, yarn_project_path, error_string(err)])
+		push_warning("yarn project importer: couldn't add %s to the definitions in %s: %s" % [entry_to_add, yarn_project_path, error_string(err)])
 	else:
-		print("yarn project importer: added %s to the definitions in %s" % [ysls_name, yarn_project_path])
+		print("yarn project importer: added %s to the definitions in %s" % [entry_to_add, yarn_project_path])
 
 
 func _save_ysls_file(generator: YarnYSLSGenerator, yarn_project_path: String) -> void:

@@ -42,6 +42,11 @@ const _YarnProgramParser := preload("res://addons/yarn_spinner/core/yarn_program
 @export var source_files: PackedStringArray = PackedStringArray()
 @export var line_info: Dictionary = {}
 @export var diagnostics: Array = []
+## enum name -> { "raw_type": "Number" or "String", "description": String,
+## "cases": [{ "name": String, "value": float or String, "description": String }] }
+@export var enums: Dictionary = {}
+## variable name -> type name: "Number", "String", "Bool", or an enum's name
+@export var variable_types: Dictionary = {}
 
 var _cached_program: YarnProgram
 
@@ -60,6 +65,47 @@ func get_program() -> YarnProgram:
 		_cached_program.line_metadata = line_metadata.duplicate()
 
 	return _cached_program
+
+
+## Whether the project declares an enum called [param enum_name].
+func has_enum(enum_name: String) -> bool:
+	return enums.has(enum_name)
+
+
+## The cases of an enum in teh order they're declared. Each gets a Dictionary
+## with "name", "value" and "description". Empty if there's no such enum!
+func get_enum_cases(enum_name: String) -> Array:
+	if not enums.has(enum_name):
+		return []
+	return (enums[enum_name] as Dictionary).get("cases", [])
+
+
+## The raw value of [param case_name] in [param enum_name], or null if the
+## enum or the case doesn't exist.
+func get_enum_value(enum_name: String, case_name: String) -> Variant:
+	for entry: Dictionary in get_enum_cases(enum_name):
+		if entry.get("name", "") == case_name:
+			return entry.get("value")
+	return null
+
+
+## The name of the case of [param enum_name] whose raw value is
+## [param value], or an empty string if there isn't one.
+func get_enum_case_name(enum_name: String, value: Variant) -> String:
+	for entry: Dictionary in get_enum_cases(enum_name):
+		var case_value: Variant = entry.get("value")
+		if (case_value is float or case_value is int) and (value is float or value is int):
+			if is_equal_approx(float(case_value), float(value)):
+				return entry.get("name", "")
+		elif typeof(case_value) == typeof(value) and case_value == value:
+			return entry.get("name", "")
+	return ""
+
+
+## The declared type of [param variable_name]: "Number", "String", "Bool",
+## or the name of an enum. Empty if the variable isn't declared...
+func get_variable_type(variable_name: String) -> String:
+	return variable_types.get(variable_name, "")
 
 
 func clear_cache() -> void:

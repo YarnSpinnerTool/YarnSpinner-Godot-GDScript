@@ -15,7 +15,10 @@
 - It's version 5 of the file all the way for this version.
 - Functions in definitions files with default-valued parameters are now declared, and can be called with or without those arguments.
 - Fixed the native compiler failing on every Yarn Project that otherwise compiled, under Yarn Spinner 3.3!
+- When the importer adds its generated `.ysls.json` to a version 5 project, it writes the path as `${workspaceRoot}/...`. Version 4 projects get the file name, as before. In a version 2 or 3 project, which can list only one definitions file, it fills in `definitions` when it's empty and otherwise leaves the project unchanged and warns, instead of turning `definitions` into a list.
 - The importer no longer adds its generated `.ysls.json` to `definitions` again when the project already lists it under a different path, such as through `${workspaceRoot}`.
+- Yarn Projects now keep the enums declared in their Yarn Scripts, with each case's name and value, and the type of every declared variable, so a game can read them while it runs. `YarnProjectResource` has new `enums` and `variable_types` properties, and `has_enum()`, `get_enum_cases()`, `get_enum_value()`, `get_enum_case_name()` and `get_variable_type()`. These are filled in by the native compiler; a project compiled with the ysc fallback has them empty.
+- Every Yarn Project is reimported once after updating, so existing projects pick up their enums and variable types.
 
 ## Early Access 3.2
 
