@@ -4,6 +4,7 @@
 
 - Presenters now get `on_dialogue_started` before `on_node_started`, and the Dialogue Runner emits `dialogue_started` before `node_started`. The start node is entered after every Presenter has finished `on_dialogue_started`.
 - A run of content that finishes instantly, such as a looping node whose Presenters return straight away, no longer locks the game. The Dialogue Runner now waits a frame after 100 pieces of content in a single frame.
+- A Presenter listed in a Dialogue Runner's Presenters array can now use `dialogue_runner` in its own `_ready()`, wherever it sits in the scene tree. `add_command()`, `add_function()` and `add_command_target()` also work before the Dialogue Runner's `_ready()` has run.
 - The editor's Docs links now open the Yarn Spinner for Godot (GDScript) documentation, and the Yarn Project Inspector's help text points to **Project > Tools > Create Yarn Project...**.
 - The native compiler and plugin now report version 3.3.
 - The native compiler now uses the functions declared in a Yarn Project's `definitions` files, not only the ones found in the project's GDScript. Paths can be relative to the `.yarnproject`, absolute, `res://` paths, or start with `${workspaceRoot}`, which stands for the folder containing `project.godot`. Globs such as `${workspaceRoot}/definitions/*.ysls.json` work too. Files in the current format (`functions`, `yarnName`, `return.type`) and the older one (`Functions`, `YarnName`, `ReturnType`) are both read.

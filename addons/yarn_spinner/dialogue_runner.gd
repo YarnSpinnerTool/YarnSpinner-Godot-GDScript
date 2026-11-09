@@ -192,13 +192,17 @@ const STALL_WARNING_SECONDS := 5.0
 const MAX_CONTINUES_PER_FRAME := 100
 
 
+func _init() -> void:
+	if not Engine.is_editor_hint():
+		_library = YarnLibrary.new()
+
+
 func _ready() -> void:
 	# don't run in editor - @tool is only for the inspector button
 	if Engine.is_editor_hint():
 		return
 
 	_vm = YarnVirtualMachine.new()
-	_library = YarnLibrary.new()
 	_library.set_virtual_machine(_vm)
 	if line_provider == null:
 		line_provider = YarnLineProvider.new()
@@ -251,6 +255,11 @@ func _enter_tree() -> void:
 	# _ready, which fires after _enter_tree), so we skip — _ready handles
 	# the initial bind in that case.
 	_bind_vm_signals()
+
+	if not Engine.is_editor_hint():
+		for presenter in presenters:
+			if presenter != null:
+				presenter.dialogue_runner = self
 
 
 func _exit_tree() -> void:
