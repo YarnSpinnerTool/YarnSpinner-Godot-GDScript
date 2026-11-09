@@ -78,18 +78,16 @@ The ready-made Presenter scripts all live in `addons/yarn_spinner/ui/`. The `dia
 
 ## Wire It Up
 
-In your game script, connect the Presenters to the runner and start dialogue:
+Select the YarnDialogueRunner, and in the Inspector add LinePresenter and OptionsPresenter to its **Presenters** list.
+
+To start the dialogue, turn on **Auto Start** in the Inspector, or start it from your game script:
 
 ```gdscript
 extends Node2D
 
 @onready var dialogue_runner := $YarnDialogueRunner
-@onready var line_presenter := $CanvasLayer/LinePresenter
-@onready var options_presenter := $CanvasLayer/OptionsPresenter
 
 func _ready():
-	dialogue_runner.add_presenter(line_presenter)
-	dialogue_runner.add_presenter(options_presenter)
 	dialogue_runner.start_dialogue("Start")
 ```
 
@@ -293,7 +291,9 @@ func run_options(options: Array[YarnOption], token: YarnCancellationToken = null
 	return chosen
 ```
 
-Register it the same way:
+Add it to the Dialogue Runner's **Presenters** list in the Inspector, the same way. Its `dialogue_runner` variable is then ready to use in its own `_ready()`.
+
+If you create a Presenter from code, register it with `add_presenter()`. Its `dialogue_runner` variable is null until you do:
 
 ```gdscript
 dialogue_runner.add_presenter(my_custom_presenter)
