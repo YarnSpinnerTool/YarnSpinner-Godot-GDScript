@@ -1274,7 +1274,7 @@ func _get_binding_call_regex() -> RegEx:
 		#   .register_instance_command("yarn_name", ...)
 		# Captures: (1) method name, (2) yarn name string, (3) optional second arg for type
 		_binding_call_regex.compile(
-			"\\.(add_binding|add_command|add_function|add_command_handler|register_command|register_function|register_instance_command)\\s*\\(\\s*\"([^\"]+)\"\\s*(?:,\\s*([^,)]+))?"
+			"(?<![\\w])(add_binding|add_command|add_function|add_command_handler|register_command|register_function|register_instance_command)\\s*\\(\\s*\"([^\"]+)\"\\s*(?:,\\s*([^,)]+))?"
 		)
 	return _binding_call_regex
 

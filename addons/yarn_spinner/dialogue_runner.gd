@@ -580,7 +580,7 @@ func _register_script_actions(script: Script) -> bool:
 				continue
 
 			if not is_static:
-				push_error("dialogue runner: function '%s' in %s must be static to be registered as a Yarn function" % [yarn_name, script.resource_path])
+				push_error("dialogue runner: function '%s' in %s must be static to be found automatically. Make it static, or remove the _yarn_function_ prefix and register it with add_function(\"%s\", callable)" % [yarn_name, script.resource_path, yarn_name])
 				continue
 
 			_action_sources["function:" + yarn_name] = script

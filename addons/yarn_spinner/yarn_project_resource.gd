@@ -134,5 +134,3 @@ func get_line_ids_for_nodes(node_names: PackedStringArray) -> PackedStringArray:
 	for node_name in node_names:
 		ids.append_array(program.get_line_ids_for_node(node_name))
 	return ids
-
-
