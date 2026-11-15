@@ -291,6 +291,8 @@ func _function_for_file(info: Dictionary) -> Dictionary:
 		result["Location"] = info["location"]
 	if info.has("containsErrors"):
 		result["containsErrors"] = info["containsErrors"]
+	if info.has("errorCodes"):
+		result["errorCodes"] = info["errorCodes"]
 	return result
 
 
@@ -889,6 +891,7 @@ func _build_command_info(yarn_name: String, method_name: String, method_info: Di
 		"async": is_async
 	}
 	_apply_source_details(info, source_method)
+	_set_error_codes(info, _parameter_error_codes(method_info, source_method))
 	return info
 
 
@@ -908,7 +911,92 @@ func _build_function_info(yarn_name: String, method_name: String, method_info: D
 		"return": {"type": return_type}
 	}
 	_apply_source_details(info, source_method)
+	var codes := _parameter_error_codes(method_info, source_method)
+	if _has_unusable_return(method_info, source_method):
+		codes.append(ERROR_FUNCTION_RETURN_TYPE)
+	_set_error_codes(info, codes)
 	return info
+
+
+func _has_unusable_return(method_info: Dictionary, source_method: Dictionary) -> bool:
+	if not source_method.is_empty():
+		return _is_unusable_return_text(String(source_method.get("return_text", "")).strip_edges())
+	var return_info: Dictionary = method_info.get("return", {})
+	var type := int(return_info.get("type", TYPE_NIL))
+	if type == TYPE_NIL:
+		return (int(return_info.get("usage", 0)) & PROPERTY_USAGE_NIL_IS_VARIANT) == 0
+	return not type in [TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_SIGNAL]
+
+
+func _is_unusable_return_text(type_text: String) -> bool:
+	if type_text in ["", "Variant", "bool", "int", "float", "String", "StringName", "Signal"]:
+		return false
+	if type_text == "void" or type_text.begins_with("Array") or type_text.begins_with("Dictionary") or type_text.begins_with("Packed"):
+		return true
+	for variant_type in TYPE_MAX:
+		if type_string(variant_type) == type_text:
+			return true
+	return type_text.contains(".") or _is_object_class_name(type_text)
+
+
+const ERROR_FUNCTION_RETURN_TYPE := "YS1004"
+const ERROR_TOKEN_NOT_LAST := "YS1006"
+const ERROR_INCOMPATIBLE_PARAMETER := "YS1008"
+const _YARN_COMPATIBLE_TYPES: Array[int] = [TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR2, TYPE_VECTOR3, TYPE_COLOR, TYPE_OBJECT]
+const _YARN_COMPATIBLE_TYPE_NAMES: Array[String] = ["", "Variant", "bool", "int", "float", "String", "StringName", "Vector2", "Vector3", "Color"]
+
+
+static func _set_error_codes(info: Dictionary, codes: PackedStringArray) -> void:
+	var unique := PackedStringArray()
+	for code in codes:
+		if not unique.has(code):
+			unique.append(code)
+	info["containsErrors"] = not unique.is_empty()
+	if not unique.is_empty():
+		info["errorCodes"] = Array(unique)
+
+
+func _parameter_error_codes(method_info: Dictionary, source_method: Dictionary) -> PackedStringArray:
+	var codes := PackedStringArray()
+	var args: Array = method_info.get("args", [])
+	if not args.is_empty():
+		for i in args.size():
+			var arg: Dictionary = args[i]
+			if String(arg.get("class_name", "")) == YarnLibrary.CANCELLATION_TOKEN_CLASS:
+				if i != args.size() - 1:
+					codes.append(ERROR_TOKEN_NOT_LAST)
+			elif not int(arg.get("type", TYPE_NIL)) in _YARN_COMPATIBLE_TYPES:
+				codes.append(ERROR_INCOMPATIBLE_PARAMETER)
+		return codes
+	codes.append_array(_source_parameter_error_codes(source_method))
+	return codes
+
+
+func _source_parameter_error_codes(source_method: Dictionary) -> PackedStringArray:
+	var codes := PackedStringArray()
+	var params: Array = source_method.get("params", [])
+	for i in params.size():
+		var param: Dictionary = params[i]
+		if param["is_rest"]:
+			continue
+		var type_text := String(param["type_text"]).strip_edges()
+		if type_text == YarnLibrary.CANCELLATION_TOKEN_CLASS:
+			if i != params.size() - 1:
+				codes.append(ERROR_TOKEN_NOT_LAST)
+		elif not _is_compatible_type_text(type_text):
+			codes.append(ERROR_INCOMPATIBLE_PARAMETER)
+	return codes
+
+
+func _is_compatible_type_text(type_text: String) -> bool:
+	if type_text in _YARN_COMPATIBLE_TYPE_NAMES:
+		return true
+	if type_text.begins_with("Array") or type_text.begins_with("Dictionary") or type_text.begins_with("Packed"):
+		return false
+	for variant_type in TYPE_MAX:
+		if type_string(variant_type) == type_text:
+			return variant_type in _YARN_COMPATIBLE_TYPES
+	return true
 
 
 static func _source_is_async(source_method: Dictionary) -> bool:
@@ -1494,6 +1582,10 @@ func _scan_runtime_bindings(source: String, file_name: String, path: String = ""
 					info["return"] = {"type": _yarn_return_type_from_text(source_method["return_text"])}
 					info["async"] = _source_is_async(source_method)
 					_apply_source_details(info, source_method)
+					var codes := _source_parameter_error_codes(source_method)
+					if _is_unusable_return_text(String(source_method["return_text"]).strip_edges()):
+						codes.append(ERROR_FUNCTION_RETURN_TYPE)
+					_set_error_codes(info, codes)
 				_functions[yarn_name] = info
 		else:
 			if not _commands.has(yarn_name):
@@ -1510,6 +1602,7 @@ func _scan_runtime_bindings(source: String, file_name: String, path: String = ""
 					info["parameters"] = _build_parameters_from_source(source_method)
 					info["async"] = source_method["has_await"] or source_method["return_text"] == "Signal"
 					_apply_source_details(info, source_method)
+					_set_error_codes(info, _source_parameter_error_codes(source_method))
 				_commands[yarn_name] = info
 
 
