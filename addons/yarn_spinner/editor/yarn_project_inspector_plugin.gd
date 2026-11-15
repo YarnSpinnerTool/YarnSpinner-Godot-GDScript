@@ -82,6 +82,9 @@ func _parse_begin(object: Object) -> void:
 
 	_add_compilation_status(container, has_compiled_data, program, diagnostics)
 
+	if editable:
+		_add_upgrade_section(container, project_path)
+
 	if not diagnostics.is_empty():
 		_add_errors_section(container, diagnostics)
 
@@ -279,6 +282,35 @@ func _show_unapplied_changes_prompt(project_path: String) -> void:
 # =========================================================================
 # Section Builders
 # =========================================================================
+
+func _add_upgrade_section(container: VBoxContainer, project_path: String) -> void:
+	var abs_path := ProjectSettings.globalize_path(project_path)
+	var version := YarnProjectImporter.project_language_version(abs_path)
+	if version <= 0 or version >= YarnProjectImporter.CURRENT_PROJECT_FILE_VERSION:
+		return
+	_add_message(container, ("This Yarn Project uses file version %d. Upgrade it to version %d to use every Yarn Spinner 3.3 feature. " +
+		"After upgrading, calling a Function that isn't declared is an error, not a warning.") % [version, YarnProjectImporter.CURRENT_PROJECT_FILE_VERSION], "warning")
+	var upgrade_button := Button.new()
+	upgrade_button.text = "Upgrade Yarn Project"
+	upgrade_button.pressed.connect(func() -> void:
+		_upgrade_project(project_path)
+	)
+	container.add_child(upgrade_button)
+
+
+func _upgrade_project(project_path: String) -> void:
+	var data := YarnProjectUtility.read_project_json(project_path)
+	if data.is_empty():
+		push_error("yarn project inspector: couldn't read %s to upgrade it" % project_path)
+		return
+	data["projectFileVersion"] = YarnProjectImporter.CURRENT_PROJECT_FILE_VERSION
+	if YarnProjectUtility.write_project_json(project_path, data) != OK:
+		push_error("yarn project inspector: couldn't write %s" % project_path)
+		return
+	_pending.erase(project_path)
+	EditorInterface.get_resource_filesystem().reimport_files(PackedStringArray([project_path]))
+	_refresh_inspector(project_path)
+
 
 func _add_compilation_status(container: VBoxContainer, has_compiled_data: bool, program: YarnProgram, diagnostics: Array) -> void:
 	var status_label := Label.new()

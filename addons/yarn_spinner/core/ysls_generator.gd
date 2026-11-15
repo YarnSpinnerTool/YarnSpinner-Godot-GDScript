@@ -86,11 +86,49 @@ func _scan_file(path: String) -> void:
 func scan_for_project(yarn_project_path: String, scan_path: String = "") -> void:
 	if not scan_path.is_empty():
 		scan_directory(scan_path)
+		_scan_included_addons()
 		return
 	_scan_directory_recursive(find_scan_root(yarn_project_path))
 	for path in find_reachable_files(yarn_project_path):
 		_scan_file(path)
+	_scan_included_addons()
 	_resolve_pending_bindings()
+
+
+const SETTING_INCLUDED_ADDON_PATHS := "yarn_spinner/ysls/included_addon_paths"
+
+
+## Folders under res://addons that the scan reads, from the project setting
+## yarn_spinner/ysls/included_addon_paths. Addons are skipped otherwise.
+static func included_addon_paths() -> PackedStringArray:
+	var result := PackedStringArray()
+	if not ProjectSettings.has_setting(SETTING_INCLUDED_ADDON_PATHS):
+		return result
+	for entry in ProjectSettings.get_setting(SETTING_INCLUDED_ADDON_PATHS, PackedStringArray()):
+		var path := String(entry).strip_edges().replace("\\", "/").trim_suffix("/")
+		if path.is_empty():
+			continue
+		if not path.begins_with("res://"):
+			path = "res://" + path.trim_prefix("/")
+		if path == "res://addons/yarn_spinner" or path.begins_with("res://addons/yarn_spinner/"):
+			continue
+		result.append(path)
+	return result
+
+
+static func _is_in_included_addon(path: String) -> bool:
+	for root in included_addon_paths():
+		if path == root or path.begins_with(root + "/"):
+			return true
+	return false
+
+
+func _scan_included_addons() -> void:
+	for root in included_addon_paths():
+		if DirAccess.dir_exists_absolute(root):
+			_scan_directory_recursive(root)
+		else:
+			push_warning("ysls generator: the included addon folder '%s' doesn't exist" % root)
 
 
 func scan_gdscript_file(path: String) -> void:
@@ -137,6 +175,40 @@ func scan_node(node: Node, recursive: bool = true) -> void:
 			scan_node(child, true)
 
 
+## When true, instance parameters are written as strings. Projects older
+## than file version 5 can't declare functions that take instances.
+var instance_parameters_as_strings := false
+
+
+func _with_instances_as_strings(entries: Array) -> Array:
+	var result: Array = []
+	for entry: Dictionary in entries:
+		var copy := entry.duplicate(true)
+		for param: Dictionary in copy.get("parameters", []):
+			if param.get("type", "") == "instance":
+				param["type"] = "string"
+				param.erase("subtype")
+			elif param.get("type", "") == "enum" and param.has("rawType"):
+				param["type"] = param["rawType"]
+				param.erase("subtype")
+		result.append(copy)
+	return result
+
+
+func _without_raw_types(entries: Array) -> Array:
+	var result: Array = []
+	for entry: Dictionary in entries:
+		var copy := entry
+		for param: Dictionary in entry.get("parameters", []):
+			if param.has("rawType"):
+				copy = entry.duplicate(true)
+				for copied: Dictionary in copy.get("parameters", []):
+					copied.erase("rawType")
+				break
+		result.append(copy)
+	return result
+
+
 func generate_ysls_dict() -> Dictionary:
 	var commands_array: Array = []
 	var functions_array: Array = []
@@ -152,6 +224,16 @@ func generate_ysls_dict() -> Dictionary:
 
 	for func_name in _functions:
 		functions_array.append(_functions[func_name])
+
+	for builtin_function in _get_builtin_functions():
+		if not _functions.has(builtin_function["yarnName"]):
+			functions_array.append(builtin_function)
+
+	if instance_parameters_as_strings:
+		commands_array = _with_instances_as_strings(commands_array)
+		functions_array = _with_instances_as_strings(functions_array)
+	commands_array = _without_raw_types(commands_array)
+	functions_array = _without_raw_types(functions_array)
 
 	return {
 		"version": YSLS_VERSION,
@@ -822,11 +904,17 @@ func _build_function_info(yarn_name: String, method_name: String, method_info: D
 		"fileName": file_name,
 		"language": "gdscript",
 		"parameters": params,
-		"async": false,
+		"async": _source_is_async(source_method),
 		"return": {"type": return_type}
 	}
 	_apply_source_details(info, source_method)
 	return info
+
+
+static func _source_is_async(source_method: Dictionary) -> bool:
+	if source_method.is_empty():
+		return false
+	return bool(source_method.get("has_await", false)) or str(source_method.get("return_text", "")).strip_edges() == "Signal"
 
 
 func _apply_source_details(info: Dictionary, source_method: Dictionary) -> void:
@@ -851,6 +939,8 @@ func _build_parameters(method_info: Dictionary, source_method: Dictionary = {}) 
 
 	for i in range(args.size()):
 		var arg: Dictionary = args[i]
+		if String(arg.get("class_name", "")) == YarnLibrary.CANCELLATION_TOKEN_CLASS:
+			continue
 		var param := {
 			"name": arg.get("name", "arg%d" % i),
 			"isParamsArray": false
@@ -881,6 +971,8 @@ func _build_parameters(method_info: Dictionary, source_method: Dictionary = {}) 
 func _build_parameters_from_source(source_method: Dictionary) -> Array:
 	var params: Array = []
 	for source_param in source_method.get("params", []):
+		if String(source_param["type_text"]).strip_edges() == YarnLibrary.CANCELLATION_TOKEN_CLASS:
+			continue
 		var param := {
 			"name": source_param["name"],
 			"isParamsArray": source_param["is_rest"]
@@ -900,15 +992,35 @@ func _yarn_type_info(type: int, type_class: String) -> Dictionary:
 		TYPE_BOOL:
 			return {"type": "bool"}
 		TYPE_INT, TYPE_FLOAT:
+			if type == TYPE_INT and not type_class.is_empty():
+				var enum_type := _yarn_enum_type_info(type_class)
+				if not enum_type.is_empty():
+					return enum_type
 			return {"type": "number"}
 		TYPE_STRING, TYPE_STRING_NAME:
 			return {"type": "string"}
 		TYPE_OBJECT:
 			if _is_node_class_name(type_class):
 				return {"type": "instance", "subtype": type_class}
+			if not type_class.is_empty():
+				return {"type": "instance", "subtype": type_class}
 			return {"type": "any"}
 		_:
 			return {"type": "any"}
+
+
+func _yarn_enum_type_info(type_class: String) -> Dictionary:
+	if not type_class.contains("."):
+		return {}
+	var info := YarnLibrary.yarn_enum_info(type_class)
+	if info.is_empty() or (info.values as Dictionary).is_empty():
+		return {}
+	var raw_type := "number"
+	for raw in (info.values as Dictionary).values():
+		if raw is String:
+			raw_type = "string"
+		break
+	return {"type": "enum", "subtype": info.name, "rawType": raw_type}
 
 
 func _yarn_type_info_from_text(type_text: String) -> Dictionary:
@@ -920,7 +1032,12 @@ func _yarn_type_info_from_text(type_text: String) -> Dictionary:
 		"String", "StringName":
 			return {"type": "string"}
 		var other:
+			var enum_type := _yarn_enum_type_info(other)
+			if not enum_type.is_empty():
+				return enum_type
 			if _is_node_class_name(other):
+				return {"type": "instance", "subtype": other}
+			if _is_object_class_name(other):
 				return {"type": "instance", "subtype": other}
 			return {"type": "any"}
 
@@ -928,6 +1045,17 @@ func _yarn_type_info_from_text(type_text: String) -> Dictionary:
 func _yarn_return_type_from_text(type_text: String) -> String:
 	var info := _yarn_type_info_from_text(type_text)
 	return "any" if info["type"] == "instance" else info["type"]
+
+
+func _is_object_class_name(type_class: String) -> bool:
+	if type_class.is_empty():
+		return false
+	if ClassDB.class_exists(type_class):
+		return true
+	for entry in ProjectSettings.get_global_class_list():
+		if entry.get("class", "") == type_class:
+			return true
+	return false
 
 
 func _is_node_class_name(type_class: String) -> bool:
@@ -1001,6 +1129,28 @@ func _get_script_class_name(script: Script, path: String) -> String:
 	# fallback: derive from file name (e.g., "character.gd" -> "Character")
 	var file_name := path.get_file().get_basename()
 	return file_name.to_pascal_case()
+
+
+func _get_builtin_functions() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for declaration: Dictionary in YarnLibrary.COMPILER_DECLARATIONS:
+		var parameters: Array = []
+		var index := 0
+		for type: String in declaration.get("parameters", []):
+			parameters.append({"name": "p%d" % index, "type": type, "isParamsArray": false})
+			index += 1
+		if declaration.has("variadicParameterType"):
+			parameters.append({"name": "p%d" % index, "type": declaration["variadicParameterType"], "isParamsArray": true})
+		result.append({
+			"yarnName": declaration["name"],
+			"definitionName": declaration["name"],
+			"fileName": "",
+			"language": "gdscript",
+			"parameters": parameters,
+			"async": false,
+			"return": {"type": declaration["returnType"]},
+		})
+	return result
 
 
 func _get_builtin_commands() -> Array[Dictionary]:
@@ -1336,6 +1486,7 @@ func _scan_runtime_bindings(source: String, file_name: String, path: String = ""
 					info["definitionName"] = handler_name
 					info["parameters"] = _build_parameters_from_source(source_method)
 					info["return"] = {"type": _yarn_return_type_from_text(source_method["return_text"])}
+					info["async"] = _source_is_async(source_method)
 					_apply_source_details(info, source_method)
 				_functions[yarn_name] = info
 		else:
@@ -1501,7 +1652,9 @@ static func _file_dependencies(path: String, graph: Dictionary, classes: Diction
 
 
 static func _is_followed_path(path: String) -> bool:
-	if not path.begins_with("res://") or path.begins_with("res://addons/"):
+	if not path.begins_with("res://"):
+		return false
+	if path.begins_with("res://addons/") and not _is_in_included_addon(path):
 		return false
 	if not path.get_extension().to_lower() in ["gd", "tscn", "scn", "tres", "res"]:
 		return false
@@ -1524,7 +1677,7 @@ static func _project_global_classes() -> Dictionary:
 	var classes: Dictionary = {}
 	for class_info in ProjectSettings.get_global_class_list():
 		var class_path := String(class_info.get("path", ""))
-		if not class_path.begins_with("res://addons/"):
+		if not class_path.begins_with("res://addons/") or _is_in_included_addon(class_path):
 			classes[String(class_info.get("class", ""))] = class_path
 	return classes
 

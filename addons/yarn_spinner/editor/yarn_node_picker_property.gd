@@ -23,6 +23,10 @@ extends EditorProperty
 var source_property: StringName = &"yarn_project"
 var value_type: Variant.Type = TYPE_STRING
 
+var filter: String = ""
+var filter_type: String = "contains"
+var filter_header: String = "title"
+
 var _option_button: OptionButton
 var _updating: bool = false
 var _read_only: bool = false
@@ -34,6 +38,26 @@ func _init() -> void:
 	_option_button.clip_text = true
 	_option_button.item_selected.connect(_on_item_selected)
 	add_child(_option_button)
+
+
+## Reads filter settings from a hint string like
+## "yarn_node:yarn_project;filter=Start;filter_type=starts_with;header=tags".
+## filter_type is contains, starts_with, ends_with or matches_regex.
+func configure_filter(hint_string: String) -> void:
+	var parts := hint_string.split(";")
+	for i in range(1, parts.size()):
+		var pair := parts[i].split("=", true, 1)
+		if pair.size() != 2:
+			continue
+		var key := pair[0].strip_edges()
+		var value := pair[1].strip_edges()
+		match key:
+			"filter":
+				filter = value
+			"filter_type":
+				filter_type = value
+			"header":
+				filter_header = value
 
 
 func _enter_tree() -> void:
@@ -110,7 +134,39 @@ func _get_node_names() -> PackedStringArray:
 	if program == null:
 		return PackedStringArray()
 
-	return filter_node_names(program)
+	return apply_filter(program, filter_node_names(program), filter, filter_type, filter_header)
+
+
+static func apply_filter(program: YarnProgram, names: PackedStringArray, filter_text: String, type: String, header: String) -> PackedStringArray:
+	if filter_text.is_empty():
+		return names
+	var regex: RegEx = null
+	if type == "matches_regex":
+		regex = RegEx.create_from_string("(?i)" + filter_text)
+		if regex == null or not regex.is_valid():
+			push_warning("yarn node picker: \"%s\" isn't a valid regular expression" % filter_text)
+			return names
+	var result: PackedStringArray = []
+	for node_name in names:
+		var value := node_name
+		if header != "title":
+			var node := program.get_node(node_name)
+			if node == null or not node.headers.has(header):
+				continue
+			value = str(node.headers[header])
+		var matched := false
+		match type:
+			"starts_with":
+				matched = value.begins_with(filter_text)
+			"ends_with":
+				matched = value.ends_with(filter_text)
+			"matches_regex":
+				matched = regex.search(value) != null
+			_:
+				matched = value.contains(filter_text)
+		if matched:
+			result.append(node_name)
+	return result
 
 
 func _find_project() -> YarnProjectResource:
@@ -143,4 +199,5 @@ static func filter_node_names(program: YarnProgram) -> PackedStringArray:
 		if node != null and node.headers.has(YarnProgram.NODE_GROUP_HEADER):
 			continue
 		filtered.append(node_name)
+	filtered.sort()
 	return filtered

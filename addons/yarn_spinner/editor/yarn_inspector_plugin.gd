@@ -38,6 +38,7 @@ func _parse_property(object: Object, type: Variant.Type, name: String, hint_type
 	if _is_node_picker_property(type, hint_type, hint_string):
 		var custom_picker := YarnNodePickerProperty.new()
 		custom_picker.source_property = _node_picker_source(hint_string)
+		custom_picker.configure_filter(hint_string)
 		custom_picker.value_type = type
 		add_property_editor(name, custom_picker)
 		return true
@@ -112,11 +113,11 @@ static func _is_node_picker_property(type: int, hint_type: int, hint_string: Str
 		return false
 	if hint_type != PROPERTY_HINT_NONE:
 		return false
-	return hint_string == NODE_PICKER_HINT or hint_string.begins_with(NODE_PICKER_HINT + ":")
+	return hint_string == NODE_PICKER_HINT or hint_string.begins_with(NODE_PICKER_HINT + ":") or hint_string.begins_with(NODE_PICKER_HINT + ";")
 
 
 static func _node_picker_source(hint_string: String) -> StringName:
-	var source := hint_string.trim_prefix(NODE_PICKER_HINT).trim_prefix(":").strip_edges()
+	var source := hint_string.get_slice(";", 0).trim_prefix(NODE_PICKER_HINT).trim_prefix(":").strip_edges()
 	if source.is_empty():
 		return &"yarn_project"
 	return StringName(source)

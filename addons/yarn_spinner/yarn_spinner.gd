@@ -20,10 +20,11 @@ extends Node
 ## yarn spinner singleton providing global access and utilities.
 ## autoloaded as "YarnSpinner" when the plugin is enabled.
 
-const VERSION := "3.3"  # keep in sync with plugin.cfg
+const VERSION := "3.3.1"  # keep in sync with plugin.cfg
 
 var _global_commands: Dictionary[String, Callable] = {}
 var _global_functions: Dictionary[String, Dictionary] = {}
+var _global_converters: Dictionary[String, Callable] = {}
 var _saliency_strategies: Dictionary[String, YarnSaliencyStrategy] = {}
 
 
@@ -62,6 +63,18 @@ func register_function(func_name: String, callable: Callable, param_count: int =
 
 func unregister_function(func_name: String) -> void:
 	_global_functions.erase(func_name)
+
+
+func register_converter(type_name: String, converter: Callable) -> void:
+	_global_converters[type_name] = converter
+
+
+func unregister_converter(type_name: String) -> void:
+	_global_converters.erase(type_name)
+
+
+func get_global_converters() -> Dictionary:
+	return _global_converters.duplicate()
 
 
 func get_global_commands() -> Dictionary:

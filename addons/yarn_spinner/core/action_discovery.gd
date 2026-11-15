@@ -96,7 +96,7 @@ static func load_registry(path: String) -> Dictionary:
 
 static func declares_yarn_action(source: String) -> bool:
 	if _declaration_regex == null:
-		_declaration_regex = RegEx.create_from_string("(?m)^[ \\t]*(static[ \\t]+)?func[ \\t]+_yarn_(command|function)_")
+		_declaration_regex = RegEx.create_from_string("(?m)^[ \\t]*(static[ \\t]+)?func[ \\t]+_yarn_(command|function|converter)_")
 	return _declaration_regex.search(source) != null
 
 

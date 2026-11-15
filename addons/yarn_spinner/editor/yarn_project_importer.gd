@@ -136,6 +136,8 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 	# so the compiler gets each function's types. The .ysls.json below is
 	# written from the same scan.
 	var generator := _scan_yarn_actions(source_file, ysls_scan_path_option(options.get("ysls_scan_path", "")))
+	var project_version := project_language_version(abs_path)
+	generator.instance_parameters_as_strings = project_version > 0 and project_version < CURRENT_PROJECT_FILE_VERSION
 
 	# Write the .ysls.json and list it in the project's "definitions" before
 	# compiling. The ysc fallback reads each function's types from it.
@@ -157,6 +159,8 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 	if resource == null:
 		resource = _compile_ysc(source_file, abs_path, source_files, options)
 
+	_explain_undeclarable_functions(resource, generator)
+
 	for diag: Dictionary in resource.diagnostics:
 		var location := ""
 		if not str(diag.get("file", "")).is_empty():
@@ -167,6 +171,31 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 	var save_err := ResourceSaver.save(resource, save_file)
 
 	return save_err
+
+
+func _explain_undeclarable_functions(resource: YarnProjectResource, generator: YarnYSLSGenerator) -> void:
+	if resource == null or resource.diagnostics.is_empty():
+		return
+	var untyped: Dictionary = {}
+	for info: Dictionary in generator.generate_ysls_dict().get("functions", []):
+		var return_info: Dictionary = info.get("return", {})
+		if str(return_info.get("type", "any")) == "any":
+			untyped[str(info.get("yarnName", ""))] = info
+	if untyped.is_empty():
+		return
+	var pattern := RegEx.create_from_string("no declaration found for (\\S+)")
+	var diagnostics: Array = resource.diagnostics
+	for i in diagnostics.size():
+		var diag: Dictionary = diagnostics[i]
+		var found := pattern.search(str(diag.get("message", "")))
+		if found == null or not untyped.has(found.get_string(1)):
+			continue
+		var info: Dictionary = untyped[found.get_string(1)]
+		diag["message"] = ("%s. The function %s (%s in %s) doesn't declare a return type Yarn can use, so the compiler can't check calls to it. " +
+			"Give it a typed return, for example -> String, and if it needs to wait, await inside it rather than returning a Signal.") % [
+			diag.get("message", ""), found.get_string(1), info.get("definitionName", ""), info.get("fileName", "")]
+		diagnostics[i] = diag
+	resource.diagnostics = diagnostics
 
 
 func _compile_ysc(source_file: String, abs_path: String, source_files: PackedStringArray, options: Dictionary) -> YarnProjectResource:
@@ -625,7 +654,10 @@ func _function_declarations(generator: YarnYSLSGenerator, abs_project_path: Stri
 			if parameter.get("isParamsArray", false):
 				declaration["variadicParameterType"] = str(parameter.get("type", "any"))
 				break
-			declaration["parameters"].append(str(parameter.get("type", "any")))
+			if parameter.has("subtype"):
+				declaration["parameters"].append({"name": str(parameter.get("name", "")), "type": str(parameter.get("type", "any")), "subtype": str(parameter["subtype"])})
+			else:
+				declaration["parameters"].append(str(parameter.get("type", "any")))
 		declarations.append(declaration)
 		declared[yarn_name] = true
 

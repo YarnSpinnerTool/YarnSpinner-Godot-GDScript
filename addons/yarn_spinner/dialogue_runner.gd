@@ -166,6 +166,8 @@ var _current_options: Array[YarnOption]
 var _waiting_for_content: bool = false
 var _current_cancellation_token: YarnCancellationToken
 var _current_line_token: YarnCancellationToken
+var _current_command_token: YarnCancellationToken
+var _dialogue_token: YarnCancellationToken
 var _current_options_token: YarnCancellationToken
 ## The active options round's selection promise. select_option routes
 ## external calls through it so every selection takes the same path.
@@ -195,6 +197,15 @@ const MAX_CONTINUES_PER_FRAME := 100
 func _init() -> void:
 	if not Engine.is_editor_hint():
 		_library = YarnLibrary.new()
+		_library.cancellation_token_provider = _provide_cancellation_token
+
+
+func _provide_cancellation_token() -> YarnCancellationToken:
+	if _current_command_token != null:
+		return _current_command_token
+	if _dialogue_token == null:
+		_dialogue_token = YarnCancellationToken.new()
+	return _dialogue_token
 
 
 func _ready() -> void:
@@ -529,6 +540,8 @@ func _scan_singletons_for_commands(registered_scripts: Dictionary) -> void:
 				else:
 					_action_sources["function:" + yarn_name] = script
 					_library.register_function(yarn_name, Callable(singleton, method_name))
+			elif method_name.begins_with(CONVERTER_PREFIX):
+				_register_converter_method(method_name.substr(CONVERTER_PREFIX.length()), Callable(singleton, method_name), script)
 
 
 func _scan_node_for_commands(node: Node, registered_scripts: Dictionary) -> void:
@@ -541,12 +554,30 @@ func _scan_node_for_commands(node: Node, registered_scripts: Dictionary) -> void
 		_scan_node_for_commands(child, registered_scripts)
 
 
+const CONVERTER_PREFIX := "_yarn_converter_"
+
+
+func _register_converter_method(type_name: String, callable: Callable, script: Script) -> void:
+	if _library.has_converter(type_name):
+		push_error("dialogue runner: a converter for %s already exists, so the one in %s was ignored" % [type_name, script.resource_path])
+		return
+	_library.register_converter(type_name, callable)
+
+
 func _register_script_actions(script: Script) -> bool:
 	var found_actions := false
 
 	for method in script.get_script_method_list():
 		var method_name: String = method["name"]
 		var is_static: bool = (method.get("flags", 0) & METHOD_FLAG_STATIC) != 0
+
+		if method_name.begins_with(CONVERTER_PREFIX):
+			found_actions = true
+			if not is_static:
+				push_error("dialogue runner: converter %s in %s must be static to be found automatically. Make it static, or register it with add_converter()" % [method_name, script.resource_path])
+				continue
+			_register_converter_method(method_name.substr(CONVERTER_PREFIX.length()), Callable(script, method_name), script)
+			continue
 
 		if method_name.begins_with("_yarn_command_"):
 			var yarn_name := method_name.substr(14)  # remove "_yarn_command_"
@@ -650,6 +681,7 @@ func start_dialogue(node_name: String = "") -> void:
 
 	_is_running = true
 	_run_id += 1
+	_dialogue_token = YarnCancellationToken.new()
 	var run := _run_id
 	_content_complete_pending = false
 	_stop_requested = false
@@ -691,6 +723,10 @@ func stop_dialogue() -> void:
 func _cancel_current_content() -> void:
 	if _current_line_token != null:
 		_current_line_token.request_next_content()
+	if _current_command_token != null:
+		_current_command_token.request_next_content()
+	if _dialogue_token != null:
+		_dialogue_token.request_next_content()
 	if _current_options_token != null:
 		_current_options_token.request_next_content()
 
@@ -878,6 +914,17 @@ func get_library() -> YarnLibrary:
 
 func add_function(func_name: String, callable: Callable, param_count: int = -1) -> void:
 	_library.register_function(func_name, callable, param_count)
+
+
+## Adds a converter so commands and functions can take parameters of
+## [param type_name]. The converter takes the String from the Yarn script and
+## returns the value, or null if nothing matches.
+func add_converter(type_name: String, converter: Callable) -> void:
+	_library.register_converter(type_name, converter)
+
+
+func remove_converter(type_name: String) -> void:
+	_library.unregister_converter(type_name)
 
 
 func remove_function(func_name: String) -> void:
@@ -1102,6 +1149,8 @@ func get_localisation_debug_info() -> String:
 func request_hurry_up() -> void:
 	if _current_line_token != null:
 		_current_line_token.request_hurry_up()
+	if _current_command_token != null:
+		_current_command_token.request_hurry_up()
 
 
 ## Asks the current content to finish and advance. Delivered through the
@@ -1110,6 +1159,8 @@ func request_hurry_up() -> void:
 func request_next_content() -> void:
 	if _current_line_token != null:
 		_current_line_token.request_next_content()
+	if _current_command_token != null:
+		_current_command_token.request_next_content()
 
 
 func request_next_line() -> void:
@@ -1518,7 +1569,11 @@ func _on_command(command_text: String) -> void:
 	# Awaited: coroutine command handlers (like the built-in <<wait>>) run
 	# to completion inside dispatch. The epoch captured above guards the
 	# completion below against content that advanced past us meanwhile.
+	var command_token := YarnCancellationToken.new()
+	_current_command_token = command_token
 	var result := await _dispatch_command_with_discovery(command_text)
+	if not (result.handled and result.is_async) and _current_command_token == command_token:
+		_current_command_token = null
 
 	if result.status == YarnLibrary.CommandDispatchStatus.NOT_FOUND:
 		if await _handle_builtin_command(command_text):
@@ -1565,6 +1620,9 @@ func _on_command(command_text: String) -> void:
 				await async_result.completed
 			else:
 				await async_result
+
+	if _current_command_token == command_token:
+		_current_command_token = null
 
 	if run != _run_id or not _is_running or epoch != _line_epoch:
 		return
@@ -1722,6 +1780,12 @@ func _register_global_commands() -> void:
 			if not _library.has_function(func_name):
 				var info: Dictionary = funcs[func_name]
 				_library.register_function(func_name, info.get("callable"), info.get("param_count", -1))
+
+	if ys.has_method("get_global_converters"):
+		var converters: Dictionary = ys.get_global_converters()
+		for type_name in converters:
+			if not _library.has_converter(type_name):
+				_library.register_converter(type_name, converters[type_name])
 
 
 func _cmd_wait(duration: float) -> void:

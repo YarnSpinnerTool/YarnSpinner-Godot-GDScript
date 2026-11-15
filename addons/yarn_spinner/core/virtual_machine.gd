@@ -70,6 +70,12 @@ var _instruction_count: int = 0
 var max_call_stack_depth: int = 0
 ## Prevents re-entrant calls to continue_dialogue from signal handlers.
 var _is_continuing: bool = false
+var _waiting_for_function: bool = false
+var _function_call_generation: int = 0
+
+
+func is_waiting_for_function() -> bool:
+	return _waiting_for_function
 
 
 func set_library(library: YarnLibrary) -> void:
@@ -157,6 +163,9 @@ func _load_node(node_name: String, clear_state: bool) -> void:
 
 
 func continue_dialogue() -> void:
+	if _waiting_for_function:
+		return
+
 	if _is_continuing:
 		if current_state == ExecutionState.SUSPENDED:
 			current_state = ExecutionState.RUNNING
@@ -237,6 +246,8 @@ func set_selected_option(option_index: int) -> void:
 
 
 func signal_content_complete() -> void:
+	if _waiting_for_function:
+		return
 	if current_state != ExecutionState.SUSPENDED:
 		push_warning("virtual machine: signal_content_complete called but not in SUSPENDED state (current: %s)" % ExecutionState.keys()[current_state])
 		return
@@ -637,10 +648,44 @@ func _execute_call_function(instruction: YarnInstruction) -> void:
 		_fail("function '%s' is not present in the library" % func_name)
 		return
 
-	var result: Variant = _library.call_function(func_name, _stack, self)
+	var prepared := _library.prepare_function_call(func_name, _stack)
+	if not prepared.ok:
+		_fail("function '%s' failed: %s" % [func_name, _library.take_function_error()])
+		return
+
+	var pending := {"done": false, "suspended": false, "value": null}
+	_call_function_async(func_name, prepared, pending, _function_call_generation)
+	if pending.done:
+		_push_function_result(func_name, pending.value)
+		return
+
+	pending.suspended = true
+	_waiting_for_function = true
+	current_state = ExecutionState.SUSPENDED
+
+
+func _call_function_async(func_name: String, prepared: Dictionary, pending: Dictionary, generation: int) -> void:
+	var callable: Callable = prepared.callable
+	var value: Variant = await callable.callv(prepared.args)
+	pending.value = value
+	pending.done = true
+	if not pending.suspended:
+		return
+	if generation != _function_call_generation or current_state != ExecutionState.SUSPENDED or _has_error:
+		return
+	_waiting_for_function = false
+	_push_function_result(func_name, value)
+	if _has_error:
+		return
+	current_state = ExecutionState.RUNNING
+	if not _is_continuing:
+		continue_dialogue()
+
+
+func _push_function_result(func_name: String, value: Variant) -> void:
+	var result: Variant = _library.finish_function_call(func_name, value)
 	if YarnLibrary.is_function_error(result):
-		var message := _library.take_function_error()
-		_fail("function '%s' failed: %s" % [func_name, message])
+		_fail("function '%s' failed: %s" % [func_name, _library.take_function_error()])
 		return
 	_push(result)
 
@@ -792,6 +837,8 @@ func _fail(message: String) -> void:
 
 
 func _reset_state() -> void:
+	_function_call_generation += 1
+	_waiting_for_function = false
 	_stack.clear()
 	_pending_options.clear()
 	_call_stack.clear()

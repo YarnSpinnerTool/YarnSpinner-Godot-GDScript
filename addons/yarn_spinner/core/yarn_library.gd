@@ -57,6 +57,10 @@ var _command_targets: Dictionary[String, Node] = {}
 var _target_root: Node
 var _instance_commands: Dictionary[String, Dictionary] = {}
 var _vm_ref: WeakRef
+var _converters: Dictionary[String, Callable] = {}
+var cancellation_token_provider: Callable
+
+const CANCELLATION_TOKEN_CLASS := "YarnCancellationToken"
 
 static var _global_classes: Dictionary = {}
 
@@ -109,6 +113,7 @@ func register_function(func_name: String, callable: Callable, param_count: int =
 	if not callable.is_valid():
 		push_error("yarn library: cannot add function %s: the callable is not valid" % func_name)
 		return
+	_warn_if_lambda("function", func_name, callable)
 	_add_function(func_name, callable, param_count)
 
 
@@ -140,6 +145,7 @@ func register_command(command_name: String, callable: Callable, param_names: Pac
 	if not callable.is_valid():
 		push_error("yarn library: failed to register command %s: the callable is not valid" % command_name)
 		return
+	_warn_if_lambda("command", command_name, callable)
 	_commands[command_name] = callable
 	_command_params[command_name] = param_names
 
@@ -147,6 +153,63 @@ func register_command(command_name: String, callable: Callable, param_names: Pac
 func unregister_command(command_name: String) -> void:
 	_commands.erase(command_name)
 	_command_params.erase(command_name)
+
+
+func _warn_if_lambda(kind: String, action_name: String, callable: Callable) -> void:
+	if not callable.is_custom():
+		return
+	if not _find_method_info(callable.get_object(), callable.get_method()).is_empty():
+		return
+	push_warning(("yarn library: the %s '%s' was registered with a lambda. Registering lambdas is deprecated: " +
+		"they're slower, have no parameter types, and aren't cleaned up automatically. Pass a named method instead.") % [kind, action_name])
+
+
+## Registers a converter that turns a string from a Yarn script into a value
+## of [param type_name], so commands and functions can take that type as a
+## parameter. [param converter] takes a String and returns the value, or
+## null if the string doesn't match anything.
+func register_converter(type_name: String, converter: Callable) -> void:
+	if type_name.is_empty():
+		push_error("yarn library: converter type name cannot be empty")
+		return
+	if not converter.is_valid():
+		push_error("yarn library: cannot add converter for %s: the callable is not valid" % type_name)
+		return
+	if _converters.has(type_name):
+		push_error("yarn library: cannot add converter for %s: one already exists" % type_name)
+		return
+	_converters[type_name] = converter
+
+
+func unregister_converter(type_name: String) -> void:
+	_converters.erase(type_name)
+
+
+func has_converter(type_name: String) -> bool:
+	return _converters.has(type_name)
+
+
+func _convert_with_converter(type_name: String, value: Variant) -> Dictionary:
+	var converter: Callable = _converters[type_name]
+	if not converter.is_valid():
+		return {"ok": false, "value": null, "error": "the converter for %s is no longer valid" % type_name}
+	var text := value if value is String else YarnVirtualMachine._value_to_string(value)
+	var converted: Variant = converter.call(text)
+	if converted == null:
+		return {"ok": false, "value": null, "error": "the converter for %s couldn't convert '%s'" % [type_name, text]}
+	return {"ok": true, "value": converted, "error": ""}
+
+
+func current_cancellation_token() -> YarnCancellationToken:
+	if cancellation_token_provider.is_valid():
+		var token: Variant = cancellation_token_provider.call()
+		if token is YarnCancellationToken:
+			return token
+	return YarnCancellationToken.new()
+
+
+static func _is_token_arg(arg: Dictionary) -> bool:
+	return String(arg.get("class_name", "")) == CANCELLATION_TOKEN_CLASS
 
 
 func _validate_command_name(command_name: String) -> bool:
@@ -275,24 +338,41 @@ func _get_vm() -> YarnVirtualMachine:
 
 
 func call_function(func_name: String, stack: Array, vm: YarnVirtualMachine) -> Variant:
+	var prepared := prepare_function_call(func_name, stack)
+	if not prepared.ok:
+		return FUNCTION_ERROR
+	var callable: Callable = prepared.callable
+	var result: Variant = callable.callv(prepared.args)
+	return finish_function_call(func_name, result)
+
+
+## Pops a function's arguments from [param stack] and converts them.
+## Returns {ok, callable, args}. On failure the error is there for
+## [method take_function_error].
+func prepare_function_call(func_name: String, stack: Array) -> Dictionary:
 	_function_error = ""
+	var failed := {"ok": false, "callable": Callable(), "args": []}
 
 	if not _functions.has(func_name):
-		return _function_failure(("unknown function '%s'. It is not registered at runtime. " +
+		_function_failure(("unknown function '%s'. It is not registered at runtime. " +
 			"If you defined it with _yarn_function_%s, make sure that script is on a node under " +
 			"the DialogueRunner's discovery root (a valid .ysls.json does not register it); " +
 			"otherwise register it with runner.add_function(\"%s\", callable).") % [func_name, func_name, func_name])
+		return failed
 
 	# The compiler always pushes arg count before CALL_FUNC
 	if stack.is_empty():
-		return _function_failure("stack underflow reading arg count for '%s'" % func_name)
+		_function_failure("stack underflow reading arg count for '%s'" % func_name)
+		return failed
 	var count_value: Variant = stack.pop_back()
 	if not (count_value is float or count_value is int):
-		return _function_failure("expected an argument count for '%s', got %s" % [func_name, type_string(typeof(count_value))])
+		_function_failure("expected an argument count for '%s', got %s" % [func_name, type_string(typeof(count_value))])
+		return failed
 	var arg_count := YarnNumber.to_int32(float(count_value))
 
 	if arg_count < 0 or arg_count > stack.size():
-		return _function_failure("stack underflow calling '%s' (need %d, have %d)" % [func_name, arg_count, stack.size()])
+		_function_failure("stack underflow calling '%s' (need %d, have %d)" % [func_name, arg_count, stack.size()])
+		return failed
 
 	var args: Array = []
 	args.resize(arg_count)
@@ -304,30 +384,55 @@ func call_function(func_name: String, stack: Array, vm: YarnVirtualMachine) -> V
 	var max_args: int = signature.max
 	if arg_count < min_args or (max_args >= 0 and arg_count > max_args):
 		var expected := str(min_args) if min_args == max_args else ("at least %d" % min_args if max_args < 0 else "%d to %d" % [min_args, max_args])
-		return _function_failure("function %s expected %s parameters, but received %d" % [func_name, expected, arg_count])
+		_function_failure("function %s expected %s parameters, but received %d" % [func_name, expected, arg_count])
+		return failed
 
 	var types: Array = signature.types
+	var classes: Array = signature.get("classes", [])
 	for i in range(mini(args.size(), types.size())):
-		# Most arguments already arrive as the type the function asked for.
 		var arg: Variant = args[i]
 		var target_type: int = types[i]
+		var target_class: String = classes[i] if i < classes.size() else ""
+		if target_type == TYPE_INT and not target_class.is_empty():
+			var enum_info := yarn_enum_info(target_class)
+			if not enum_info.is_empty():
+				var from_enum := convert_yarn_enum(arg, enum_info)
+				if not from_enum.ok:
+					_function_failure("function %s: parameter %d: %s" % [func_name, i + 1, from_enum.error])
+					return failed
+				args[i] = from_enum.value
+				continue
+		if target_type == TYPE_OBJECT and _converters.has(target_class):
+			var from_converter := _convert_with_converter(target_class, arg)
+			if not from_converter.ok:
+				_function_failure("function %s: parameter %d: %s" % [func_name, i + 1, from_converter.error])
+				return failed
+			args[i] = from_converter.value
+			continue
 		if target_type == TYPE_NIL or (target_type == TYPE_FLOAT and arg is float) \
 				or (target_type == TYPE_BOOL and arg is bool) or (target_type == TYPE_STRING and arg is String):
 			continue
 		var converted := _convert_function_argument(arg, target_type)
 		if not converted.ok:
-			return _function_failure("function %s: parameter %d %s" % [func_name, i + 1, converted.error])
+			_function_failure("function %s: parameter %d %s" % [func_name, i + 1, converted.error])
+			return failed
 		args[i] = converted.value
 
 	var callable: Callable = _functions[func_name]
 	if not callable.is_valid():
-		return _function_failure("the callable for function %s is no longer valid" % func_name)
+		_function_failure("the callable for function %s is no longer valid" % func_name)
+		return failed
 
-	var result: Variant = callable.callv(args)
+	if signature.get("wants_token", false):
+		args.append(current_cancellation_token())
 
+	return {"ok": true, "callable": callable, "args": args}
+
+
+## Converts what a function returned into a Yarn value, or FUNCTION_ERROR.
+func finish_function_call(func_name: String, result: Variant) -> Variant:
 	if not _function_error.is_empty():
 		return FUNCTION_ERROR
-
 	return _convert_function_result(func_name, result)
 
 
@@ -343,11 +448,17 @@ func _describe_callable(callable: Callable, param_count: int) -> Dictionary:
 		var bound := callable.get_bound_arguments_count()
 		var fixed := maxi(args.size() - bound, 0)
 		var defaults: int = maxi(info.get("default_args", []).size() - bound, 0)
+		var wants_token := fixed > 0 and _is_token_arg(args[fixed - 1])
+		if wants_token:
+			fixed -= 1
+			defaults = maxi(defaults - 1, 0)
 		var types: Array[int] = []
+		var classes: Array[String] = []
 		for i in range(fixed):
 			types.append(int(args[i].get("type", TYPE_NIL)))
+			classes.append(String(args[i].get("class_name", "")))
 		var variadic := (int(info.get("flags", 0)) & METHOD_FLAG_VARARG) != 0
-		return {"min": maxi(fixed - defaults, 0), "max": -1 if variadic else fixed, "types": types}
+		return {"min": maxi(fixed - defaults, 0), "max": - 1 if variadic else fixed, "types": types, "classes": classes, "wants_token": wants_token}
 
 	var count := param_count if param_count >= 0 else callable.get_argument_count()
 	return {"min": count, "max": count, "types": []}
@@ -363,7 +474,9 @@ func _convert_function_result(func_name: String, result: Variant) -> Variant:
 	if result == null:
 		return _function_failure("function %s did not return a value" % func_name)
 	if result is Object and (result as Object).get_class() == "GDScriptFunctionState":
-		return _function_failure("function %s must return its value immediately, without awaiting" % func_name)
+		return _function_failure("function %s waited for something, but it was called from a smart variable or a when: header, which need a value straight away" % func_name)
+	if result is Signal:
+		return _function_failure("function %s returned a Signal, but it was called from a smart variable or a when: header, which need a value straight away" % func_name)
 	return _function_failure("function %s returned a %s, which is not a Yarn value (bool, number or string)" % [func_name, type_string(typeof(result))])
 
 
@@ -417,7 +530,7 @@ static func parse_single(text: String) -> Dictionary:
 		"infinity", "+infinity":
 			return {"ok": true, "value": INF}
 		"-infinity":
-			return {"ok": true, "value": -INF}
+			return {"ok": true, "value": - INF}
 	var split_at := s.length()
 	for i in range(s.length()):
 		var c := s[i]
@@ -592,6 +705,7 @@ func _coerce_call_args(method_info: Dictionary, args: Array, command_name: Strin
 	var expected_args: Array = []
 	var min_args := 0
 	var max_args := -1
+	var wants_token := false
 
 	if method_info.is_empty():
 		if not callable.is_valid():
@@ -602,6 +716,10 @@ func _coerce_call_args(method_info: Dictionary, args: Array, command_name: Strin
 		expected_args = method_info.get("args", [])
 		expected_args = expected_args.slice(0, maxi(expected_args.size() - bound_count, 0))
 		var default_count: int = method_info.get("default_args", []).size()
+		if not expected_args.is_empty() and _is_token_arg(expected_args[expected_args.size() - 1]):
+			wants_token = true
+			expected_args = expected_args.slice(0, expected_args.size() - 1)
+			default_count = maxi(default_count - 1, 0)
 		min_args = maxi(expected_args.size() - default_count, 0)
 		var variadic := (int(method_info.get("flags", 0)) & METHOD_FLAG_VARARG) != 0
 		max_args = -1 if variadic else expected_args.size()
@@ -623,6 +741,8 @@ func _coerce_call_args(method_info: Dictionary, args: Array, command_name: Strin
 			return {"success": false, "status": CommandDispatchStatus.INVALID_PARAMETER,
 				"error": "can't convert parameter %d of %s: %s" % [i, command_name, out.error], "args": coerced}
 		coerced[i] = out.value
+	if wants_token:
+		coerced.append(current_cancellation_token())
 	return {"success": true, "status": CommandDispatchStatus.SUCCESS, "error": "", "args": coerced}
 
 
@@ -685,6 +805,11 @@ func _coerce_value(value: Variant, target_type: int, type_class: String = "", pa
 			return {"ok": true, "value": StringName(str_value), "error": ""}
 
 		TYPE_OBJECT:
+			if _converters.has(type_class):
+				var from_converter := _convert_with_converter(type_class, str_value)
+				if from_converter.ok:
+					return from_converter
+				return failure.call(type_class)
 			# Node-typed parameters: resolve string to node via scene tree lookup
 			if _is_node_class(type_class):
 				var node := _find_node_by_name(str_value)
@@ -697,6 +822,13 @@ func _coerce_value(value: Variant, target_type: int, type_class: String = "", pa
 			return failure.call(type_class if not type_class.is_empty() else "Object")
 
 		TYPE_INT:
+			if not type_class.is_empty():
+				var enum_info := yarn_enum_info(type_class)
+				if not enum_info.is_empty():
+					var from_enum := convert_yarn_enum(str_value, enum_info)
+					if from_enum.ok:
+						return from_enum
+					return {"ok": false, "value": null, "error": "can't convert the given parameter at position %d (\"%s\") to parameter %s: %s" % [index + 1, str_value, param_name, from_enum.error]}
 			var parsed := parse_int32(str_value)
 			if parsed.ok:
 				return {"ok": true, "value": parsed.value, "error": ""}
@@ -805,6 +937,54 @@ func _is_node_class(type_class: String) -> bool:
 			return false
 		current = info.get("base", "")
 	return false
+
+
+static var _yarn_enums: Dictionary = {}
+
+
+static func yarn_enum_info(type_class: String) -> Dictionary:
+	if _yarn_enums.has(type_class):
+		return _yarn_enums[type_class]
+	var info := {}
+	var dot := type_class.rfind(".")
+	if dot > 0:
+		var owner_name := type_class.substr(0, dot)
+		var enum_name := type_class.substr(dot + 1)
+		var owner_info := _get_global_class(owner_name)
+		var path := String(owner_info.get("path", ""))
+		var script := load(path) as Script if not path.is_empty() else null
+		if script != null:
+			var constants := script.get_script_constant_map()
+			if constants.get(enum_name) is Dictionary:
+				var values: Variant = constants.get("_%s_VALUES" % enum_name.to_snake_case().to_upper())
+				info = {"name": enum_name, "cases": constants[enum_name], "values": values if values is Dictionary else {}}
+	_yarn_enums[type_class] = info
+	return info
+
+
+static func convert_yarn_enum(value: Variant, info: Dictionary) -> Dictionary:
+	var cases: Dictionary = info.cases
+	var values: Dictionary = info.values
+	for case_number in values:
+		var raw: Variant = values[case_number]
+		if typeof(raw) == typeof(value) and raw == value:
+			return {"ok": true, "value": case_number, "error": ""}
+		if (raw is float or raw is int) and (value is float or value is int) and float(raw) == float(value):
+			return {"ok": true, "value": case_number, "error": ""}
+		if (raw is float or raw is int) and value is String and value.is_valid_float() and float(raw) == value.to_float():
+			return {"ok": true, "value": case_number, "error": ""}
+	if value is String:
+		var case_name: String = value.strip_edges()
+		if case_name.begins_with("."):
+			case_name = case_name.substr(1)
+		elif case_name.begins_with(String(info.name) + "."):
+			case_name = case_name.substr(String(info.name).length() + 1)
+		var key := case_name.to_snake_case().to_upper()
+		if cases.has(key):
+			return {"ok": true, "value": cases[key], "error": ""}
+		if cases.has(case_name):
+			return {"ok": true, "value": cases[case_name], "error": ""}
+	return {"ok": false, "value": null, "error": "'%s' isn't a case of the %s enum" % [value, info.name]}
 
 
 static func _get_global_class(class_name_to_find: String) -> Dictionary:

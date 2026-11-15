@@ -121,6 +121,17 @@ func _register_project_settings() -> void:
 		"type": TYPE_BOOL,
 	})
 
+	var included_setting := YarnYSLSGenerator.SETTING_INCLUDED_ADDON_PATHS
+	if not ProjectSettings.has_setting(included_setting):
+		ProjectSettings.set_setting(included_setting, PackedStringArray())
+	ProjectSettings.set_initial_value(included_setting, PackedStringArray())
+	ProjectSettings.add_property_info({
+		"name": included_setting,
+		"type": TYPE_PACKED_STRING_ARRAY,
+		"hint": PROPERTY_HINT_TYPE_STRING,
+		"hint_string": "%d/%d:" % [TYPE_STRING, PROPERTY_HINT_DIR],
+	})
+
 
 func _exit_tree() -> void:
 	var fs := EditorInterface.get_resource_filesystem()
@@ -460,7 +471,7 @@ func _create_yarn_project() -> void:
 
 	dialog.file_selected.connect(func(path: String) -> void:
 		var project := {
-			"projectFileVersion": 4,
+			"projectFileVersion": 5,
 			"sourceFiles": ["**/*.yarn"],
 			"baseLanguage": "en",
 		}
