@@ -188,8 +188,8 @@ func _with_instances_as_strings(entries: Array) -> Array:
 			if param.get("type", "") == "instance":
 				param["type"] = "string"
 				param.erase("subtype")
-			elif param.get("type", "") == "enum" and param.has("rawType"):
-				param["type"] = param["rawType"]
+			elif param.get("type", "") == "enum":
+				param["type"] = param.get("rawType", "any")
 				param.erase("subtype")
 		result.append(copy)
 	return result
@@ -1013,7 +1013,13 @@ func _yarn_enum_type_info(type_class: String) -> Dictionary:
 	if not type_class.contains("."):
 		return {}
 	var info := YarnLibrary.yarn_enum_info(type_class)
-	if info.is_empty() or (info.values as Dictionary).is_empty():
+	if info.is_empty():
+		var parts := type_class.split(".")
+		if parts.size() == 2 and parts[0].is_valid_ascii_identifier() and parts[1].is_valid_ascii_identifier() \
+				and not _is_object_class_name(parts[0]) and not ClassDB.class_exists(parts[0]):
+			return {"type": "enum", "subtype": parts[1]}
+		return {}
+	if (info.values as Dictionary).is_empty():
 		return {}
 	var raw_type := "number"
 	for raw in (info.values as Dictionary).values():

@@ -645,6 +645,12 @@ func _function_declarations(generator: YarnYSLSGenerator, abs_project_path: Stri
 		if yarn_name.is_empty() or declared.has(yarn_name):
 			continue
 		var return_info: Dictionary = info.get("return", {})
+		var untyped_parameter := false
+		for parameter: Dictionary in info.get("parameters", []):
+			if str(parameter.get("type", "any")) == "any" and not parameter.get("isParamsArray", false):
+				untyped_parameter = true
+		if untyped_parameter:
+			continue
 		var declaration := {
 			"name": yarn_name,
 			"returnType": str(return_info.get("type", "any")),
