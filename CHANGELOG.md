@@ -1,5 +1,22 @@
 # Yarn Spinner for Godot (GDScript) — Changelog
 
+## Early Access 3.3.1
+
+- Functions can now wait! A function that uses `await`, such as one that waits for the player to pick an item, pauses the dialogue until it returns a value. Give it a typed return, for example a `-> String`, so the compiler knows what it returns. Functions called from smart variables or `when:` headers still have to return straight away! Don't forget.
+- Commands and functions can now be cancelled. If the last parameter of a handler is a `YarnCancellationToken`, the Dialogue Runner passes one in. A command's token is cancelled by `request_hurry_up()`, `request_next_content()` and `stop_dialogue()`. A function's token is cancelled when dialogue stops...
+- Commands and functions can now take your own types as parameters!! Add a converter with `add_converter()` on the Dialogue Runner or `YarnSpinner.register_converter()`, or write a static `_yarn_converter_<TypeName>(input: String)` method, which is found automatically. A converter takes the text from the Yarn Script and returns the value, or `null` if nothing matches.
+- Commands and functions can now take a Yarn enum as a parameter, using the enum in the generated variables class, for example `func feed(food: MyVariables.FoodType)`. They accept the enum's value (`{$food}`), its full case name (`FoodType.Apple`) or its short case name (`.Apple`). In the `.ysls.json`, these parameters are marked as that Yarn enum... so the VS Code extension suggests its cases. Projects older than file version 5 get the enum's raw type instead.
+- Registering a command or function with a lambda now logs a deprecation warning. Pass a named method instead, please.
+- New Yarn Projects are created at project file version 5 (i.e. YS 3.3). The Yarn Project Inspector shows an **Upgrade Yarn Project** button for older projects.
+- In a version 5 project, calling a function that doesn't declare a usable return type, such as one that returns a `Signal`, now explains how to fix it :)
+- The `.ysls.json` now includes functions and commands registered with a plain `add_function(...)` or `add_command(...)` call, not only ones written as `runner.add_function(...)`.
+- The error for a `_yarn_function_` method that isn't static now says to make it static, or remove the prefix and register it with `add_function()`.
+- The `.ysls.json` now lists the built-in functions that only Yarn Spinner for Godot has, such as `abs`, `clamp`, `uppercase` and `plural`, so the VS Code extension no longer marks them as unknown. Sorry!
+- In the `.ysls.json`, parameters that use a converter are written as instances of their type, the same way Yarn Spinner for Unity writes them. In projects older than file version 5, instance parameters are written as strings, so those functions are still declared. Cancellation token parameters are left out.
+- Functions that wait are now marked `async` in the `.ysls.json`...
+- A new project setting, **Yarn Spinner > YSLS > Included Addon Paths**, lists folders under `res://addons` for the `.ysls.json` scan to read. Addons are still skipped by default. Use it when an addon registers functions or commands, for example with `YarnSpinner.register_function()` from an autoload, so the compiler and the VS Code extension know about them.
+- Node pickers in the Inspector now list nodes alphabetically, and can be filtered. Add `;filter=Start` to the `yarn_node` hint, with optional `filter_type` (`contains`, `starts_with`, `ends_with` or `matches_regex`) and `header` to filter on a header other than the title.
+
 ## Early Access 3.3
 
 - Presenters now get `on_dialogue_started` before `on_node_started`, and the Dialogue Runner emits `dialogue_started` before `node_started`. The start node is entered after every Presenter has finished `on_dialogue_started`.
