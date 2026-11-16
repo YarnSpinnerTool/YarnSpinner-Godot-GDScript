@@ -335,6 +335,9 @@ func _request_line_hurry_up_internal() -> bool:
 		return false
 
 	if combine_hurry_and_advance and not _is_line_status():
+		if dialogue_runner != null and dialogue_runner.is_running_command() and not _has_options_content():
+			dialogue_runner.request_next_content()
+			return true
 		return false
 
 	var acted := _has_line_content()
@@ -400,6 +403,18 @@ func request_dialogue_cancellation() -> void:
 	dialogue_cancellation_requested.emit()
 	if dialogue_runner != null:
 		dialogue_runner.stop_dialogue()
+
+
+func request_hurry_up_content() -> void:
+	_sync_with_runner()
+	if _has_options_content():
+		_request_option_hurry_up_internal()
+	else:
+		_request_line_hurry_up_internal()
+
+
+func request_next_content() -> void:
+	request_next_line()
 
 
 func request_advance() -> void:

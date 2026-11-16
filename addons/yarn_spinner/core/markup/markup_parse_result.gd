@@ -90,7 +90,22 @@ func delete_range(attr_to_delete: YarnMarkupAttribute) -> YarnMarkupParseResult:
 
 	var deletion_start := attr_to_delete.position
 	var deletion_end := attr_to_delete.position + attr_to_delete.length
-	var edited_text := text.substr(0, attr_to_delete.position) + text.substr(attr_to_delete.position + attr_to_delete.length)
+	var edited_text := ""
+	var visible_index := 0
+	var in_tag := false
+	for character in text:
+		if character == YarnMarkupParser.BBCODE_TAG_START:
+			in_tag = true
+			edited_text += character
+		elif character == YarnMarkupParser.BBCODE_TAG_END:
+			in_tag = false
+			edited_text += character
+		elif in_tag:
+			edited_text += character
+		else:
+			if visible_index < deletion_start or visible_index >= deletion_end:
+				edited_text += character
+			visible_index += 1
 
 	for existing_attr in attributes:
 		if existing_attr == attr_to_delete:

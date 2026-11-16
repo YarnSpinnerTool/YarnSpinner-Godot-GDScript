@@ -131,10 +131,17 @@ func _setup_presenters() -> void:
 	line_presenter.character_label = _character_label
 	line_presenter.character_container = _character_container
 	line_presenter.continue_indicator = _continue_indicator
+	line_presenter.fade_target = _fade_target()
 	add_child(line_presenter)
 
 	options_presenter = YarnOptionsPresenter.new()
 	options_presenter.options_container = _options_container
+	options_presenter.fade_target = _fade_target()
+	options_presenter.show_last_line = true
+	options_presenter.last_line_text = _text_label
+	options_presenter.last_line_container = _text_label
+	options_presenter.last_line_character_name_text = _character_label
+	options_presenter.last_line_character_name_container = _character_container
 	add_child(options_presenter)
 
 	line_presenter.line_started.connect(func(_line):
@@ -145,9 +152,18 @@ func _setup_presenters() -> void:
 
 	options_presenter.options_shown.connect(func(_opts):
 		if _text_label != null:
-			_text_label.visible = false
+			_text_label.visible_characters = -1
+		if _continue_indicator != null:
+			_continue_indicator.visible = false
 		if _options_container != null:
 			_options_container.visible = true)
+
+
+func _fade_target() -> CanvasItem:
+	if _ui == null:
+		return null
+	var panel := _ui.get_node_or_null("%Panel") as CanvasItem
+	return panel if panel != null else _ui
 
 
 func start_dialogue(node_name: String = "") -> void:

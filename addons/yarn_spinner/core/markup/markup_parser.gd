@@ -39,6 +39,7 @@ func _init() -> void:
 	_line_parser.register_marker_processor("select", builtin_replacer)
 	_line_parser.register_marker_processor("plural", builtin_replacer)
 	_line_parser.register_marker_processor("ordinal", builtin_replacer)
+	_line_parser.register_marker_processor("br", builtin_replacer)
 
 	# pause is a regular self-closing attribute read at display time by PauseEventProcessor
 	_character_processor = YarnCharacterMarkupProcessor.new()
@@ -197,14 +198,31 @@ func convert_to_bbcode(parse_result: YarnMarkupParseResult) -> String:
 			return a.order < b.order
 		return a.order > b.order)
 
+	var open_index := PackedInt32Array()
+	var close_index := PackedInt32Array([0])
+	var in_tag := false
+	for i in plain_text.length():
+		var character := plain_text[i]
+		if character == BBCODE_TAG_START:
+			in_tag = true
+		elif character == BBCODE_TAG_END:
+			in_tag = false
+		elif not in_tag:
+			open_index.append(i)
+			close_index.append(i + 1)
+	open_index.append(plain_text.length())
+	var visible_count := open_index.size() - 1
+
 	var output := ""
 	var current_pos := 0
 	var stack: Array[Dictionary] = []
 
 	for event in events:
-		if event.pos > current_pos:
-			output += escape_text(plain_text.substr(current_pos, event.pos - current_pos))
-			current_pos = event.pos
+		var visible_pos: int = clampi(event.pos, 0, visible_count)
+		var text_pos: int = open_index[visible_pos] if event.open else close_index[visible_pos]
+		if text_pos > current_pos:
+			output += escape_text(plain_text.substr(current_pos, text_pos - current_pos))
+			current_pos = text_pos
 
 		if event.open:
 			var processor := _find_processor(event.attr.name)

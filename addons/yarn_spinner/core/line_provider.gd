@@ -76,6 +76,7 @@ func _init() -> void:
 	_line_parser.register_marker_processor("select", builtin_replacer)
 	_line_parser.register_marker_processor("plural", builtin_replacer)
 	_line_parser.register_marker_processor("ordinal", builtin_replacer)
+	_line_parser.register_marker_processor("br", builtin_replacer)
 
 
 func set_program(program: YarnProgram) -> void:

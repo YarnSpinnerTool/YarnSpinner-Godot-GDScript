@@ -286,8 +286,12 @@ func _compile_ysc(source_file: String, abs_path: String, source_files: PackedStr
 			if csv_line.size() >= 4:
 				var line_id := csv_line[0]
 				var tags := csv_line[3] if csv_line.size() > 3 else ""
-				if not line_id.is_empty() and not tags.is_empty():
-					line_metadata[line_id] = PackedStringArray(tags.split(" "))
+				var kept := PackedStringArray()
+				for tag in tags.split(" ", false):
+					if not tag.begins_with("line:"):
+						kept.append(tag)
+				if not line_id.is_empty() and not kept.is_empty():
+					line_metadata[line_id] = kept
 		metadata_file.close()
 
 	resource.compiled_program = compiled_data
@@ -353,10 +357,20 @@ func _compile_native(source_file: String, abs_path: String, source_files: Packed
 	var resource := YarnProjectResource.new()
 	resource.source_files = source_files
 
+	for diag: Dictionary in result.diagnostics:
+		if str(diag.get("severity", "error")).to_lower() != "warning":
+			continue
+		var warning_file := _localize(str(diag.get("fileName", "")))
+		var warning_line: int = int(diag.get("line", -1))
+		var warning_location := ""
+		if not warning_file.is_empty():
+			warning_location = "%s:%d: " % [warning_file, warning_line + 1] if warning_line >= 0 else "%s: " % warning_file
+		push_warning("yarn project importer: %s%s" % [warning_location, diag.get("message", "")])
+
 	if not result.success:
 		var diagnostics: Array = []
 		for diag: Dictionary in result.diagnostics:
-			if diag.get("severity", "error") != "error":
+			if str(diag.get("severity", "error")).to_lower() != "error":
 				continue
 			var line: int = int(diag.get("line", -1))
 			diagnostics.append({
@@ -392,8 +406,10 @@ func _compile_native(source_file: String, abs_path: String, source_files: Packed
 		if not meta.is_empty():
 			var tags := PackedStringArray()
 			for tag in meta:
-				tags.append(str(tag))
-			line_metadata[line_id] = tags
+				if not str(tag).begins_with("line:"):
+					tags.append(str(tag))
+			if not tags.is_empty():
+				line_metadata[line_id] = tags
 
 	resource.string_table = string_table
 	resource.line_metadata = line_metadata
@@ -647,7 +663,7 @@ func _function_declarations(generator: YarnYSLSGenerator, abs_project_path: Stri
 		var return_info: Dictionary = info.get("return", {})
 		var untyped_parameter := false
 		for parameter: Dictionary in info.get("parameters", []):
-			if str(parameter.get("type", "any")) == "any" and not parameter.get("isParamsArray", false):
+			if str(parameter.get("type", "any")) == "any":
 				untyped_parameter = true
 		if untyped_parameter:
 			continue
@@ -832,6 +848,8 @@ static func _declaration_from_definition(info: Dictionary, language_version: int
 			return {}
 		var parameter := parameter_list[i] as Dictionary
 		var parameter_type := str(_get_key(parameter, "type", "any")).to_lower()
+		if parameter_type == "any":
+			return {}
 		if parameter_type == "enum" or parameter_type == "instance":
 			var effective_version := language_version if language_version > 0 else CURRENT_PROJECT_FILE_VERSION
 			if effective_version < ENUM_AND_INSTANCE_MIN_VERSION:

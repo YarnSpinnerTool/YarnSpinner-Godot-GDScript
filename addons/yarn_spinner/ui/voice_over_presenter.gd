@@ -32,7 +32,6 @@ signal voice_finished(line: YarnLine)
 @export var audio_extension: String = ".ogg"
 @export var wait_for_audio: bool = true
 @export var interrupt_on_new_line: bool = true
-@export var volume_db: float = 0.0
 ## seconds before starting playback
 @export var wait_time_before_start: float = 0.0
 ## seconds after audio finishes before signaling completion
@@ -47,6 +46,10 @@ var _current_line: YarnLine
 ## bumped whenever the current line changes or dialogue ends, so a superseded
 ## line's wait timers can tell they are stale after an await.
 var _line_generation := 0
+
+
+var _fading_player: Node
+var _fading_player_volume: float = 1.0
 
 
 func _ready() -> void:
@@ -110,6 +113,8 @@ func _play_line_audio(line: YarnLine, audio: AudioStream, token: YarnCancellatio
 
 	if _is_next_content_requested(token) and not _is_player_stopped(player):
 		var start_volume: float = player.get(&"volume_linear")
+		_fading_player = player
+		_fading_player_volume = start_volume
 		if fade_out_time_on_interrupt > 0.0:
 			var elapsed := 0.0
 			var last_ticks := Time.get_ticks_usec()
@@ -124,6 +129,7 @@ func _play_line_audio(line: YarnLine, audio: AudioStream, token: YarnCancellatio
 				player.set(&"volume_linear", lerpf(start_volume, 0.0, clampf(elapsed / fade_out_time_on_interrupt, 0.0, 1.0)))
 		player.call(&"stop")
 		player.set(&"volume_linear", start_volume)
+		_fading_player = null
 	else:
 		player.call(&"stop")
 
@@ -201,29 +207,26 @@ func _get_audio_path(line_id: String) -> String:
 func _play_audio(audio: AudioStream) -> Node:
 	if audio_player != null:
 		audio_player.stream = audio
-		audio_player.volume_db = volume_db
 		audio_player.play()
 		return audio_player
 	elif audio_player_2d != null:
 		audio_player_2d.stream = audio
-		audio_player_2d.volume_db = volume_db
 		audio_player_2d.play()
 		return audio_player_2d
 	elif audio_player_3d != null:
 		audio_player_3d.stream = audio
-		audio_player_3d.volume_db = volume_db
 		audio_player_3d.play()
 		return audio_player_3d
 	return null
 
 
 func _stop_audio_immediate() -> void:
+	if _fading_player != null and is_instance_valid(_fading_player):
+		_fading_player.set(&"volume_linear", _fading_player_volume)
+	_fading_player = null
 	if audio_player != null:
 		audio_player.stop()
-		audio_player.volume_db = volume_db
 	if audio_player_2d != null:
 		audio_player_2d.stop()
-		audio_player_2d.volume_db = volume_db
 	if audio_player_3d != null:
 		audio_player_3d.stop()
-		audio_player_3d.volume_db = volume_db

@@ -83,6 +83,14 @@ func try_get_value(variable_name: String) -> Dictionary:
 		return {found = false, value = null}
 	if _variables.has(variable_name):
 		return {found = true, value = _variables[variable_name]}
+	return try_get_unstored_value(variable_name)
+
+
+func try_get_stored_value(variable_name: String) -> Dictionary:
+	if not _validate_variable_name(variable_name):
+		return {found = false, value = null}
+	if _variables.has(variable_name):
+		return {found = true, value = _variables[variable_name]}
 	return {found = false, value = null}
 
 

@@ -6,7 +6,7 @@
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_option"]
 content_margin_left = 18.0
 
-[node name="OptionItem" type="Button" node_paths=PackedStringArray("selection_indicator")]
+[node name="OptionItem" type="Button" node_paths=PackedStringArray("selection_indicator", "text_label")]
 offset_right = 240.0
 offset_bottom = 31.0
 theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
@@ -24,6 +24,22 @@ theme_override_styles/normal = SubResource("StyleBoxEmpty_option")
 alignment = 0
 script = ExtResource("1_script")
 selection_indicator = NodePath("SelectionIndicator")
+text_label = NodePath("Text")
+
+[node name="Text" type="RichTextLabel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
+vertical_alignment = 1
 
 [node name="SelectionIndicator" type="TextureRect" parent="."]
 visible = false

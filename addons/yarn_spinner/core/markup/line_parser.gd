@@ -240,6 +240,7 @@ static func create_with_builtin_replacers() -> YarnLineParser:
 	parser.register_marker_processor("select", builtin_replacer)
 	parser.register_marker_processor("plural", builtin_replacer)
 	parser.register_marker_processor("ordinal", builtin_replacer)
+	parser.register_marker_processor("br", builtin_replacer)
 	return parser
 
 
@@ -876,7 +877,7 @@ func _parse_string_with_diagnostics(input: String, locale_code: String, squish: 
 		if match_result:
 			var char_name := match_result.get_string("name")
 			var char_suffix := match_result.get_string("suffix")
-			input = "[character name=\"" + char_name + "\"]" + char_name + char_suffix + "[/character]" + input.substr(match_result.get_end())
+			input = "[character name=\"" + char_name.replace("\"", "\\\"") + "\"]" + char_name + char_suffix + "[/character]" + input.substr(match_result.get_end())
 
 	# unescape \: to : now that character detection is done
 	input = input.replace("\\:", ":")

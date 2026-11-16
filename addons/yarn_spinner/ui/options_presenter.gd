@@ -87,6 +87,7 @@ var _selected_index: int = -1
 var _last_seen_line: YarnLine = null
 var _button_callbacks: Dictionary = {}
 var _markup_parser: YarnMarkupParser
+var _accepting_selection: bool = false
 signal _selection_made(index: int)
 
 
@@ -188,7 +189,9 @@ func run_options(options: Array[YarnOption], token: YarnCancellationToken = null
 		token.next_content_requested.connect(on_wind_down, CONNECT_ONE_SHOT)
 
 	if use_fade_effect:
+		_set_options_interactable(false)
 		await _fade_presenter_alpha(0.0, 1.0, fade_up_duration, _hurry_check(token))
+	_set_options_interactable(true)
 
 	var result: int = await _wait_for_selection()
 
@@ -201,6 +204,13 @@ func run_options(options: Array[YarnOption], token: YarnCancellationToken = null
 		return -1
 
 	return result
+
+
+func _set_options_interactable(value: bool) -> void:
+	_accepting_selection = value
+	for item in _option_buttons:
+		if item is YarnOptionItem:
+			(item as YarnOptionItem).interactable = value
 
 
 static func _hurry_check(token: YarnCancellationToken) -> Callable:
@@ -365,13 +375,19 @@ func _create_option_buttons() -> void:
 
 		if item is YarnOptionItem:
 			var opt_item := item as YarnOptionItem
+			opt_item.markup_parser = _get_markup_parser()
 			opt_item.setup(option, i)
 			var item_callback := func(idx: int): _select_option(idx)
 			_button_callbacks[item] = item_callback
 			opt_item.option_selected.connect(item_callback)
 		elif item is Button:
 			var button := item as Button
-			button.text = YarnMarkupParser.strip_bbcode_tags(option.text_without_character_name)
+			var plain_text := YarnMarkupParser.strip_bbcode_tags(option.text_without_character_name)
+			if button is YarnOptionButton:
+				var bbcode := _get_markup_parser().convert_to_bbcode(option.get_markup_result_without_character_name())
+				(button as YarnOptionButton).set_option_text(bbcode, plain_text, not option.is_available)
+			else:
+				button.text = plain_text
 			# Only apply default styling when no custom button scene is set.
 			# When using a custom scene, respect its existing theme/size.
 			if option_button_scene == null:
@@ -394,7 +410,7 @@ func _create_option_buttons() -> void:
 
 
 func _select_option(index: int) -> void:
-	if not _is_showing_options:
+	if not _is_showing_options or not _accepting_selection:
 		return
 
 	if index < 0 or index >= _current_options.size():

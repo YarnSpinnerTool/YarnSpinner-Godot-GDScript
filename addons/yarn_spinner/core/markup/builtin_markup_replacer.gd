@@ -18,7 +18,7 @@
 
 class_name YarnBuiltInMarkupReplacer
 extends YarnAttributeMarkerProcessor
-## marker processor for built-in select, plural, and ordinal replacement markers.
+## marker processor for built-in select, plural, ordinal and br replacement markers.
 
 static var _value_placeholder_regex: RegEx = RegEx.create_from_string("(?<!\\\\)%")
 
@@ -36,6 +36,10 @@ func process_replacement_marker(
 	if child_builder[0].length() > 0 or child_attributes.size() > 0:
 		var diags := [MarkupDiagnostic.new("'%s' markup only works on self-closing tags" % marker.name)]
 		return ReplacementMarkerResult.new(diags, 0)
+
+	if marker.name == "br":
+		child_builder[0] += "\n"
+		return ReplacementMarkerResult.new([], 0)
 
 	var value_prop := marker.try_get_property("value")
 	if value_prop == null:

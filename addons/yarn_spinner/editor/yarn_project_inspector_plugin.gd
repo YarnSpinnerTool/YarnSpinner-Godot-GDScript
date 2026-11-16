@@ -286,7 +286,11 @@ func _show_unapplied_changes_prompt(project_path: String) -> void:
 func _add_upgrade_section(container: VBoxContainer, project_path: String) -> void:
 	var abs_path := ProjectSettings.globalize_path(project_path)
 	var version := YarnProjectImporter.project_language_version(abs_path)
-	if version <= 0 or version >= YarnProjectImporter.CURRENT_PROJECT_FILE_VERSION:
+	if version > YarnProjectImporter.CURRENT_PROJECT_FILE_VERSION:
+		_add_message(container, ("This Yarn Project uses file version %d, which is newer than this version of Yarn Spinner supports (%d). " +
+			"Update Yarn Spinner for Godot to use it.") % [version, YarnProjectImporter.CURRENT_PROJECT_FILE_VERSION], "warning")
+		return
+	if version <= 0 or version == YarnProjectImporter.CURRENT_PROJECT_FILE_VERSION:
 		return
 	_add_message(container, ("This Yarn Project uses file version %d. Upgrade it to version %d to use every Yarn Spinner 3.3 feature. " +
 		"After upgrading, calling a Function that isn't declared is an error, not a warning.") % [version, YarnProjectImporter.CURRENT_PROJECT_FILE_VERSION], "warning")
@@ -997,7 +1001,10 @@ func _count_translated_strings(project: YarnProjectResource, locale: String) -> 
 		return 0
 	for line_id: String in st_val:
 		var key: String = prefix + line_id
-		var translated: String = TranslationServer.translate(key)
-		if translated != key:
-			count += 1
+		for translation: Translation in TranslationServer.get_translations():
+			if translation == null or translation.locale != locale:
+				continue
+			if not String(translation.get_message(key)).is_empty():
+				count += 1
+				break
 	return count

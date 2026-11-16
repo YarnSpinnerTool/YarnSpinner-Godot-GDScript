@@ -33,6 +33,8 @@ signal option_selected(option_index: int)
 var option: YarnOption
 var option_index: int = -1
 var is_available: bool = true
+var interactable: bool = true
+var markup_parser: YarnMarkupParser
 var _has_submitted_selection: bool = false
 
 
@@ -64,27 +66,38 @@ func setup(yarn_option: YarnOption, index: int) -> void:
 	is_available = yarn_option.is_available
 	_has_submitted_selection = false
 
-	# Names are stripped from option text.
-	var display_text := YarnMarkupParser.strip_bbcode_tags(yarn_option.text_without_character_name)
-	if display_text.is_empty():
-		display_text = yarn_option.raw_text
-	_apply_text(display_text)
+	var plain_text := YarnMarkupParser.strip_bbcode_tags(yarn_option.text_without_character_name)
+	if plain_text.is_empty():
+		plain_text = yarn_option.raw_text
+	_apply_text(plain_text, _option_bbcode(yarn_option, plain_text))
 
 	_update_availability_visual()
 	visible = true
 
 
-func _apply_text(display_text: String) -> void:
+func _option_bbcode(yarn_option: YarnOption, plain_text: String) -> String:
+	var markup := yarn_option.get_markup_result_without_character_name()
+	if markup == null or markup.text.is_empty():
+		return YarnMarkupParser.escape_text(plain_text)
+	return _get_markup_parser().convert_to_bbcode(markup)
+
+
+func _get_markup_parser() -> YarnMarkupParser:
+	if markup_parser == null:
+		markup_parser = YarnMarkupParser.new()
+	return markup_parser
+
+
+func _apply_text(plain_text: String, bbcode: String) -> void:
+	var struck := disabled_strike_through and not is_available
 	if text_label is RichTextLabel:
-		var rich := text_label as RichTextLabel
-		var escaped := YarnMarkupParser.escape_text(display_text)
-		if disabled_strike_through and not is_available:
-			escaped = "[s]%s[/s]" % escaped
-		rich.text = escaped
+		(text_label as RichTextLabel).text = "[s]%s[/s]" % bbcode if struck else bbcode
 	elif text_label != null and "text" in text_label:
-		text_label.set("text", display_text)
-	if button != null:
-		button.text = display_text
+		text_label.set("text", plain_text)
+	if button is YarnOptionButton:
+		(button as YarnOptionButton).set_option_text(bbcode, plain_text, struck)
+	elif button != null:
+		button.text = plain_text
 
 
 func _update_availability_visual() -> void:
@@ -108,14 +121,18 @@ func reset() -> void:
 	option_index = -1
 	is_available = true
 	visible = false
+	interactable = true
 	_has_submitted_selection = false
 
 	if text_label is RichTextLabel:
 		(text_label as RichTextLabel).text = ""
 	elif text_label != null and "text" in text_label:
 		text_label.set("text", "")
-	if button != null:
+	if button is YarnOptionButton:
+		(button as YarnOptionButton).set_option_text("", "")
+	elif button != null:
 		button.text = ""
+	if button != null:
 		button.disabled = false
 
 	if unavailable_indicator != null:
@@ -132,7 +149,7 @@ func is_highlighted() -> bool:
 
 
 func invoke_option_selected() -> void:
-	if not is_available or _has_submitted_selection:
+	if not interactable or not is_available or _has_submitted_selection:
 		return
 	_has_submitted_selection = true
 	option_selected.emit(option_index)
@@ -151,5 +168,7 @@ func set_text(text: String) -> void:
 		(text_label as RichTextLabel).text = YarnMarkupParser.escape_text(text)
 	elif text_label != null and "text" in text_label:
 		text_label.set("text", text)
-	if button != null:
+	if button is YarnOptionButton:
+		(button as YarnOptionButton).set_option_text(YarnMarkupParser.escape_text(text), text)
+	elif button != null:
 		button.text = text

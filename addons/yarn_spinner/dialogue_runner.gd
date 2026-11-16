@@ -46,6 +46,7 @@ signal dialogue_cancelled()
 signal node_started(node_name: String)
 
 signal node_completed(node_name: String)
+signal _node_hooks_settled
 
 ## Emitted when a command is not handled by any registered handler.
 ## If a handler is connected, dialogue pauses until [method signal_content_complete]
@@ -150,6 +151,8 @@ var _vm: YarnVirtualMachine
 var _custom_saliency_strategy: YarnSaliencyStrategy
 var _library: YarnLibrary
 var _line_provider: YarnLineProvider
+var _node_hook_queue: Array = []
+var _running_node_hooks: bool = false
 var _asset_provider: YarnAssetProvider
 var _smart_variable_evaluator: YarnSmartVariableEvaluator
 var _is_running: bool = false
@@ -167,6 +170,7 @@ var _waiting_for_content: bool = false
 var _current_cancellation_token: YarnCancellationToken
 var _current_line_token: YarnCancellationToken
 var _current_command_token: YarnCancellationToken
+var _current_function_token: YarnCancellationToken
 var _dialogue_token: YarnCancellationToken
 var _current_options_token: YarnCancellationToken
 ## The active options round's selection promise. select_option routes
@@ -203,9 +207,10 @@ func _init() -> void:
 func _provide_cancellation_token() -> YarnCancellationToken:
 	if _current_command_token != null:
 		return _current_command_token
-	if _dialogue_token == null:
-		_dialogue_token = YarnCancellationToken.new()
-	return _dialogue_token
+	_current_function_token = YarnCancellationToken.new()
+	if _dialogue_token != null and _dialogue_token.is_next_content_requested:
+		_current_function_token.request_next_content()
+	return _current_function_token
 
 
 func _ready() -> void:
@@ -610,12 +615,11 @@ func _register_script_actions(script: Script) -> bool:
 				_report_duplicate_action("function", yarn_name, script)
 				continue
 
-			if not is_static:
-				push_error("dialogue runner: function '%s' in %s must be static to be found automatically. Make it static, or remove the _yarn_function_ prefix and register it with add_function(\"%s\", callable)" % [yarn_name, script.resource_path, yarn_name])
-				continue
-
 			_action_sources["function:" + yarn_name] = script
-			_library.register_function(yarn_name, Callable(script, method_name))
+			if is_static:
+				_library.register_function(yarn_name, Callable(script, method_name))
+			else:
+				_library.register_instance_function(yarn_name, script, method_name)
 
 			if verbose_logging:
 				print("dialogue runner: auto-registered function '%s' from %s" % [yarn_name, script.resource_path])
@@ -647,10 +651,13 @@ func _load_program() -> void:
 		_smart_variable_evaluator.set_program_context(program, _library)
 
 
-## if dialogue is already running, it will be stopped first.
 func start_dialogue(node_name: String = "") -> void:
 	if _is_starting:
 		push_warning("dialogue runner: start_dialogue called while already starting, ignoring")
+		return
+
+	if _is_running:
+		push_error("dialogue runner: can't start dialogue: dialogue is already running on this Dialogue Runner. Call stop_dialogue() first")
 		return
 
 	if node_name.is_empty():
@@ -692,7 +699,7 @@ func start_dialogue(node_name: String = "") -> void:
 
 	dialogue_started.emit()
 
-	await _notify_presenters_together("on_dialogue_started")
+	await _notify_presenters_together("on_dialogue_started", true)
 
 	if run != _run_id or not _is_running:
 		return
@@ -706,6 +713,16 @@ func start_dialogue(node_name: String = "") -> void:
 		return
 
 	_continue_dialogue()
+
+
+func run_dialogue(node_name: String = "") -> void:
+	if _is_running:
+		push_error("dialogue runner: can't run dialogue: dialogue is already running on this Dialogue Runner")
+		return
+	await start_dialogue(node_name)
+	var completion := _completion_promise
+	if _is_running and completion != null:
+		await completion.wait()
 
 
 func stop_dialogue() -> void:
@@ -727,6 +744,8 @@ func _cancel_current_content() -> void:
 		_current_command_token.request_next_content()
 	if _dialogue_token != null:
 		_dialogue_token.request_next_content()
+	if _current_function_token != null:
+		_current_function_token.request_next_content()
 	if _current_options_token != null:
 		_current_options_token.request_next_content()
 
@@ -764,10 +783,12 @@ func _finish_dialogue(was_cancelled: bool) -> void:
 	dialogue_completed.emit()
 
 
-func _notify_presenters_together(method: String) -> void:
+func _notify_presenters_together(method: String, skip_disabled: bool = false) -> void:
 	var promises: Array[YarnPromise] = []
 	for presenter in _presenters.duplicate():
 		if not is_instance_valid(presenter):
+			continue
+		if skip_disabled and _is_presenter_disabled(presenter):
 			continue
 		var promise := YarnPromise.new()
 		promises.append(promise)
@@ -1151,6 +1172,8 @@ func request_hurry_up() -> void:
 		_current_line_token.request_hurry_up()
 	if _current_command_token != null:
 		_current_command_token.request_hurry_up()
+	if _current_options_token != null:
+		_current_options_token.request_hurry_up()
 
 
 ## Asks the current content to finish and advance. Delivered through the
@@ -1161,6 +1184,12 @@ func request_next_content() -> void:
 		_current_line_token.request_next_content()
 	if _current_command_token != null:
 		_current_command_token.request_next_content()
+	if _current_options_token != null:
+		_current_options_token.request_next_content()
+
+
+func is_running_command() -> bool:
+	return _current_command_token != null
 
 
 func request_next_line() -> void:
@@ -1295,6 +1324,10 @@ func _on_line(line: YarnLine) -> void:
 		return
 
 	var run := _run_id
+	if _running_node_hooks:
+		await _node_hooks_settled
+		if run != _run_id or not _is_running:
+			return
 	_line_epoch += 1
 	var epoch := _line_epoch
 	_current_line = line
@@ -1360,7 +1393,14 @@ func _start_line_presenters(line: YarnLine, run: int, token: YarnCancellationTok
 
 
 func _is_presenter_disabled(presenter: Node) -> bool:
-	return presenter.process_mode == Node.PROCESS_MODE_DISABLED
+	var node := presenter
+	while node != null:
+		if node.process_mode == Node.PROCESS_MODE_DISABLED:
+			return true
+		if node.process_mode != Node.PROCESS_MODE_INHERIT:
+			return false
+		node = node.get_parent()
+	return false
 
 
 ## Runs one presenter's run_line and settles its promise when the presenter
@@ -1429,6 +1469,10 @@ func _on_options(options: Array[YarnOption]) -> void:
 		return
 
 	var run := _run_id
+	if _running_node_hooks:
+		await _node_hooks_settled
+		if run != _run_id or not _is_running:
+			return
 	_current_options = options
 
 	if _line_provider != null:
@@ -1464,7 +1508,7 @@ func _on_options(options: Array[YarnOption]) -> void:
 	for presenter in presenters_copy:
 		if run != _run_id:
 			return
-		if not is_instance_valid(presenter):
+		if not is_instance_valid(presenter) or _is_presenter_disabled(presenter):
 			continue
 		var done := YarnPromise.new()
 		done_promises.append(done)
@@ -1489,6 +1533,10 @@ func _on_options(options: Array[YarnOption]) -> void:
 		# Ask the remaining presenters to wind down. Per the token contract,
 		# they must finish once this fires.
 		token.request_next_content()
+		for done_promise in done_promises:
+			await done_promise.wait()
+		if run != _run_id or not _is_running:
+			return
 		await _apply_selected_option(selected_option_index)
 		return
 
@@ -1554,6 +1602,10 @@ func _watch_options_completion(done_promises: Array[YarnPromise], selection: Yar
 
 func _on_command(command_text: String) -> void:
 	var run := _run_id
+	if _running_node_hooks:
+		await _node_hooks_settled
+		if run != _run_id or not _is_running:
+			return
 	_waiting_for_content = true
 	# A superseded line join must not complete this command (see _line_epoch)
 	# and symmetrically, if this command is force-advanced past while its
@@ -1571,6 +1623,11 @@ func _on_command(command_text: String) -> void:
 	# completion below against content that advanced past us meanwhile.
 	var command_token := YarnCancellationToken.new()
 	_current_command_token = command_token
+	await _notify_presenters_of_command(command_text, command_token)
+	if run != _run_id or not _is_running or epoch != _line_epoch:
+		if _current_command_token == command_token:
+			_current_command_token = null
+		return
 	var result := await _dispatch_command_with_discovery(command_text)
 	if not (result.handled and result.is_async) and _current_command_token == command_token:
 		_current_command_token = null
@@ -1630,6 +1687,30 @@ func _on_command(command_text: String) -> void:
 	signal_content_complete()
 
 
+func _notify_presenters_of_command(command_text: String, token: YarnCancellationToken) -> void:
+	var promises: Array[YarnPromise] = []
+	for presenter in _presenters.duplicate():
+		if not is_instance_valid(presenter):
+			continue
+		if not presenter.has_method("run_command"):
+			continue
+		var promise := YarnPromise.new()
+		promises.append(promise)
+		_run_presenter_command(presenter, command_text, token, promise)
+	for promise in promises:
+		await promise.wait()
+
+
+func _run_presenter_command(presenter: Variant, command_text: String, token: YarnCancellationToken, promise: YarnPromise) -> void:
+	var on_exit := func() -> void:
+		promise.settle()
+	presenter.tree_exiting.connect(on_exit, CONNECT_ONE_SHOT)
+	await presenter.run_command(command_text, token)
+	promise.settle()
+	if is_instance_valid(presenter) and presenter.tree_exiting.is_connected(on_exit):
+		presenter.tree_exiting.disconnect(on_exit)
+
+
 func _handle_builtin_command(command_text: String) -> bool:
 	var parts := YarnCommandParser.parse(command_text)
 	if parts.is_empty():
@@ -1647,25 +1728,39 @@ func _handle_builtin_command(command_text: String) -> bool:
 
 func _on_node_start(node_name: String) -> void:
 	node_started.emit(node_name)
-
-	var presenters_copy := _presenters.duplicate()
-	for presenter in presenters_copy:
-		if is_instance_valid(presenter) and not _is_presenter_disabled(presenter):
-			_safe_call_presenter(presenter, "on_node_started", [node_name])
+	_queue_node_hook("on_node_started", node_name)
 
 
 func _on_node_complete(node_name: String) -> void:
 	node_completed.emit(node_name)
+	_queue_node_hook("on_node_completed", node_name)
 
-	var presenters_copy := _presenters.duplicate()
-	for presenter in presenters_copy:
-		if is_instance_valid(presenter) and not _is_presenter_disabled(presenter):
-			_safe_call_presenter(presenter, "on_node_completed", [node_name])
+
+func _queue_node_hook(method: String, node_name: String) -> void:
+	_node_hook_queue.append([method, node_name])
+	if _running_node_hooks:
+		return
+	_running_node_hooks = true
+	while not _node_hook_queue.is_empty():
+		var entry: Array = _node_hook_queue.pop_front()
+		for presenter in _presenters.duplicate():
+			if not is_instance_valid(presenter) or _is_presenter_disabled(presenter):
+				continue
+			if not presenter.has_method(entry[0]):
+				continue
+			await presenter.callv(entry[0], _hook_arguments(presenter, entry[0], [entry[1]]))
+	_running_node_hooks = false
+	_node_hooks_settled.emit()
 
 
 func _on_dialogue_complete() -> void:
 	if not _is_running:
 		return
+	if _running_node_hooks:
+		var run := _run_id
+		await _node_hooks_settled
+		if run != _run_id or not _is_running:
+			return
 	# A VM error ends the run to avoid a soft-lock (GDScript has no
 	# exceptions to surface it), but it isn't a natural finish — flag it
 	# as cancelled so listeners can tell the difference.
@@ -1701,7 +1796,7 @@ func _safe_notify_presenter(presenter: Variant, method: String) -> void:
 	if not presenter.has_method(method):
 		return
 
-	var result: Variant = presenter.call(method)
+	var result: Variant = presenter.callv(method, _hook_arguments(presenter, method, []))
 	if result is Signal:
 		await result
 	elif result is Object and result != null and result.has_signal("completed"):
@@ -1718,7 +1813,17 @@ func _safe_call_presenter(presenter: Variant, method: String, args: Array) -> vo
 	if not presenter.has_method(method):
 		return
 
-	presenter.callv(method, args)
+	presenter.callv(method, _hook_arguments(presenter, method, args))
+
+
+func _hook_arguments(presenter: Object, method: String, args: Array) -> Array:
+	if Callable(presenter, method).get_argument_count() <= args.size():
+		return args
+	if _dialogue_token == null:
+		_dialogue_token = YarnCancellationToken.new()
+	var with_token := args.duplicate()
+	with_token.append(_dialogue_token)
+	return with_token
 
 
 func get_asset_provider() -> YarnAssetProvider:
@@ -1788,10 +1893,23 @@ func _register_global_commands() -> void:
 				_library.register_converter(type_name, converters[type_name])
 
 
-func _cmd_wait(duration: float) -> void:
+func _cmd_wait(duration: float, token: YarnCancellationToken = null) -> void:
 	# Pause-respecting <<wait>> must not keep elapsing under a pause menu.
 	# Fixed thanks to Leonardo.
-	await YarnAsync.wait(self, duration)
+	if duration < 0.0:
+		push_error("dialogue runner: <<wait>> can't wait for a negative duration (%s)" % duration)
+		return
+	if token == null:
+		await YarnAsync.wait(self, duration)
+		return
+	var remaining := duration
+	while remaining > 0.0 and not token.is_hurry_up_requested:
+		await get_tree().process_frame
+		if not is_inside_tree():
+			return
+		if not can_process():
+			continue
+		remaining -= get_process_delta_time()
 
 
 func _regenerate_ysls_pressed() -> void:

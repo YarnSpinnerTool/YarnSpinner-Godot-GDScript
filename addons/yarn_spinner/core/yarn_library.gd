@@ -56,6 +56,7 @@ var _command_params: Dictionary[String, PackedStringArray] = {}
 var _command_targets: Dictionary[String, Node] = {}
 var _target_root: Node
 var _instance_commands: Dictionary[String, Dictionary] = {}
+var _instance_functions: Dictionary[String, Dictionary] = {}
 var _vm_ref: WeakRef
 var _converters: Dictionary[String, Callable] = {}
 var cancellation_token_provider: Callable
@@ -107,7 +108,7 @@ func register_function(func_name: String, callable: Callable, param_count: int =
 	if func_name.contains(" "):
 		push_error("yarn library: cannot add function %s: function names are not allowed to contain spaces" % func_name)
 		return
-	if _functions.has(func_name):
+	if has_function(func_name):
 		push_error("yarn library: cannot add function %s: one already exists" % func_name)
 		return
 	if not callable.is_valid():
@@ -126,6 +127,7 @@ func _add_function(func_name: String, callable: Callable, param_count: int = -1)
 
 func unregister_function(func_name: String) -> void:
 	_functions.erase(func_name)
+	_instance_functions.erase(func_name)
 	_function_param_counts.erase(func_name)
 	_function_signatures.erase(func_name)
 
@@ -208,6 +210,11 @@ func current_cancellation_token() -> YarnCancellationToken:
 	return YarnCancellationToken.new()
 
 
+static func _returns_enum(method_info: Dictionary) -> bool:
+	var return_info: Dictionary = method_info.get("return", {})
+	return int(return_info.get("type", TYPE_NIL)) == TYPE_INT and not String(return_info.get("class_name", "")).is_empty()
+
+
 static func _is_token_arg(arg: Dictionary) -> bool:
 	return String(arg.get("class_name", "")) == CANCELLATION_TOKEN_CLASS
 
@@ -244,6 +251,25 @@ func unregister_instance_command(command_name: String) -> void:
 
 func has_instance_command(command_name: String) -> bool:
 	return _instance_commands.has(command_name)
+
+
+func register_instance_function(func_name: String, target_class: Script, method_name: String = "") -> void:
+	if func_name.is_empty() or func_name.contains(" "):
+		push_error("yarn library: cannot add function '%s': function names can't be empty or contain spaces" % func_name)
+		return
+	if has_function(func_name):
+		push_error("yarn library: cannot add function %s: one already exists" % func_name)
+		return
+	if method_name.is_empty():
+		method_name = "_yarn_function_" + func_name
+	_instance_functions[func_name] = {
+		"script": target_class,
+		"method": method_name
+	}
+
+
+func has_instance_function(func_name: String) -> bool:
+	return _instance_functions.has(func_name)
 
 
 func register_command_target(target_name: String, target: Node) -> void:
@@ -316,7 +342,7 @@ func take_function_error() -> String:
 
 
 func has_function(func_name: String) -> bool:
-	return _functions.has(func_name)
+	return _functions.has(func_name) or _instance_functions.has(func_name)
 
 
 func has_command(command_name: String) -> bool:
@@ -353,7 +379,7 @@ func prepare_function_call(func_name: String, stack: Array) -> Dictionary:
 	_function_error = ""
 	var failed := {"ok": false, "callable": Callable(), "args": []}
 
-	if not _functions.has(func_name):
+	if not has_function(func_name):
 		_function_failure(("unknown function '%s'. It is not registered at runtime. " +
 			"If you defined it with _yarn_function_%s, make sure that script is on a node under " +
 			"the DialogueRunner's discovery root (a valid .ysls.json does not register it); " +
@@ -379,7 +405,19 @@ func prepare_function_call(func_name: String, stack: Array) -> Dictionary:
 	for i in range(arg_count - 1, -1, -1):
 		args[i] = stack.pop_back()
 
-	var signature: Dictionary = _function_signatures[func_name]
+	var signature: Dictionary
+	var callable: Callable
+	if _instance_functions.has(func_name):
+		var resolved := _resolve_instance_function(func_name, args)
+		if not resolved.ok:
+			return failed
+		callable = resolved.callable
+		signature = _describe_callable(callable, -1)
+		args.remove_at(0)
+		arg_count = args.size()
+	else:
+		signature = _function_signatures[func_name]
+		callable = _functions[func_name]
 	var min_args: int = signature.min
 	var max_args: int = signature.max
 	if arg_count < min_args or (max_args >= 0 and arg_count > max_args):
@@ -418,15 +456,43 @@ func prepare_function_call(func_name: String, stack: Array) -> Dictionary:
 			return failed
 		args[i] = converted.value
 
-	var callable: Callable = _functions[func_name]
 	if not callable.is_valid():
 		_function_failure("the callable for function %s is no longer valid" % func_name)
+		return failed
+
+	if signature.get("returns_enum", false):
+		_function_failure("function %s returns an enum, which a function can't return. Return the enum's value instead, as a String or a number" % func_name)
 		return failed
 
 	if signature.get("wants_token", false):
 		args.append(current_cancellation_token())
 
 	return {"ok": true, "callable": callable, "args": args}
+
+
+func _resolve_instance_function(func_name: String, args: Array) -> Dictionary:
+	var info: Dictionary = _instance_functions[func_name]
+	var expected_script: Script = info["script"]
+	var expected_class := _get_script_class_name(expected_script)
+	if args.is_empty():
+		_function_failure("function %s needs the name of a %s node as its first argument" % [func_name, expected_class])
+		return {"ok": false}
+	var target_name := YarnVirtualMachine._value_to_string(args[0])
+	if _converters.has(expected_class):
+		var converted := _convert_with_converter(expected_class, target_name)
+		if not converted.ok:
+			_function_failure("function %s: %s" % [func_name, converted.error])
+			return {"ok": false}
+		return {"ok": true, "callable": Callable(converted.value as Object, String(info["method"]))}
+	var target := _find_node_by_name(target_name)
+	if target == null:
+		_function_failure("function %s: no node named \"%s\" exists" % [func_name, target_name])
+		return {"ok": false}
+	target = _find_script_instance(target, expected_script)
+	if target == null:
+		_function_failure("function %s can't be called on %s, because it isn't a %s" % [func_name, target_name, expected_class])
+		return {"ok": false}
+	return {"ok": true, "callable": Callable(target, String(info["method"]))}
 
 
 ## Converts what a function returned into a Yarn value, or FUNCTION_ERROR.
@@ -458,7 +524,7 @@ func _describe_callable(callable: Callable, param_count: int) -> Dictionary:
 			types.append(int(args[i].get("type", TYPE_NIL)))
 			classes.append(String(args[i].get("class_name", "")))
 		var variadic := (int(info.get("flags", 0)) & METHOD_FLAG_VARARG) != 0
-		return {"min": maxi(fixed - defaults, 0), "max": - 1 if variadic else fixed, "types": types, "classes": classes, "wants_token": wants_token}
+		return {"min": maxi(fixed - defaults, 0), "max": - 1 if variadic else fixed, "types": types, "classes": classes, "wants_token": wants_token, "returns_enum": _returns_enum(info)}
 
 	var count := param_count if param_count >= 0 else callable.get_argument_count()
 	return {"min": count, "max": count, "types": []}
@@ -610,13 +676,24 @@ func dispatch_command(command_text: String, dialogue_runner: Node) -> Dictionary
 		var method_name: String = cmd_info["method"]
 
 		var target_name: String = args[0]
+		var target_class := _get_script_class_name(expected_script)
+		if _converters.has(target_class):
+			var converted := _convert_with_converter(target_class, target_name)
+			if not converted.ok:
+				return _make_dispatch_result(CommandDispatchStatus.TARGET_NOT_FOUND, false, false, null, converted.error)
+			var converted_args: Array[String] = args.slice(1)
+			var converted_call := await _safe_call(converted.value as Object, method_name, converted_args, command_name)
+			if converted_call.success:
+				return _make_dispatch_result(CommandDispatchStatus.SUCCESS, true, _is_async_result(converted_call.result), converted_call.result, "")
+			return _make_dispatch_result(converted_call.status, false, false, null, converted_call.error)
 		var target_node := _find_node_by_name(target_name)
 
 		if target_node == null:
 			return _make_dispatch_result(CommandDispatchStatus.TARGET_NOT_FOUND, false, false, null,
 				"no node named \"%s\" exists" % target_name)
 
-		if not _node_is_instance_of(target_node, expected_script):
+		target_node = _find_script_instance(target_node, expected_script)
+		if target_node == null:
 			var expected_class := _get_script_class_name(expected_script)
 			return _make_dispatch_result(CommandDispatchStatus.TARGET_MISSING_COMPONENT, false, false, null,
 				"%s can't be called on %s, because it isn't a %s" % [command_name, target_name, expected_class])
@@ -817,7 +894,7 @@ func _coerce_value(value: Variant, target_type: int, type_class: String = "", pa
 				if node != null:
 					match_node = _find_matching_node(node, type_class)
 				if match_node == null:
-					push_warning("yarn library: no %s named '%s' was found for parameter %s" % [type_class, str_value, param_name])
+					return {"ok": false, "value": null, "error": "no %s named \"%s\" was found for parameter %s" % [type_class, str_value, param_name]}
 				return {"ok": true, "value": match_node, "error": ""}
 			return failure.call(type_class if not type_class.is_empty() else "Object")
 
@@ -965,6 +1042,16 @@ static func yarn_enum_info(type_class: String) -> Dictionary:
 static func convert_yarn_enum(value: Variant, info: Dictionary) -> Dictionary:
 	var cases: Dictionary = info.cases
 	var values: Dictionary = info.values
+	var case_name := ""
+	if value is String:
+		case_name = value.strip_edges()
+		if case_name.begins_with("."):
+			case_name = case_name.substr(1)
+		elif case_name.begins_with(String(info.name) + "."):
+			case_name = case_name.substr(String(info.name).length() + 1)
+		for key in cases:
+			if key == case_name or key == case_name.to_snake_case().to_upper() and String(key).to_pascal_case() == case_name:
+				return {"ok": true, "value": cases[key], "error": ""}
 	for case_number in values:
 		var raw: Variant = values[case_number]
 		if typeof(raw) == typeof(value) and raw == value:
@@ -974,16 +1061,9 @@ static func convert_yarn_enum(value: Variant, info: Dictionary) -> Dictionary:
 		if (raw is float or raw is int) and value is String and value.is_valid_float() and float(raw) == value.to_float():
 			return {"ok": true, "value": case_number, "error": ""}
 	if value is String:
-		var case_name: String = value.strip_edges()
-		if case_name.begins_with("."):
-			case_name = case_name.substr(1)
-		elif case_name.begins_with(String(info.name) + "."):
-			case_name = case_name.substr(String(info.name).length() + 1)
-		var key := case_name.to_snake_case().to_upper()
-		if cases.has(key):
-			return {"ok": true, "value": cases[key], "error": ""}
-		if cases.has(case_name):
-			return {"ok": true, "value": cases[case_name], "error": ""}
+		var loose_key := case_name.to_snake_case().to_upper()
+		if cases.has(loose_key):
+			return {"ok": true, "value": cases[loose_key], "error": ""}
 	return {"ok": false, "value": null, "error": "'%s' isn't a case of the %s enum" % [value, info.name]}
 
 
@@ -1023,6 +1103,16 @@ func _find_node_by_name(node_name: String) -> Node:
 		return direct
 
 	return _find_node_recursive(search_root, node_name)
+
+
+func _find_script_instance(node: Node, expected_script: Script) -> Node:
+	if _node_is_instance_of(node, expected_script):
+		return node
+	for child in node.get_children():
+		var found := _find_script_instance(child, expected_script)
+		if found != null:
+			return found
+	return null
 
 
 func _node_is_instance_of(node: Node, expected_script: Script) -> bool:
@@ -1218,23 +1308,21 @@ func _builtin_random() -> float:
 
 
 func _builtin_random_range(min_val: float, max_val: float) -> float:
-	var range_size := int(max_val) - int(min_val) + 1
-	if range_size < 0:
+	var whole_min := YarnNumber.to_int32(min_val)
+	var whole_max := YarnNumber.to_int32(max_val)
+	if whole_max < whole_min:
 		report_function_error("random_range(): the maximum must not be less than the minimum")
 		return 0.0
-	if range_size == 0:
-		return min_val
-	return float(randi_range(0, range_size - 1)) + min_val
+	return float(randi_range(whole_min, whole_max))
 
 
 func _builtin_random_range_float(min_val: float, max_val: float) -> float:
-	var range_size := int(max_val) - int(min_val) + 1
-	if range_size < 0:
+	var whole_min := YarnNumber.to_int32(min_val)
+	var whole_max := YarnNumber.to_int32(max_val)
+	if whole_max < whole_min:
 		report_function_error("random_range_float(): the maximum must not be less than the minimum")
 		return 0.0
-	if range_size == 0:
-		return min_val
-	return float(randi_range(0, range_size - 1)) + min_val
+	return float(randi_range(whole_min, whole_max))
 
 
 func _builtin_dice(sides: int) -> int:
@@ -1473,12 +1561,8 @@ func _op_number_divide(a: float, b: float) -> float:
 	return a / b
 
 
-func _op_number_modulo(a: int, b: int) -> int:
-	if b == 0:
-		report_function_error("attempted to divide by zero")
-		return 0
-	# Operands convert to int before modulo
-	return a % b
+func _op_number_modulo(a: float, b: float) -> float:
+	return fmod(a, b)
 
 
 func _op_number_unary_minus(a: float) -> float:

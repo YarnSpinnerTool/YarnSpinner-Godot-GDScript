@@ -191,6 +191,8 @@ func _with_instances_as_strings(entries: Array) -> Array:
 			elif param.get("type", "") == "enum":
 				param["type"] = param.get("rawType", "any")
 				param.erase("subtype")
+			elif param.get("type", "") == "node":
+				param["type"] = param.get("rawType", "string")
 		result.append(copy)
 	return result
 
@@ -730,11 +732,12 @@ func _scan_script_methods(script: Script, path: String) -> void:
 			_commands[yarn_name] = _build_command_info(yarn_name, method_name, method, file_name, not is_static, script_class, source_method)
 
 		elif method_name.begins_with("_yarn_function_"):
-			if not is_static:
-				continue
 			var yarn_name := method_name.substr(15)  # remove "_yarn_function_"
 			var source_method := _find_source_method(script, method_name)
-			_functions[yarn_name] = _build_function_info(yarn_name, method_name, method, file_name, source_method)
+			var info := _build_function_info(yarn_name, method_name, method, file_name, source_method)
+			if not is_static:
+				(info["parameters"] as Array).push_front(_make_target_parameter(script_class))
+			_functions[yarn_name] = info
 
 
 func _process_command_binding(binding: Dictionary, path: String, script_path: String) -> void:
@@ -866,7 +869,7 @@ func _make_target_parameter(target_class: String) -> Dictionary:
 	var target_param := {
 		"name": "target",
 		"type": "instance",
-		"documentation": "The name of the %s node the runner will search for to run this command upon." % (target_class if not target_class.is_empty() else "Node"),
+		"documentation": "The name of the %s node to call this on." % (target_class if not target_class.is_empty() else "Node"),
 		"isParamsArray": false
 	}
 	if not target_class.is_empty():
@@ -1005,10 +1008,39 @@ static func _source_is_async(source_method: Dictionary) -> bool:
 	return bool(source_method.get("has_await", false)) or str(source_method.get("return_text", "")).strip_edges() == "Signal"
 
 
+const ENUM_PARAMETER_HINT := "@yarn_enum"
+const NODE_PARAMETER_HINT := "@yarn_node"
+
+
+func _apply_parameter_hints(info: Dictionary, documentation: String) -> String:
+	var kept := PackedStringArray()
+	for line in documentation.split("\n"):
+		var words := line.strip_edges().split(" ", false)
+		if words.is_empty() or not words[0] in [ENUM_PARAMETER_HINT, NODE_PARAMETER_HINT]:
+			kept.append(line)
+			continue
+		if words.size() < 2:
+			continue
+		for param: Dictionary in info.get("parameters", []):
+			if param.get("name", "") != words[1]:
+				continue
+			var raw_type := str(param.get("type", "string"))
+			if not raw_type in ["string", "number"]:
+				raw_type = "string"
+			if words[0] == ENUM_PARAMETER_HINT and words.size() >= 3:
+				param["type"] = "enum"
+				param["subtype"] = words[2]
+				param["rawType"] = raw_type
+			elif words[0] == NODE_PARAMETER_HINT:
+				param["type"] = "node"
+				param["rawType"] = raw_type
+	return "\n".join(kept).strip_edges()
+
+
 func _apply_source_details(info: Dictionary, source_method: Dictionary) -> void:
 	if source_method.is_empty():
 		return
-	var documentation: String = source_method.get("documentation", "")
+	var documentation := _apply_parameter_hints(info, source_method.get("documentation", ""))
 	if not documentation.is_empty():
 		info["documentation"] = documentation
 	info["location"] = {

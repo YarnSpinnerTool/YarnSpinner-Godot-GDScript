@@ -278,6 +278,20 @@ func try_get_value(variable_name: String) -> Dictionary:
 	return {found = false, value = null}
 
 
+func try_get_unstored_value(variable_name: String) -> Dictionary:
+	if smart_variable_evaluator != null:
+		var smart_result := smart_variable_evaluator.try_get_smart_variable(variable_name)
+		if smart_result.found:
+			return {found = true, value = smart_result.value}
+	if _program != null and _program.has_initial_value(variable_name):
+		return {found = true, value = _program.get_initial_value(variable_name)}
+	return {found = false, value = null}
+
+
+func try_get_stored_value(variable_name: String) -> Dictionary:
+	return try_get_value(variable_name)
+
+
 ## Checks stored, then smart variables, then program initial values.
 ##
 ## Smart variables are checked before initial values because they are
@@ -286,12 +300,9 @@ func get_value(variable_name: String) -> Variant:
 	var result := try_get_value(variable_name)
 	if result.found:
 		return result.value
-	if smart_variable_evaluator != null:
-		var smart_result := smart_variable_evaluator.try_get_smart_variable(variable_name)
-		if smart_result.found:
-			return smart_result.value
-	if _program != null and _program.has_initial_value(variable_name):
-		return _program.get_initial_value(variable_name)
+	var fallback := try_get_unstored_value(variable_name)
+	if fallback.found:
+		return fallback.value
 	# Internal Yarn variables are expected to not exist on first access
 	if not variable_name.begins_with("$Yarn.Internal."):
 		push_warning("variable storage: variable '%s' not found" % variable_name)
@@ -355,7 +366,7 @@ static func crc32(text: String) -> int:
 
 
 func get_variable_kind(variable_name: String) -> VariableKind:
-	if try_get_value(variable_name).found:
+	if try_get_stored_value(variable_name).found:
 		return VariableKind.STORED
 	if smart_variable_evaluator != null and smart_variable_evaluator.is_smart_variable(variable_name):
 		return VariableKind.SMART

@@ -67,13 +67,12 @@ func run_typewriter(line: YarnMarkupParseResult, display_text: String, token: Ya
 				while not _is_hurried(token) and accumulated < seconds_per_unit:
 					if not is_instance_valid(label) or not label.is_inside_tree():
 						break
-					var before := Time.get_ticks_usec()
 					await label.get_tree().process_frame
 					if not is_instance_valid(label):
 						break
 					if not label.can_process():
 						continue
-					accumulated += float(Time.get_ticks_usec() - before) / 1_000_000.0
+					accumulated += label.get_process_delta_time()
 				if uses_words:
 					accumulated -= seconds_per_unit
 

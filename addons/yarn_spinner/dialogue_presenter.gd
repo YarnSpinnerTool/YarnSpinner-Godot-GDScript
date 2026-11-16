@@ -56,6 +56,9 @@ var typewriter: YarnTypewriter
 var _fade_serial := 0
 
 
+var fade_target: CanvasItem
+
+
 ## Safely set visibility for this presenter's UI.
 ## Handles three common layouts:
 ##   1. Presenter IS a CanvasItem (e.g. extends Control) — toggles own visibility.
@@ -63,6 +66,9 @@ var _fade_serial := 0
 ##   3. Presenter has CanvasLayer children — toggles their visibility.
 ## No-op for non-visual presenters with no visual children.
 func _set_presenter_visible(v: bool) -> void:
+	if fade_target != null:
+		fade_target.visible = v
+		return
 	if is_class("CanvasItem"):
 		set("visible", v)
 		return
@@ -78,6 +84,8 @@ func _set_presenter_visible(v: bool) -> void:
 func _get_presenter_canvas_item() -> CanvasItem:
 	# The declared base is Node, but scenes often attach this script to a
 	# Control; go via Variant so the analyser allows the cast.
+	if fade_target != null:
+		return fade_target
 	var target: Variant = self
 	if target is CanvasItem:
 		return target as CanvasItem
@@ -134,6 +142,10 @@ func on_node_started(_node_name: String) -> void:
 
 ## Called when a node finishes executing.
 func on_node_completed(_node_name: String) -> void:
+	pass
+
+
+func run_command(_command_text: String, _token: YarnCancellationToken = null) -> void:
 	pass
 
 

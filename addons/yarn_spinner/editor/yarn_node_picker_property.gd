@@ -142,10 +142,11 @@ static func apply_filter(program: YarnProgram, names: PackedStringArray, filter_
 		return names
 	var regex: RegEx = null
 	if type == "matches_regex":
-		regex = RegEx.create_from_string("(?i)" + filter_text)
+		regex = RegEx.create_from_string(filter_text)
 		if regex == null or not regex.is_valid():
 			push_warning("yarn node picker: \"%s\" isn't a valid regular expression" % filter_text)
 			return names
+	var needle := filter_text.to_lower().replace("-", "_")
 	var result: PackedStringArray = []
 	for node_name in names:
 		var value := node_name
@@ -157,13 +158,13 @@ static func apply_filter(program: YarnProgram, names: PackedStringArray, filter_
 		var matched := false
 		match type:
 			"starts_with":
-				matched = value.begins_with(filter_text)
+				matched = value.to_lower().begins_with(needle)
 			"ends_with":
-				matched = value.ends_with(filter_text)
+				matched = value.to_lower().ends_with(needle)
 			"matches_regex":
 				matched = regex.search(value) != null
 			_:
-				matched = value.contains(filter_text)
+				matched = value.to_lower().contains(needle)
 		if matched:
 			result.append(node_name)
 	return result
