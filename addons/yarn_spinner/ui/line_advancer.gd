@@ -315,6 +315,8 @@ func _on_input_hurry_up_lines() -> bool:
 
 
 func _on_input_next_content() -> bool:
+	if _has_options_content():
+		return false
 	var acted := _has_line_content()
 	request_next_line()
 	return acted

@@ -94,6 +94,7 @@ const COMPILER_DECLARATIONS: Array[Dictionary] = [
 	{"name": "length", "parameters": ["string"], "returnType": "number"},
 	{"name": "uppercase", "parameters": ["string"], "returnType": "string"},
 	{"name": "lowercase", "parameters": ["string"], "returnType": "string"},
+	{"name": "first_letter_caps", "parameters": ["string"], "returnType": "string"},
 ]
 
 
