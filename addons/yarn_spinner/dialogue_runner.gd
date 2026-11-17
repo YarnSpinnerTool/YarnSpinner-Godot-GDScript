@@ -588,6 +588,8 @@ func _register_script_actions(script: Script) -> bool:
 			var yarn_name := method_name.substr(14)  # remove "_yarn_command_"
 			found_actions = true
 
+			if not is_static and _library.add_instance_command_class(yarn_name, script):
+				continue
 			if _library.has_command(yarn_name) or _library.has_instance_command(yarn_name):
 				_report_duplicate_action("command", yarn_name, script)
 				continue

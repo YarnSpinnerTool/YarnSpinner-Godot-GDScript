@@ -246,6 +246,30 @@ func register_instance_command(command_name: String, target_class: Script, metho
 	}
 
 
+func add_instance_command_class(command_name: String, target_class: Script, method_name: String = "") -> bool:
+	if not _instance_commands.has(command_name) or _commands.has(command_name):
+		return false
+	if method_name.is_empty():
+		method_name = "_yarn_command_" + command_name
+	var info: Dictionary = _instance_commands[command_name]
+	var others: Array = info.get("others", [])
+	if info["script"] == target_class:
+		return true
+	for other in others:
+		if other["script"] == target_class:
+			return true
+	others.append({"script": target_class, "method": method_name})
+	info["others"] = others
+	return true
+
+
+func _instance_command_classes(command_name: String) -> Array:
+	var info: Dictionary = _instance_commands[command_name]
+	var classes: Array = [{"script": info["script"], "method": info["method"]}]
+	classes.append_array(info.get("others", []))
+	return classes
+
+
 func unregister_instance_command(command_name: String) -> void:
 	_instance_commands.erase(command_name)
 
@@ -672,30 +696,35 @@ func dispatch_command(command_text: String, dialogue_runner: Node) -> Dictionary
 			return _make_dispatch_result(CommandDispatchStatus.INVALID_PARAMETER_COUNT, false, false, null,
 				"%s needs a target, but none was specified" % command_name)
 
-		var cmd_info: Dictionary = _instance_commands[command_name]
-		var expected_script: Script = cmd_info["script"]
-		var method_name: String = cmd_info["method"]
-
+		var classes := _instance_command_classes(command_name)
 		var target_name: String = args[0]
-		var target_class := _get_script_class_name(expected_script)
-		if _converters.has(target_class):
-			var converted := _convert_with_converter(target_class, target_name)
+		for entry in classes:
+			var converter_class := _get_script_class_name(entry["script"])
+			if not _converters.has(converter_class):
+				continue
+			var converted := _convert_with_converter(converter_class, target_name)
 			if not converted.ok:
 				return _make_dispatch_result(CommandDispatchStatus.TARGET_NOT_FOUND, false, false, null, converted.error)
 			var converted_args: Array[String] = args.slice(1)
-			var converted_call := await _safe_call(converted.value as Object, method_name, converted_args, command_name)
+			var converted_call := await _safe_call(converted.value as Object, entry["method"], converted_args, command_name)
 			if converted_call.success:
 				return _make_dispatch_result(CommandDispatchStatus.SUCCESS, true, _is_async_result(converted_call.result), converted_call.result, "")
 			return _make_dispatch_result(converted_call.status, false, false, null, converted_call.error)
-		var target_node := _find_node_by_name(target_name)
 
-		if target_node == null:
+		var found_node := _find_node_by_name(target_name)
+		if found_node == null:
 			return _make_dispatch_result(CommandDispatchStatus.TARGET_NOT_FOUND, false, false, null,
 				"no node named \"%s\" exists" % target_name)
 
-		target_node = _find_script_instance(target_node, expected_script)
+		var target_node: Node = null
+		var method_name := ""
+		for entry in classes:
+			target_node = _find_script_instance(found_node, entry["script"])
+			if target_node != null:
+				method_name = entry["method"]
+				break
 		if target_node == null:
-			var expected_class := _get_script_class_name(expected_script)
+			var expected_class := _get_script_class_name(classes[0]["script"])
 			return _make_dispatch_result(CommandDispatchStatus.TARGET_MISSING_COMPONENT, false, false, null,
 				"%s can't be called on %s, because it isn't a %s" % [command_name, target_name, expected_class])
 
