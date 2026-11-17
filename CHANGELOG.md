@@ -3,22 +3,59 @@
 ## Early Access 3.3.1
 
 - Functions can now wait! A function that uses `await`, such as one that waits for the player to pick an item, pauses the dialogue until it returns a value. Give it a typed return, for example a `-> String`, so the compiler knows what it returns. Functions called from smart variables or `when:` headers still have to return straight away! Don't forget.
-- Commands and functions can now be cancelled. If the last parameter of a handler is a `YarnCancellationToken`, the Dialogue Runner passes one in. A command's token is cancelled by `request_hurry_up()`, `request_next_content()` and `stop_dialogue()`. A function's token is cancelled when dialogue stops...
+- Commands and functions can now be cancelled!! If the last parameter of a handler is a `YarnCancellationToken`, the Dialogue Runner passes one in. A command's token is cancelled by `request_hurry_up()`, `request_next_content()` and `stop_dialogue()`. A function's token is cancelled when dialogue stops..
+- A `_yarn_function_` method that isn't static is now an instance function. Its first argument in Yarn is tebh name of the node to call it on, like `health("Alice")`. Previously, it was skipped with an error. The `.ysls.json` lists it with the node as its first parameter...
 - Commands and functions can now take your own types as parameters!! Add a converter with `add_converter()` on the Dialogue Runner or `YarnSpinner.register_converter()`, or write a static `_yarn_converter_<TypeName>(input: String)` method, which is found automatically. A converter takes the text from the Yarn Script and returns the value, or `null` if nothing matches.
 - Commands and functions can now take a Yarn enum as a parameter, using the enum in the generated variables class, for example `func feed(food: MyVariables.FoodType)`. They accept the enum's value (`{$food}`), its full case name (`FoodType.Apple`) or its short case name (`.Apple`). In the `.ysls.json`, these parameters are marked as that Yarn enum... so the VS Code extension suggests its cases. Projects older than file version 5 get the enum's raw type instead.
-- A function with a parameter whose type can't be worked out is now left undeclared, rather than being declared as taking fewer arguments than it does, which made calls to it fail to compile.
+- A function with a parameter whose type can't be worked out, including a `...` parameter, is now left undeclared, rather than being declared as taking fewer arguments than it does, which made calls to it fail to compile. This applies to functions found in your scripts and to ones listed in definitions files.
 - Enum parameters typed with the generated variables class are recognised before that class has been generated, so a Yarn Project that uses them compiles on its first import.
+- Presenters have a new `run_command(command_text, token)` method. The Dialogue Runner calls it on every Presenter before each command runs, and waits for them all to return.
+- The Dialogue Runner has a new `run_dialogue(node_name)` method, which returns once the whole conversation has ended.
+- `request_hurry_up()` on the Dialogue Runner now hurries options as well as lines. `request_next_line()` and `request_hurry_up_option()` still work, but are deprecated in favour of `request_next_content()` and `request_hurry_up()`.
+- The Line Advancer has new `request_hurry_up_content()` and `request_next_content()` methods, matching Yarn Spinner for Unity! Its `request_hurry_up()`, `request_next_line()` and `request_option_hurry_up()` methods still work, but are deprecated.
+- A Presenter's `on_dialogue_started`, `on_dialogue_completed`, `on_node_started` and `on_node_completed` methods can take a `YarnCancellationToken` as an extra last parameter. Presenters without it work as before.
+- An instance command or function can be on a type that has a converter, not only on a node's script. Its first argument goes to the converter, and the method is called on the object it returns.
+- A `String` parameter can be marked for the VS Code extension with a line in the method's `##` comment: `@yarn_node name` for node names, or `@yarn_enum name EnumName` for an enum's cases.
+- A function whose return type is an enum is now an error when it's called, as in Yarn Spinner for Unity. Return the enum's value instead.
 - Registering a command or function with a lambda now logs a deprecation warning. Pass a named method instead, please.
 - New Yarn Projects are created at project file version 5 (i.e. YS 3.3). The Yarn Project Inspector shows an **Upgrade Yarn Project** button for older projects.
 - In a version 5 project, calling a function that doesn't declare a usable return type, such as one that returns a `Signal`, now explains how to fix it :)
 - The `.ysls.json` now includes functions and commands registered with a plain `add_function(...)` or `add_command(...)` call, not only ones written as `runner.add_function(...)`.
-- The error for a `_yarn_function_` method that isn't static now says to make it static, or remove the prefix and register it with `add_function()`.
 - The `.ysls.json` now lists the built-in functions that only Yarn Spinner for Godot has, such as `abs`, `clamp`, `uppercase` and `plural`, so the VS Code extension no longer marks them as unknown. Sorry!
 - In the `.ysls.json`, parameters that use a converter are written as instances of their type, the same way Yarn Spinner for Unity writes them. In projects older than file version 5, instance parameters are written as strings, so those functions are still declared. Cancellation token parameters are left out.
 - Functions that wait are now marked `async` in the `.ysls.json`...
 - The `.ysls.json` now flags commands and functions that can't work, with the same error codes Yarn Spinner for Unity uses, so the VS Code extension marks them: `YS1004` for a function whose return type Yarn can't use (such as `void` or `Array`), `YS1006` for a `YarnCancellationToken` that isn't the last parameter, and `YS1008` for a parameter type Yarn can't pass in (such as `Array` or `Dictionary`). Each entry also has `containsErrors`.
 - A new project setting, **Yarn Spinner > YSLS > Included Addon Paths**, lists folders under `res://addons` for the `.ysls.json` scan to read. Addons are still skipped by default. Use it when an addon registers functions or commands, for example with `YarnSpinner.register_function()` from an autoload, so the compiler and the VS Code extension know about them.
-- Node pickers in the Inspector now list nodes alphabetically, and can be filtered. Add `;filter=Start` to the `yarn_node` hint, with optional `filter_type` (`contains`, `starts_with`, `ends_with` or `matches_regex`) and `header` to filter on a header other than the title.
+- Node pickers in the Inspector now list nodes alphabetically, and can be filtered. Add `;filter=Start` to the `yarn_node` hint, with optional `filter_type` (`contains`, `starts_with`, `ends_with` or `matches_regex`) and `header` to filter on a header other than the title. `contains`, `starts_with` and `ends_with` ignore upper and lower case; `matches_regex` doesn't, the same as in Yarn Spinner for Unity!
+- Options now keep their markup formatting, such as `[b]`, `[style]` and your own palette tags. The default option scene has a `RichTextLabel`, set as the **Text Label** of its `YarnOptionButton`, which takes its font, size and colours from the button. Option scenes of your own that only have a `Button` still show plain text; add a `RichTextLabel` and set it as the button's **Text Label** to get formatting.
+- Unavailable options are now struck through in the default option scene, the same as in Yarn Spinner for Unity.
+- `[br /]` now starts a new line.
+- Options can't be picked until they have finished fading in, the same as in Yarn Spinner for Unity.
+- New `YarnPaletteMarkerProcessorNode` and `YarnStyleMarkerProcessorNode`, so a markup palette and your own `[style]` names can be set up in the Inspector without code. They work on every line and option of their Dialogue Runner.
+- When a command or function takes a Yarn enum, case names are now checked before backing values, the same as in Yarn Spinner for Unity. This only matters if one case's backing value is the same text as another case's name.
+- The Dialogue Runner now waits for a Presenter's `on_node_started()` and `on_node_completed()` to return, the same as in Yarn Spinner for Unity. A Presenter that uses `await` in them, for example to fade in a title, holds the node's first line until it's done. Presenters that don't wait in them work as before.
+- `try_get_value()` on the built-in Variable Storage now finds a variable that hasn't been set yet, with its declared value, and a smart variable, with its current value, the same as in Yarn Spinner for Unity. Previously, it only found variables that had been set. Use the new `try_get_stored_value()` to check only what's been set. A Variable Storage of your own can return the new `try_get_unstored_value()` from its `try_get_value()` to do the same.
+- `start_dialogue()` no longer restarts when dialogue is already running. It logs an error and leaves the current dialogue alone, the same as `run_dialogue()` and Yarn Spinner for Unity. Call `stop_dialogue()` first to switch to another node.
+- `<<wait>>` can now be skipped. Hurry-up and next-content both end it early, the same as in Yarn Spinner for Unity, and a Line Advancer's hurry input now skips a running command. A negative duration is an error.
+- `request_next_content()` now cancels options that are showing: no option is picked, and the dialogue carries on after the options, the same as in Yarn Spinner for Unity.
+- After the player picks an option, the Dialogue Runner now waits for every Presenter's `run_options()` to return before it carries on, so a Presenter can finish hiding its options first.
+- A Presenter that's disabled (its **Process Mode** is Disabled, or it inherits that from a parent) is no longer sent options or `on_dialogue_started()`. `run_command()` is now called on every Presenter, disabled or not. This matches Yarn Spinner for Unity.
+- If a command or function takes a node and no node with that name is found, the Dialogue Runner now logs an error and doesn't call it, the same as in Yarn Spinner for Unity. Previously it passed `null`.
+- A command or function on a node is now also found when the script is on a child of the node you name, the same as in Yarn Spinner for Unity.
+- The `%` operator now works on decimal numbers, so `5.5 % 2` is `1.5`, and no longer reports an error when the second number is zero. `random_range()` and `random_range_float()` now round both of their bounds to whole numbers. Both match Yarn Spinner for Unity.
+- A line's metadata no longer includes its `line:` tag, the same as in Yarn Spinner for Unity.
+- The typewriter now follows `Engine.time_scale`, like the Presenter's fades already did.
+- The Voice Over Presenter no longer has a **Volume dB** setting and no longer changes its audio player's volume. Set the volume on the audio player or its bus.
+- Compiler warnings now appear in the Output panel when a Yarn Project is imported. Previously only errors did.
+- The Yarn Project Inspector warns when a project's file version is newer than this version of Yarn Spinner supports.
+- Fixed markup that mixes a palette or `[style]` tag with a built-in tag such as `[b]`. The built-in tag was being put inside the other tag's formatting code.
+- Fixed a character name with a double quote in it, such as `Mr "X" Jr: Hello`, showing the line as raw markup.
+- Fixed the Yarn Project Inspector showing the same translated count for every language.
+- `YarnDialogueView` now fades its panel in and out around each line and set of options, and keeps the line before a set of options on screen above them, like the Dialogue System prefab in Yarn Spinner for Unity.
+- Presenters have a new `fade_target` property. Set it to a `CanvasItem` for the Presenter to show, hide and fade, when the Presenter isn't one itself and doesn't have one as a child.
+- A `YarnOptionButton` whose **Text Label** has **Fit Content** on now grows to fit its text.
+- `first_letter_caps()` is now declared to the compiler, so it works in version 5 Yarn Projects and inside lines, and is listed in the `.ysls.json`.
+- A Line Advancer's **Advance Action** no longer does anything while options are showing, so it can't skip a choice. Calling `request_next_content()` on the Dialogue Runner still cancels them.
 
 ## Early Access 3.3
 
