@@ -141,10 +141,20 @@ static func _run_compiler(bin_path: String, input_json: String) -> Dictionary:
 	temp_file.store_string(input_json)
 	temp_file.close()
 
+	var permission_problem := _ensure_executable(bin_path)
+	if not permission_problem.is_empty():
+		DirAccess.remove_absolute(temp_path)
+		return {"error": permission_problem}
+
 	var output := []
 	var exit_code := OS.execute(bin_path, ["--input", temp_path], output, true, false)
 
 	DirAccess.remove_absolute(temp_path)
+
+	if exit_code == -1:
+		var message := _launch_failed_message(bin_path)
+		_report_problem(message)
+		return {"error": message}
 
 	if output.is_empty():
 		return {"error": "Native compiler produced no output (exit code %d)" % exit_code}
@@ -156,6 +166,46 @@ static func _run_compiler(bin_path: String, input_json: String) -> Dictionary:
 			message = "The bundled compiler is out of date. Rebuild it with native/build.sh."
 		return {"error": message}
 	return {"json": result_json}
+
+
+static var _checked_paths: Dictionary = {}
+static var _reported: Dictionary = {}
+
+
+static func _ensure_executable(bin_path: String) -> String:
+	if OS.get_name() == "Windows" or _checked_paths.has(bin_path):
+		return ""
+
+	var permissions := FileAccess.get_unix_permissions(bin_path)
+	var execute_bits := FileAccess.UNIX_EXECUTE_OWNER | FileAccess.UNIX_EXECUTE_GROUP | FileAccess.UNIX_EXECUTE_OTHER
+	if permissions & FileAccess.UNIX_EXECUTE_OWNER == 0:
+		var err := FileAccess.set_unix_permissions(bin_path, permissions | execute_bits)
+		if err != OK or FileAccess.get_unix_permissions(bin_path) & FileAccess.UNIX_EXECUTE_OWNER == 0:
+			var message := "The bundled Yarn Spinner compiler isn't allowed to run, and Yarn Spinner couldn't fix it. Make it executable by running this in a terminal, then reimport your Yarn Projects:\nchmod +x \"%s\"" % bin_path
+			_report_problem(message)
+			return message
+		print("Yarn Spinner: made the bundled compiler executable: %s" % bin_path)
+
+	_checked_paths[bin_path] = true
+	return ""
+
+
+static func _launch_failed_message(bin_path: String) -> String:
+	if OS.get_name() == "Windows":
+		return "The bundled Yarn Spinner compiler couldn't be started. Check that this file exists and that your antivirus software isn't blocking it, then reimport your Yarn Projects:\n%s" % bin_path
+	return "The bundled Yarn Spinner compiler couldn't be started. Run this in a terminal, then reimport your Yarn Projects:\nchmod +x \"%s\"" % bin_path
+
+
+static func _report_problem(message: String) -> void:
+	if _reported.has(message):
+		return
+	_reported[message] = true
+	push_error("Yarn Spinner: %s" % message)
+	if Engine.is_editor_hint() and Engine.has_singleton("EditorInterface"):
+		var editor_interface: Object = Engine.get_singleton("EditorInterface")
+		var toaster: Object = editor_interface.call("get_editor_toaster")
+		if toaster != null:
+			toaster.call("push_toast", "Yarn Spinner: the bundled compiler can't run. See the Output panel for how to fix it.", 2)
 
 
 static func _first_diagnostic_message(result_json: String, exit_code: int) -> String:

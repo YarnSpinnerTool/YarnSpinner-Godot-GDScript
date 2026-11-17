@@ -2,6 +2,7 @@
 
 ## Early Access 3.3.1
 
+- The bundled compiler is made executable before it runs. If it still can't run, the editor shows an error with the command to fix it, instead of failing without saying why.
 - Functions can now wait! A function that uses `await`, such as one that waits for the player to pick an item, pauses the dialogue until it returns a value. Give it a typed return, for example a `-> String`, so the compiler knows what it returns. Functions called from smart variables or `when:` headers still have to return straight away! Don't forget.
 - Commands and functions can now be cancelled!! If the last parameter of a handler is a `YarnCancellationToken`, the Dialogue Runner passes one in. A command's token is cancelled by `request_hurry_up()`, `request_next_content()` and `stop_dialogue()`. A function's token is cancelled when dialogue stops..
 - A `_yarn_function_` method that isn't static is now an instance function. Its first argument in Yarn is tebh name of the node to call it on, like `health("Alice")`. Previously, it was skipped with an error. The `.ysls.json` lists it with the node as its first parameter...
