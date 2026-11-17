@@ -1,6 +1,22 @@
 # Yarn Spinner for Godot (GDScript) — Changelog
 
-## Early Access 3.3.1
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+## [Unreleased]
+
+### Added
+
+### Changed
+
+### Fixed
+
+### Removed
+
+## [3.3.1] - 2026-11-17
+
+### Early Access 3.3.1
 
 - The bundled compiler is made executable before it runs. If it still can't run, the editor shows an error with the command to fix it, instead of failing without saying why.
 - Functions can now wait! A function that uses `await`, such as one that waits for the player to pick an item, pauses the dialogue until it returns a value. Give it a typed return, for example a `-> String`, so the compiler knows what it returns. Functions called from smart variables or `when:` headers still have to return straight away! Don't forget.
@@ -58,7 +74,9 @@
 - `first_letter_caps()` is now declared to the compiler, so it works in version 5 Yarn Projects and inside lines, and is listed in the `.ysls.json`.
 - A Line Advancer's **Advance Action** no longer does anything while options are showing, so it can't skip a choice. Calling `request_next_content()` on the Dialogue Runner still cancels them.
 
-## Early Access 3.3
+## [3.3.0]
+
+### Early Access 3.3
 
 - Presenters now get `on_dialogue_started` before `on_node_started`, and the Dialogue Runner emits `dialogue_started` before `node_started`. The start node is entered after every Presenter has finished `on_dialogue_started`.
 - A run of content that finishes instantly, such as a looping node whose Presenters return straight away, no longer locks the game. The Dialogue Runner now waits a frame after 100 pieces of content in a single frame.
@@ -80,9 +98,11 @@
 - Every Yarn Project is reimported once after updating, so existing projects pick up their enums and variable types.
 - The Yarn Spinner tab's main screen has a new `edit_file_at_node()` method, so other editor plugins can open a Yarn Script at a particular node.
 
-## Early Access 3.2
+## [3.2.0] 
 
-### Yarn Project Inspector
+### Early Access 3.2
+
+#### Yarn Project Inspector
 
 The Inspector for `.yarnproject` files now matches the one in Yarn Spinner for Unity.
 
@@ -111,7 +131,7 @@ The Inspector for `.yarnproject` files now matches the one in Yarn Spinner for U
 
 These settings are also available in the Import dock.
 
-### Strict warning compatibility
+#### Strict warning compatibility
 
 A handful of internal variable declarations relied on inferring their type
 from a `Variant` value, which fails to compile in projects that escalate
@@ -119,7 +139,7 @@ GDScript's `INFERENCE_ON_VARIANT` warning to an error. Those declarations
 now use explicit types, so the addon compiles cleanly under strict warning
 settings.
 
-### Yarn node picker for your own scripts
+#### Yarn node picker for your own scripts
 
 The node dropdown used by the Dialogue Runner's `start_node` can now be
 used on your own exported properties. Export a `String` or `StringName`
@@ -136,7 +156,7 @@ The source property can hold a `YarnProjectResource` or anything with a
 reads a `yarn_project` property on the same object. The dropdown refreshes
 when the source property is changed in the Inspector.
 
-### Yarn Projects work in `@tool` scripts
+#### Yarn Projects work in `@tool` scripts
 
 `YarnProjectResource`, `YarnProgram`, `YarnNode` and `YarnInstruction` are
 now `@tool`, so their methods can be called from editor scripts.
@@ -145,14 +165,14 @@ editor, because Godot only exposes a non-tool script's exported properties
 there. The parsed program is cached and refreshed when the project is
 reimported.
 
-### Sample gallery ordering and thumbnails
+#### Sample gallery ordering and thumbnails
 
 The Samples tab in the Yarn Spinner editor screen now lists samples in a
 learning-path order (starting points first, then core features,
 presentation, voice over, and saliency) instead of alphabetically, and
 every sample card has a screenshot.
 
-### YarnDialoguePresenter is abstract
+#### YarnDialoguePresenter is abstract
 
 `YarnDialoguePresenter` is now marked `@abstract`, matching its Yarn Spinner for Unity
 equivalent (`DialoguePresenterBase`). Attaching the base script to a node
@@ -162,7 +182,7 @@ now refuses the attach outright. Attach one of the Presenters from
 and friends), or subclass the base for your own. Existing subclasses are
 unaffected.
 
-### Functions can be used inside lines
+#### Functions can be used inside lines
 
 A function call inside a line, like `Rosa: You have {coin_count()} coins.`,
 used to fail to compile with "Can't determine the type of the expression".
@@ -199,7 +219,7 @@ gets them from the project's `"definitions"` instead:
 - `ysc` only reads the first file in `"definitions"`, so if your project
   already listed another definitions file first, that's the one it uses..
 
-### Faster function calls and numbers
+#### Faster function calls and numbers
 
 All the operators in Yarn (`+`, `<`, `==` et al) are a function call, so
 the virtual machine calls functions a lot. Each call used to build a
@@ -222,7 +242,7 @@ instead of going through `try_get_value`'s `{found, value}` Dictionary.
 Reading a stored variable went from 0.42 µs to 0.13 µs. Reading a variable
 that's only declared and hasn't been set yet now checks the stored values first.
 
-### Changed
+#### Changed
 
 - Gamepads can work with the Presenters out of the box. Godot's default
   `ui_accept` and `ui_cancel` have no gamepad buttons, so a gamepad couldn't
@@ -371,7 +391,7 @@ that's only declared and hasn't been set yet now checks the stored values first.
   turned off. The Dialogue Runner's Regenerate YSLS button uses the same
   search when its own Ysls Scan Path is empty.
 
-### Fixed
+#### Fixed
 
 - Calling `stop_dialogue()` from a `node_started` handler no longer fails.
   The runner now stops cleanly, whether the node was jumped to or was the 
@@ -511,7 +531,7 @@ that's only declared and hasn't been set yet now checks the stored values first.
   in the scan folder. Only files that hold Command bindings are read, so
   materials, textures and models aren't loaded or imported along the way.
 
-### Documentation
+#### Documentation
 
 - The custom Presenter example in the quick start now uses the new
   Presenter contract (`run_line(line, token) -> void`, await inside). The
@@ -524,7 +544,7 @@ that's only declared and hasn't been set yet now checks the stored values first.
   for platforms without a bundled binary. This will improve in the next
   alpha, so probably worth still keeping `ysc` around for now.
 
-## Alpha 8 (2026-07-28)
+## [0.0.0-alpha8] 2026-07-28
 
 Lots of small quality of life changes. Scene-based options, some tweaks to boolean flag parameters (to match Yarn Spinner for Unity), and a word wrap fix in the Line Presenter. If you show options with the built-in Presenter, note that
 option text no longer includes the character name prefix.
@@ -575,7 +595,7 @@ this only adds the flag form.
 If you only write command handlers without a trailing `bool` flag, or you
 already pass `true`/`false` explicitly, nothing should really change.
 
-## Alpha 7 (2026-07-22)
+## [0.0.0-alpha7] 2026-07-22
 
 This alpha reworks how Presenters and the Dialogue Runner talk to each
 other. If you implemented Presenters or commands against an earlier alpha,
