@@ -18,9 +18,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Early Access 3.3.2
 
-- Two scripts can now have a command with the same name, such as when an add-on's sample and the Yarn Spinner samples are in one project. The command runs on whichever script the target node has. Previously, the second script's command wasn't registered and an error was shown.
+- The Yarn Spinner screen can now compile a Yarn Project. **Compile** in the toolbar saves the open file and compiles its Yarn Project, and right-clicking a Yarn Project or script in the sidebar offers **Compile** and **Compile All Yarn Projects**. The toolbar shows whether it compiled, and how many errors happened.
+- Two scripts can now have a command with the same name, such as when an add-on's sample and the Yarn Spinner samples are in one project! The command runs on whichever script the target node has :) Previously, the second script's command wasn't registered and an error was shown...
 - When a typewriter was interrupted by new text in the same label, such as when the player changes option in a speech bubble, the new text could briefly appear in full before typing.
-- Importing a Yarn Project with the `ysc` tool no longer fails with "Value cannot be null. (Parameter 'first')" when the project's definitions declare functions. Versions of `ysc` with this bug now compile the project without its definitions and show a warning. Update `ysc`, or use the native compiler, to keep the function declarations.
+- Importing a Yarn Project with the `ysc` tool no longer fails with "Value cannot be null. (Parameter 'first')" (and other isues) when the project's definitions declare functions. Versions of `ysc` with this bug now compile the project without its definitions and show a warning. Update `ysc`, or use the native compiler, to keep the function declarations.
 
 ## [3.3.1] - 2026-11-17
 

@@ -43,6 +43,10 @@ var _pending_home: bool = false
 var _welcome_button: Button
 var _save_button: Button
 var _reload_button: Button
+var _compile_button: Button
+var _compile_status: Label
+var _project_menu: PopupMenu
+var _menu_project_path: String = ""
 var _commands_toggle: Button
 var _samples_button: Button
 var _path_label: Label
@@ -149,12 +153,23 @@ func _build_toolbar() -> Control:
 	_reload_button.pressed.connect(_reload_file)
 	toolbar.add_child(_reload_button)
 
+	_compile_button = Button.new()
+	_compile_button.text = "Compile"
+	_compile_button.icon = _editor_icon("Play")
+	_compile_button.tooltip_text = "Save and compile the Yarn Project this file belongs to"
+	_compile_button.pressed.connect(_compile_current)
+	toolbar.add_child(_compile_button)
+
 	toolbar.add_child(VSeparator.new())
 
 	_path_label = Label.new()
 	_path_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_path_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	toolbar.add_child(_path_label)
+
+	_compile_status = Label.new()
+	_compile_status.theme_type_variation = "HeaderSmall"
+	toolbar.add_child(_compile_status)
 
 	_commands_toggle = Button.new()
 	_commands_toggle.text = "Commands"
@@ -211,7 +226,14 @@ func _build_sidebar() -> Control:
 	_file_tree.allow_reselect = true
 	_file_tree.allow_rmb_select = false
 	_file_tree.item_selected.connect(_on_file_tree_selected)
+	_file_tree.gui_input.connect(_on_file_tree_gui_input)
 	files_box.add_child(_file_tree)
+
+	_project_menu = PopupMenu.new()
+	_project_menu.add_icon_item(_editor_icon("Play"), "Compile", 0)
+	_project_menu.add_icon_item(_editor_icon("Reload"), "Compile All Yarn Projects", 1)
+	_project_menu.id_pressed.connect(_on_project_menu_id_pressed)
+	files_box.add_child(_project_menu)
 	sidebar.add_child(files_box)
 
 	# Nodes
@@ -487,7 +509,7 @@ func _rebuild_file_list() -> void:
 		var header_label: String = "Unassociated" if is_orphan_group else group.name
 		header.set_text(0, "%s  (%d)" % [header_label, matched.size()])
 		header.set_selectable(0, false)
-		header.set_metadata(0, {"kind": _TREE_KIND_GROUP})
+		header.set_metadata(0, {"kind": _TREE_KIND_GROUP, "project_path": group.project_path})
 		if is_orphan_group:
 			header.set_icon(0, orphan_icon)
 			header.set_icon_modulate(0, Color(1, 1, 1, 0.6))
@@ -655,6 +677,7 @@ func _update_ui() -> void:
 	_path_label.text = display
 	_save_button.disabled = not _is_dirty
 	_reload_button.disabled = _current_path.is_empty()
+	_compile_button.disabled = _project_for_file(_current_path).is_empty()
 	_code_edit.editable = not _current_path.is_empty()
 
 	# Show the "Yarn Spinner Editor" callout only when nothing is being edited.
@@ -1184,6 +1207,83 @@ func _shortcut_input(event: InputEvent) -> void:
 		return
 	_save_file()
 	accept_event()
+
+
+func _project_for_file(path: String) -> String:
+	if path.is_empty():
+		return ""
+	for group in _project_groups:
+		if group.project_path != "" and group.files.has(path):
+			return group.project_path
+	return ""
+
+
+func _all_project_paths() -> PackedStringArray:
+	var paths := PackedStringArray()
+	for group in _project_groups:
+		if group.project_path != "":
+			paths.append(group.project_path)
+	return paths
+
+
+func _compile_current() -> void:
+	var project_path := _project_for_file(_current_path)
+	if project_path.is_empty():
+		return
+	if _is_dirty:
+		_save_file()
+	_compile_projects(PackedStringArray([project_path]))
+
+
+func _on_file_tree_gui_input(event: InputEvent) -> void:
+	var mouse := event as InputEventMouseButton
+	if mouse == null or not mouse.pressed or mouse.button_index != MOUSE_BUTTON_RIGHT:
+		return
+	var item := _file_tree.get_item_at_position(mouse.position)
+	if item == null:
+		return
+	var meta = item.get_metadata(0)
+	if not meta is Dictionary:
+		return
+	var project_path: String = meta.get("project_path", "")
+	if meta.get("kind", "") == _TREE_KIND_FILE:
+		project_path = _project_for_file(meta.get("path", ""))
+	_menu_project_path = project_path
+	_project_menu.set_item_disabled(_project_menu.get_item_index(0), project_path.is_empty())
+	_project_menu.set_item_disabled(_project_menu.get_item_index(1), _all_project_paths().is_empty())
+	_project_menu.position = Vector2i(_file_tree.get_screen_position() + mouse.position)
+	_project_menu.reset_size()
+	_project_menu.popup()
+	_file_tree.accept_event()
+
+
+func _on_project_menu_id_pressed(id: int) -> void:
+	if id == 0 and not _menu_project_path.is_empty():
+		if _is_dirty and _project_for_file(_current_path) == _menu_project_path:
+			_save_file()
+		_compile_projects(PackedStringArray([_menu_project_path]))
+	elif id == 1:
+		if _is_dirty:
+			_save_file()
+		_compile_projects(_all_project_paths())
+
+
+func _compile_projects(project_paths: PackedStringArray) -> void:
+	if project_paths.is_empty():
+		return
+	EditorInterface.get_resource_filesystem().reimport_files(project_paths)
+	var errors := 0
+	for project_path in project_paths:
+		var resource := ResourceLoader.load(project_path, "", ResourceLoader.CACHE_MODE_REPLACE)
+		if resource != null and "diagnostics" in resource:
+			errors += (resource.diagnostics as Array).size()
+	var subject := project_paths[0].get_file() if project_paths.size() == 1 else "%d Yarn Projects" % project_paths.size()
+	if errors == 0:
+		_compile_status.text = "Compiled %s" % subject
+		_compile_status.remove_theme_color_override("font_color")
+	else:
+		_compile_status.text = "%s: %d %s, see Output" % [subject, errors, "error" if errors == 1 else "errors"]
+		_compile_status.add_theme_color_override("font_color", get_theme_color("error_color", "Editor"))
 
 
 func _editor_icon(icon_name: String) -> Texture2D:
