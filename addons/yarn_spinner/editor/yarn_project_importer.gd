@@ -198,6 +198,24 @@ func _explain_undeclarable_functions(resource: YarnProjectResource, generator: Y
 	resource.diagnostics = diagnostics
 
 
+func _run_ysc(ysc_path: String, project_path: String, temp_dir: String, output_name: String, output: Array) -> int:
+	var args := PackedStringArray([
+		"compile",
+		project_path,
+		"-o", temp_dir,
+		"-n", output_name,
+	])
+	return OS.execute(ysc_path, args, output, true)
+
+
+func _hit_null_declarations_bug(output: Array) -> bool:
+	for chunk in output:
+		var text := str(chunk)
+		if text.contains("ArgumentNullException") and text.contains("GetCompilationJob"):
+			return true
+	return false
+
+
 func _compile_ysc(source_file: String, abs_path: String, source_files: PackedStringArray, options: Dictionary) -> YarnProjectResource:
 	var resource := YarnProjectResource.new()
 	resource.source_files = source_files
@@ -215,15 +233,18 @@ func _compile_ysc(source_file: String, abs_path: String, source_files: PackedStr
 
 	var output_name := source_file.get_file().get_basename()
 
-	var args := PackedStringArray([
-		"compile",
-		abs_path,
-		"-o", temp_dir,
-		"-n", output_name,
-	])
-
 	var output: Array = []
-	var exit_code := OS.execute(ysc_path, args, output, true)
+	var exit_code := _run_ysc(ysc_path, abs_path, temp_dir, output_name, output)
+
+	if exit_code != 0 and _hit_null_declarations_bug(output):
+		var stripped_path := abs_path.get_base_dir().path_join("." + abs_path.get_file().get_basename() + ".ysc.yarnproject")
+		var data := YarnProjectUtility.read_project_json(abs_path)
+		data.erase("definitions")
+		if YarnProjectUtility.write_project_json(stripped_path, data) == OK:
+			push_warning("yarn project importer: this version of ysc can't read function declarations from the definitions in %s, so it compiled without them. Update ysc or build the native compiler (native/build.sh) to fix this." % source_file)
+			output.clear()
+			exit_code = _run_ysc(ysc_path, stripped_path, temp_dir, output_name, output)
+			DirAccess.remove_absolute(stripped_path)
 
 	if exit_code != 0:
 		if exit_code == 127:

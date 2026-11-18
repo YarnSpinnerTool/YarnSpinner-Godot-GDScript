@@ -52,6 +52,7 @@ func run_typewriter(line: YarnMarkupParseResult, display_text: String, token: Ya
 		var boundaries := word_boundaries(label.get_parsed_text()) if uses_words else PackedInt32Array()
 		var next_boundary := 0
 		var accumulated := seconds_per_unit
+		var replaced := false
 
 		for i in range(character_count):
 			if not is_instance_valid(label):
@@ -84,12 +85,15 @@ func run_typewriter(line: YarnMarkupParseResult, display_text: String, token: Ya
 
 			if not is_instance_valid(label):
 				break
+			if label.text != display_text:
+				replaced = true
+				break
 			label.visible_characters = i + 1
 
 			if not uses_words:
 				accumulated -= seconds_per_unit
 
-		if is_instance_valid(label):
+		if is_instance_valid(label) and not replaced and label.text == display_text:
 			label.visible_characters = -1
 
 	for handler in action_markup_handlers:
