@@ -87,37 +87,21 @@ func test_file_uses_current_format():
 	assert_eq(add["parameters"][0]["type"], "number")
 
 
-func test_node_name_parameters_are_nodes():
+func test_node_hint_marks_parameters_as_nodes():
 	var script := GDScript.new()
-	script.source_code = "extends Node\n\nstatic func _yarn_function_go_to(destination: YarnNodeName) -> bool:\n\treturn true\n\n\nstatic func _yarn_command_travel(destination: YarnNodeName) -> void:\n\tpass\n"
+	script.source_code = "extends Node\n\n## Goes somewhere.\n## @yarn_node destination\nstatic func _yarn_function_go(destination: String) -> bool:\n\treturn true\n\n\n## @yarn_node destination\nstatic func _yarn_command_travel(destination: String) -> void:\n\tpass\n"
 	assert_eq(script.reload(), OK)
-
 	var generator := YarnYSLSGenerator.new()
 	generator._scan_script_methods(script, "res://fixture/travel.gd")
 	var data := generator.generate_ysls_dict()
-	assert_eq(_find(data["functions"], "go_to")["parameters"][0], {"name": "destination", "isParamsArray": false, "type": "node"})
+	var go := _find(data["functions"], "go")
+	assert_eq(go["parameters"][0], {"name": "destination", "isParamsArray": false, "type": "node"})
+	assert_eq(go["documentation"], "Goes somewhere.")
+	assert_false(go["containsErrors"])
 	assert_eq(_find(data["commands"], "travel")["parameters"][0]["type"], "node")
-	assert_false(_find(data["functions"], "go_to")["containsErrors"])
 
 	generator.instance_parameters_as_strings = true
-	assert_eq(_find(generator.generate_ysls_dict()["functions"], "go_to")["parameters"][0]["type"], "string")
-
-
-func test_deprecated_node_hint_still_works():
-	var script := GDScript.new()
-	script.source_code = "extends Node\n\n## Goes somewhere.\n## @yarn_node destination\nstatic func _yarn_function_go(destination: String) -> bool:\n\treturn true\n"
-	assert_eq(script.reload(), OK)
-	var generator := YarnYSLSGenerator.new()
-	generator._scan_script_methods(script, "res://fixture/old_travel.gd")
-	generator._scan_script_methods(script, "res://fixture/old_travel_again.gd")
-	var go := _find(generator.generate_ysls_dict()["functions"], "go")
-	assert_eq(go["parameters"][0]["type"], "node")
-	assert_eq(go["documentation"], "Goes somewhere.")
-
-
-func test_node_name_type_from_source_text():
-	var generator := YarnYSLSGenerator.new()
-	assert_eq(generator._yarn_type_info_from_text("YarnNodeName"), {"type": "node", "rawType": "string"})
+	assert_eq(_find(generator.generate_ysls_dict()["functions"], "go")["parameters"][0]["type"], "string")
 
 
 const VARIADIC_SOURCE := """extends Node
@@ -162,7 +146,7 @@ func test_variadic_hint_sets_the_rest_parameter_type():
 	assert_eq(score["parameters"][1], {"name": "points", "type": "number", "isParamsArray": true})
 
 
-func test_variadic_hint_ignores_unknown_types():
+func test_variadic_hint_leaves_unknown_types_untyped():
 	var data: Dictionary = _variadic_data()["data"]
 	assert_eq(_find(data["functions"], "misspelt")["parameters"][0]["type"], "any")
 	assert_eq(_find(data["functions"], "unhinted")["parameters"][0]["type"], "any")
@@ -178,6 +162,66 @@ func test_variadic_hint_lets_the_function_be_declared():
 	assert_eq(declared["has_all_items"]["variadicParameterType"], "string")
 	assert_false(declared.has("misspelt"))
 	assert_false(declared.has("unhinted"))
+
+
+const TYPED_VARIADIC_SOURCE := """extends Node
+
+## Has every food.
+## @yarn_variadic enum Food
+static func _yarn_function_has_all(...foods: Array) -> bool:
+	return true
+
+
+## @yarn_variadic node
+static func _yarn_function_visited_all(...nodes: Array) -> bool:
+	return true
+
+
+## @yarn_variadic enum
+static func _yarn_function_nameless(...foods: Array) -> bool:
+	return true
+
+
+## @yarn_variadic node
+static func _yarn_command_tour(guide: String, ...stops: Array) -> void:
+	pass
+"""
+
+
+func _typed_variadic_generator() -> YarnYSLSGenerator:
+	var script := GDScript.new()
+	script.source_code = TYPED_VARIADIC_SOURCE
+	assert_eq(script.reload(), OK)
+	var generator := YarnYSLSGenerator.new()
+	generator._scan_script_methods(script, "res://fixture/pantry.gd")
+	return generator
+
+
+func test_variadic_hint_takes_nodes_and_enums():
+	var generator := _typed_variadic_generator()
+	var data := generator.generate_ysls_dict()
+	var has_all := _find(data["functions"], "has_all")
+	assert_eq(has_all["parameters"], [{"name": "foods", "type": "enum", "isParamsArray": true, "subtype": "Food"}])
+	assert_eq(has_all["documentation"], "Has every food.")
+	assert_eq(_find(data["functions"], "visited_all")["parameters"], [{"name": "nodes", "type": "node", "isParamsArray": true}])
+	assert_eq(_find(data["commands"], "tour")["parameters"][1], {"name": "stops", "type": "node", "isParamsArray": true})
+	assert_eq(_find(data["functions"], "nameless")["parameters"][0]["type"], "any")
+
+	generator.instance_parameters_as_strings = true
+	var older := generator.generate_ysls_dict()
+	assert_eq(_find(older["functions"], "visited_all")["parameters"][0]["type"], "string")
+	assert_eq(_find(older["functions"], "has_all")["parameters"][0]["type"], "any")
+
+
+func test_variadic_nodes_and_enums_are_declared():
+	var generator := _typed_variadic_generator()
+	var importer := load("res://addons/yarn_spinner/editor/yarn_project_importer.gd")
+	var declared := {}
+	for declaration: Dictionary in importer._function_declarations(generator, ProjectSettings.globalize_path("res://none.yarnproject"), 5):
+		declared[declaration["name"]] = declaration
+	assert_eq(declared["has_all"]["variadicParameterType"], {"type": "enum", "subtype": "Food"})
+	assert_eq(declared["visited_all"]["variadicParameterType"], "string")
+	assert_false(declared.has("nameless"))
 
 
 func test_legacy_functions():
@@ -204,10 +248,11 @@ func test_legacy_functions():
 	assert_eq(legacy[1]["ReturnType"], "string")
 
 
-func test_node_types_are_instances():
+func test_object_types_are_instances():
 	var generator := YarnYSLSGenerator.new()
 	assert_eq(generator._yarn_type_info(TYPE_OBJECT, "Node2D"), {"type": "instance", "subtype": "Node2D"})
-	assert_eq(generator._yarn_type_info(TYPE_OBJECT, "Resource"), {"type": "any"})
+	assert_eq(generator._yarn_type_info(TYPE_OBJECT, "Resource"), {"type": "instance", "subtype": "Resource"})
+	assert_eq(generator._yarn_type_info(TYPE_OBJECT, ""), {"type": "any"})
 	assert_eq(generator._yarn_type_info(TYPE_INT, ""), {"type": "number"})
 
 
@@ -233,7 +278,10 @@ func test_script_methods():
 
 	var add := _find(data["functions"], "add")
 	assert_eq(add["return"], {"type": "number"})
-	assert_true(_find(data["functions"], "not_static").is_empty())
+	var not_static := _find(data["functions"], "not_static")
+	assert_eq(not_static["parameters"][0]["type"], "instance")
+	assert_eq(not_static["parameters"][0]["subtype"], "Mover")
+	assert_eq(not_static["parameters"][1], {"name": "a", "type": "number", "isParamsArray": false})
 
 
 func test_call_sites_resolve_same_file_handlers():

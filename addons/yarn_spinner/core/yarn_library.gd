@@ -98,12 +98,8 @@ const COMPILER_DECLARATIONS: Array[Dictionary] = [
 ]
 
 
-const NODE_NAME_CLASS := "YarnNodeName"
-
-
 func _init() -> void:
 	_register_builtin_functions()
-	_converters[NODE_NAME_CLASS] = YarnNodeName.from_yarn
 
 
 func register_function(func_name: String, callable: Callable, param_count: int = -1) -> void:

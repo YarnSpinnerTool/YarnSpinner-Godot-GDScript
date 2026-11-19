@@ -1020,6 +1020,8 @@ const ENUM_PARAMETER_HINT := "@yarn_enum"
 const NODE_PARAMETER_HINT := "@yarn_node"
 const VARIADIC_PARAMETER_HINT := "@yarn_variadic"
 const VARIADIC_TYPES: Array[String] = ["string", "number", "bool"]
+const VARIADIC_NODE_TYPE := "node"
+const VARIADIC_ENUM_TYPE := "enum"
 
 
 func _apply_parameter_hints(info: Dictionary, documentation: String) -> String:
@@ -1032,43 +1034,47 @@ func _apply_parameter_hints(info: Dictionary, documentation: String) -> String:
 		if words.size() < 2:
 			continue
 		if words[0] == VARIADIC_PARAMETER_HINT:
-			_apply_variadic_hint(info, words[1])
+			_apply_variadic_hint(info, words)
 			continue
 		for param: Dictionary in info.get("parameters", []):
 			if param.get("name", "") != words[1]:
 				continue
-			var raw_type := str(param.get("type", "string"))
-			if not raw_type in ["string", "number"]:
-				raw_type = "string"
 			if words[0] == ENUM_PARAMETER_HINT and words.size() >= 3:
+				var raw_type := str(param.get("type", "string"))
+				if not raw_type in ["string", "number"]:
+					raw_type = "string"
 				param["type"] = "enum"
 				param["subtype"] = words[2]
 				param["rawType"] = raw_type
 			elif words[0] == NODE_PARAMETER_HINT:
 				param["type"] = "node"
-				param["rawType"] = raw_type
-				_warn_node_hint_deprecated(info, words[1])
+				param["rawType"] = "string"
 	return "\n".join(kept).strip_edges()
 
 
-static var _warned_node_hints: Dictionary[String, bool] = {}
+static var _warned_variadic_hints: Dictionary[String, bool] = {}
 
 
-static func _warn_node_hint_deprecated(info: Dictionary, parameter_name: String) -> void:
-	var key := "%s:%s:%s" % [info.get("fileName", ""), info.get("yarnName", ""), parameter_name]
-	if _warned_node_hints.has(key):
-		return
-	_warned_node_hints[key] = true
-	push_warning("ysls generator: @yarn_node in the ## comment of %s (%s) is deprecated, and will be removed in a future major release. Give the parameter the YarnNodeName type instead, for example %s: YarnNodeName, and read the node's name from its name property." % [
-		info.get("yarnName", ""), info.get("fileName", ""), parameter_name])
-
-
-func _apply_variadic_hint(info: Dictionary, type: String) -> void:
-	if not type in VARIADIC_TYPES:
+func _apply_variadic_hint(info: Dictionary, words: PackedStringArray) -> void:
+	var type := words[1]
+	var hinted := {}
+	if type in VARIADIC_TYPES:
+		hinted = {"type": type}
+	elif type == VARIADIC_NODE_TYPE:
+		hinted = {"type": "node", "rawType": "string"}
+	elif type == VARIADIC_ENUM_TYPE and words.size() >= 3:
+		hinted = {"type": "enum", "subtype": words[2]}
+	if hinted.is_empty():
+		var written := " ".join(words.slice(1))
+		var key := "%s:%s:%s" % [info.get("fileName", ""), info.get("yarnName", ""), written]
+		if not _warned_variadic_hints.has(key):
+			_warned_variadic_hints[key] = true
+			push_warning("ysls generator: @yarn_variadic %s in the ## comment of %s (%s) isn't a type Yarn Spinner knows. Use %s, %s, or %s followed by the enum's name. The extra arguments are left untyped." % [
+				written, info.get("yarnName", ""), info.get("fileName", ""), ", ".join(VARIADIC_TYPES), VARIADIC_NODE_TYPE, VARIADIC_ENUM_TYPE])
 		return
 	for param: Dictionary in info.get("parameters", []):
 		if param.get("isParamsArray", false):
-			param["type"] = type
+			param.merge(hinted, true)
 
 
 func _apply_source_details(info: Dictionary, source_method: Dictionary) -> void:
@@ -1154,8 +1160,6 @@ func _yarn_type_info(type: int, type_class: String) -> Dictionary:
 		TYPE_STRING, TYPE_STRING_NAME:
 			return {"type": "string"}
 		TYPE_OBJECT:
-			if type_class == YarnLibrary.NODE_NAME_CLASS:
-				return {"type": "node", "rawType": "string"}
 			if _is_node_class_name(type_class):
 				return {"type": "instance", "subtype": type_class}
 			if not type_class.is_empty():
@@ -1193,8 +1197,6 @@ func _yarn_type_info_from_text(type_text: String) -> Dictionary:
 			return {"type": "number"}
 		"String", "StringName":
 			return {"type": "string"}
-		YarnLibrary.NODE_NAME_CLASS:
-			return {"type": "node", "rawType": "string"}
 		var other:
 			var enum_type := _yarn_enum_type_info(other)
 			if not enum_type.is_empty():

@@ -839,7 +839,10 @@ static func _function_declarations(generator: YarnYSLSGenerator, abs_project_pat
 		for parameter: Dictionary in info.get("parameters", []):
 			var parameter_type := compiler_parameter_type(str(parameter.get("type", "any")))
 			if parameter.get("isParamsArray", false):
-				declaration["variadicParameterType"] = parameter_type
+				if parameter.has("subtype"):
+					declaration["variadicParameterType"] = {"type": parameter_type, "subtype": str(parameter["subtype"])}
+				else:
+					declaration["variadicParameterType"] = parameter_type
 				break
 			if parameter.has("subtype"):
 				declaration["parameters"].append({"name": str(parameter.get("name", "")), "type": parameter_type, "subtype": str(parameter["subtype"])})

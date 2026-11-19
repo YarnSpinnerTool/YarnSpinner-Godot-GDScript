@@ -83,21 +83,18 @@ func test_lines_and_options_run_to_completion():
 	assert_false(_runner.is_running())
 
 
-func test_next_content_during_options_does_not_skip_the_choice():
+func test_next_content_during_options_cancels_them():
 	_make_runner("ShortcutOptions")
 	_presenter.hold_options = true
 	_runner.start_dialogue()
 	assert_true(await _wait_until(func(): return _runner.are_options_active()))
 
 	_runner.request_next_content()
-	for i in range(5):
-		await get_tree().process_frame
 
-	assert_true(_runner.are_options_active())
-	assert_eq(_presenter.lines.size(), 0)
-
-	_runner.select_option(0)
-	assert_true(await _wait_until(func(): return "This line should appear." in _presenter.lines))
+	assert_true(await _wait_until(func(): return _presenter.lines.size() == 1))
+	assert_eq(_presenter.lines[0], "Bea: line text")
+	assert_false("This line should appear." in _presenter.lines)
+	assert_true(await _wait_until(func(): return _presenter.option_sets.size() == 2))
 	await _runner.stop_dialogue()
 
 
@@ -231,11 +228,37 @@ func test_command_scripts_added_later_are_discovered():
 	assert_true(late.get("pinged"))
 
 
-func test_duplicate_discovered_commands_are_reported():
+func test_two_scripts_can_share_an_instance_command():
 	var container := _make_discovering_runner()
 	await get_tree().process_frame
 
-	var source := "extends Node\n\n\nfunc _yarn_command_duplicate_discovery() -> void:\n\tpass\n"
+	var first := _command_script("extends Node\n\nvar heard := \"\"\n\n\nfunc _yarn_command_shared_ping() -> void:\n\theard = \"first\"\n")
+	var second := _command_script("extends Node\n\nvar heard := \"\"\n\n\nfunc _yarn_command_shared_ping() -> void:\n\theard = \"second\"\n")
+	var first_node := Node.new()
+	first_node.name = "FirstNode"
+	first_node.set_script(first)
+	container.add_child(first_node)
+	var second_node := Node.new()
+	second_node.name = "SecondNode"
+	second_node.set_script(second)
+	container.add_child(second_node)
+
+	_runner._auto_discover_commands()
+	assert_push_error_count(0)
+
+	var first_result: Dictionary = await _runner._dispatch_command_with_discovery("shared_ping FirstNode")
+	var second_result: Dictionary = await _runner._dispatch_command_with_discovery("shared_ping SecondNode")
+	assert_true(first_result.handled)
+	assert_true(second_result.handled)
+	assert_eq(first_node.get("heard"), "first")
+	assert_eq(second_node.get("heard"), "second")
+
+
+func test_duplicate_static_commands_are_reported():
+	var container := _make_discovering_runner()
+	await get_tree().process_frame
+
+	var source := "extends Node\n\n\nstatic func _yarn_command_duplicate_discovery() -> void:\n\tpass\n"
 	var first := _command_script(source)
 	var second := _command_script(source)
 	for script in [first, first, second]:
