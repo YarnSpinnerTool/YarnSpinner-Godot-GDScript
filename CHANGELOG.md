@@ -8,9 +8,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- A new `YarnNodeName` type for parameters that take the name of a Yarn node, for example `func _yarn_function_go_to(destination: YarnNodeName) -> bool`. The `.ysls.json` marks these parameters as nodes, so the VS Code extension suggests node names, and the parameter receives a `YarnNodeName` whose `name` is the node's name. It works for commands and functions, and replaces the `## @yarn_node` comment.
+- A function or command that takes any number of arguments (`...items: Array`) can now say what type they are, with a line in its `##` comment: `@yarn_variadic string`, `@yarn_variadic number` or `@yarn_variadic bool`. GDScript doesn't allow a type on a `...` parameter, so without this line the function can't be declared, and calls to it don't compile in a version 5 Yarn Project.
+
 ### Changed
 
+- Marking a parameter as a node name with `## @yarn_node name` is deprecated, and will be removed in a future major release. It still works, but the editor shows a warning. Give the parameter the new `YarnNodeName` type instead.
+- The generated `.ysls.json` now uses the Yarn Spinner 3.3 format, with functions under `functions` (`yarnName`, `parameters`, `return`), like commands already were. Previously functions were written in the older capitalised format (`Functions`, `YarnName`, `ReturnType`), which the VS Code extension flags as an error and which Yarn Spinner for Unity can't read. When the importer uses `ysc`, it gives `ysc` its own definitions file instead, declaring the same functions the bundled compiler gets, in both formats, because `ysc` 3.2 only reads the older one. Your own definitions files are left as they are.
+
 ### Fixed
+
+- Importing a Yarn Project with `ysc` 3.2 no longer fails with "An item with the same key has already been added. Key: visited". The generated `.ysls.json` listed Yarn's own `visited`, `visited_count` and `has_any_content` functions, which `ysc` already declares itself. They're now left out, and the `.ysls.json` only lists the built-in functions that Yarn Spinner for Godot adds.
+- When the importer falls back to `ysc` and `ysc` itself fails, it now shows one error that says which `ysc` it used (version and path), what went wrong, and how to fix it, instead of a long stack trace. It recognises a `ysc` that's too old for the project's file version, one that can't read the project, the duplicate declaration error above, a missing .NET runtime, and other crashes. It also says why the bundled compiler wasn't used! The full `ysc` output is still printed to the Output panel. Errors in your Yarn scripts are stildshown as before.
+- The quickstart no longer says to install `ysc` 3.2.2, which can't open version 5 Yarn Projects, and explains what `ysc` 3.2 and 3.3.0 can't do.
+- The warning shown when `ysc` 3.3.0 can't read a project's definitions now says what happens next: in a version 5 project, calls to the definitions' functions fail as unknown functions. It's a bug in `ysc` 3.3.0 that's fixed in later versions.
+- A function with a parameter marked `@yarn_node` now compiles in a version 5 Yarn Project. Previously the compiler dropped the parameter, so every call failed with "expects 0 parameters, not 1".
 
 ### Removed
 

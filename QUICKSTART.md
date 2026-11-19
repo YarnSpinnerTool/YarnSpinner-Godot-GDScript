@@ -32,12 +32,25 @@ so there's nothing to install. Whenever Godot imports or reimports the
 never need to compile manually.
 
 If the bundled binary isn't available for your platform, the plugin falls
-back to the `ysc` command line tool. Install the required version globally
-with:
+back to the `ysc` command line tool. Install it globally with:
 
 ```
-dotnet tool install YarnSpinner.Console --global --version 3.2.2
+dotnet tool install YarnSpinner.Console --global
 ```
+
+If you already have it, update it with `dotnet tool update -g YarnSpinner.Console`.
+
+`ysc` has some limits the bundled compiler doesn't, so use the bundled one
+where you can:
+
+- `ysc` 3.2 can't open Yarn Projects at file version 5, which is what new
+  projects use.
+- `ysc` 3.3.0 can't read function declarations from a definitions file, such
+  as the generated `.ysls.json`. The importer compiles without them and shows
+  a warning. In a version 5 project, calls to those functions then fail as
+  unknown functions. This is fixed in versions of `ysc` after 3.3.0; until
+  you have one, a version 5 project that uses your own functions needs the
+  bundled compiler.
 
 ### Manual compilation
 

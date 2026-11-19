@@ -168,6 +168,39 @@ func test_dispatch_command_with_args():
 	assert_eq(received_args[0][1], "warning")
 
 
+var _received_node_name: Variant = null
+
+
+func _go_to(destination: YarnNodeName) -> bool:
+	_received_node_name = destination
+	return true
+
+
+func _travel(destination: YarnNodeName) -> void:
+	_received_node_name = destination
+
+
+func test_function_receives_node_name():
+	_lib.register_function("go_to", _go_to)
+	assert_true(_call("go_to", ["Shop"]))
+	assert_true(_received_node_name is YarnNodeName)
+	assert_eq(_received_node_name.name, "Shop")
+	assert_eq(str(_received_node_name), "Shop")
+
+
+func test_command_receives_node_name():
+	_lib.register_command("travel", _travel)
+	var result: Dictionary = await _lib.dispatch_command("travel Shop", self)
+	assert_eq(result.status, YarnLibrary.CommandDispatchStatus.SUCCESS)
+	assert_true(_received_node_name is YarnNodeName)
+	assert_eq(_received_node_name.name, "Shop")
+
+
+func test_node_name_converter_is_built_in():
+	assert_true(_lib.has_converter(YarnLibrary.NODE_NAME_CLASS))
+	assert_null(YarnNodeName.from_yarn(""))
+
+
 func test_dispatch_command_with_wrong_argument_count():
 	_lib.register_command("pair", func(a, b): pass)
 	var result: Dictionary = await _lib.dispatch_command("pair one", self)

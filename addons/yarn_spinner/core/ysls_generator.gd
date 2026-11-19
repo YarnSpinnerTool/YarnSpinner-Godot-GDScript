@@ -244,29 +244,32 @@ func generate_ysls_dict() -> Dictionary:
 	}
 
 
-## The .ysls.json as it's written to disk. Functions go under PascalCase
-## "Functions", which ysc needs when it reads a project's "definitions" file
-## to know each function's types. The VS Code extension reads either case.
 func generate_ysls_file_dict() -> Dictionary:
 	var data := generate_ysls_dict()
-	var functions: Array = []
-	for info: Dictionary in data["functions"]:
-		functions.append(_function_for_file(info))
 	return {
 		"version": data["version"],
 		"commands": data["commands"],
-		"Functions": functions
+		"functions": data["functions"]
 	}
 
 
-## ysc needs YarnName, ReturnType, Parameters and Documentation on every
-## function, and stops with an error on any type other than these four.
-func _function_for_file(info: Dictionary) -> Dictionary:
+static func legacy_functions(functions: Array) -> Array:
+	var result: Array = []
+	for info: Variant in functions:
+		if info is Dictionary:
+			result.append(_legacy_function(info))
+	return result
+
+
+static func _legacy_function(info: Dictionary) -> Dictionary:
 	var parameters: Array = []
-	for param: Dictionary in info.get("parameters", []):
+	var source_parameters: Variant = info.get("parameters", [])
+	for param: Variant in source_parameters if source_parameters is Array else []:
+		if not param is Dictionary:
+			continue
 		var file_param := {
 			"Name": param.get("name", ""),
-			"Type": _definition_type(param.get("type", "any")),
+			"Type": _definition_type(str(param.get("type", "any"))),
 			"IsParamsArray": param.get("isParamsArray", false)
 		}
 		if param.has("subtype"):
@@ -277,7 +280,12 @@ func _function_for_file(info: Dictionary) -> Dictionary:
 			file_param["Documentation"] = param["documentation"]
 		parameters.append(file_param)
 
-	var return_info: Dictionary = info.get("return", {})
+	var return_info: Variant = info.get("return", {})
+	var return_type := "any"
+	if return_info is Dictionary:
+		return_type = str((return_info as Dictionary).get("type", "any"))
+	elif return_info is String:
+		return_type = return_info
 	var result := {
 		"YarnName": info.get("yarnName", ""),
 		"DefinitionName": info.get("definitionName", ""),
@@ -285,7 +293,7 @@ func _function_for_file(info: Dictionary) -> Dictionary:
 		"Language": info.get("language", "gdscript"),
 		"Documentation": info.get("documentation", ""),
 		"Parameters": parameters,
-		"ReturnType": _definition_type(return_info.get("type", "any"))
+		"ReturnType": _definition_type(return_type)
 	}
 	if info.has("signature"):
 		result["Signature"] = info["signature"]
@@ -332,7 +340,7 @@ func save_ysls(path: String) -> Error:
 	file.store_string(json)
 	file.close()
 	print("ysls generator: saved '%s' with %d commands, %d functions" % [
-		path, data["commands"].size(), data["Functions"].size()
+		path, data["commands"].size(), data["functions"].size()
 	])
 	return OK
 
@@ -1010,16 +1018,21 @@ static func _source_is_async(source_method: Dictionary) -> bool:
 
 const ENUM_PARAMETER_HINT := "@yarn_enum"
 const NODE_PARAMETER_HINT := "@yarn_node"
+const VARIADIC_PARAMETER_HINT := "@yarn_variadic"
+const VARIADIC_TYPES: Array[String] = ["string", "number", "bool"]
 
 
 func _apply_parameter_hints(info: Dictionary, documentation: String) -> String:
 	var kept := PackedStringArray()
 	for line in documentation.split("\n"):
 		var words := line.strip_edges().split(" ", false)
-		if words.is_empty() or not words[0] in [ENUM_PARAMETER_HINT, NODE_PARAMETER_HINT]:
+		if words.is_empty() or not words[0] in [ENUM_PARAMETER_HINT, NODE_PARAMETER_HINT, VARIADIC_PARAMETER_HINT]:
 			kept.append(line)
 			continue
 		if words.size() < 2:
+			continue
+		if words[0] == VARIADIC_PARAMETER_HINT:
+			_apply_variadic_hint(info, words[1])
 			continue
 		for param: Dictionary in info.get("parameters", []):
 			if param.get("name", "") != words[1]:
@@ -1034,7 +1047,28 @@ func _apply_parameter_hints(info: Dictionary, documentation: String) -> String:
 			elif words[0] == NODE_PARAMETER_HINT:
 				param["type"] = "node"
 				param["rawType"] = raw_type
+				_warn_node_hint_deprecated(info, words[1])
 	return "\n".join(kept).strip_edges()
+
+
+static var _warned_node_hints: Dictionary[String, bool] = {}
+
+
+static func _warn_node_hint_deprecated(info: Dictionary, parameter_name: String) -> void:
+	var key := "%s:%s:%s" % [info.get("fileName", ""), info.get("yarnName", ""), parameter_name]
+	if _warned_node_hints.has(key):
+		return
+	_warned_node_hints[key] = true
+	push_warning("ysls generator: @yarn_node in the ## comment of %s (%s) is deprecated, and will be removed in a future major release. Give the parameter the YarnNodeName type instead, for example %s: YarnNodeName, and read the node's name from its name property." % [
+		info.get("yarnName", ""), info.get("fileName", ""), parameter_name])
+
+
+func _apply_variadic_hint(info: Dictionary, type: String) -> void:
+	if not type in VARIADIC_TYPES:
+		return
+	for param: Dictionary in info.get("parameters", []):
+		if param.get("isParamsArray", false):
+			param["type"] = type
 
 
 func _apply_source_details(info: Dictionary, source_method: Dictionary) -> void:
@@ -1120,6 +1154,8 @@ func _yarn_type_info(type: int, type_class: String) -> Dictionary:
 		TYPE_STRING, TYPE_STRING_NAME:
 			return {"type": "string"}
 		TYPE_OBJECT:
+			if type_class == YarnLibrary.NODE_NAME_CLASS:
+				return {"type": "node", "rawType": "string"}
 			if _is_node_class_name(type_class):
 				return {"type": "instance", "subtype": type_class}
 			if not type_class.is_empty():
@@ -1157,6 +1193,8 @@ func _yarn_type_info_from_text(type_text: String) -> Dictionary:
 			return {"type": "number"}
 		"String", "StringName":
 			return {"type": "string"}
+		YarnLibrary.NODE_NAME_CLASS:
+			return {"type": "node", "rawType": "string"}
 		var other:
 			var enum_type := _yarn_enum_type_info(other)
 			if not enum_type.is_empty():
@@ -1257,9 +1295,14 @@ func _get_script_class_name(script: Script, path: String) -> String:
 	return file_name.to_pascal_case()
 
 
+const CORE_FUNCTIONS: Array[String] = ["visited", "visited_count", "has_any_content"]
+
+
 func _get_builtin_functions() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for declaration: Dictionary in YarnLibrary.COMPILER_DECLARATIONS:
+		if declaration["name"] in CORE_FUNCTIONS:
+			continue
 		var parameters: Array = []
 		var index := 0
 		for type: String in declaration.get("parameters", []):
