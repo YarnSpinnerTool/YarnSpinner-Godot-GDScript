@@ -1798,7 +1798,7 @@ func _safe_notify_presenter(presenter: Variant, method: String) -> void:
 	if not presenter.has_method(method):
 		return
 
-	var result: Variant = presenter.callv(method, _hook_arguments(presenter, method, []))
+	var result: Variant = await presenter.callv(method, _hook_arguments(presenter, method, []))
 	if result is Signal:
 		await result
 	elif result is Object and result != null and result.has_signal("completed"):

@@ -21,6 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - The quickstart no longer says to install `ysc` 3.2.2, which can't open version 5 Yarn Projects, and explains what `ysc` 3.2 and 3.3.0 can't do!!
 - The warning shown when `ysc` 3.3.0 can't read a project's definitions now says what happens next: in a version 5 project, calls to the definitions' functions fail as unknown functions. It's a bug in `ysc` 3.3.0 that's fixed in later versions.
 - A function with a parameter marked `@yarn_node` now compiles in a version 5 Yarn Project. Previously the compiler dropped the parameter, so every call failed with "expects 0 parameters, not 1".
+- A Presenter whose `on_dialogue_started()` or `on_dialogue_completed()` waits for something no longer causes a "Trying to call an async function without await" error. The Dialogue Runner now waits for it to finish.
+- A Command or Function with optional parameters followed by a `YarnCancellationToken` now gets the token when the optional parameters are left out. Previously the token was passed in place of the first missing parameter, and the Command didn't run.
 
 ### Removed
 

@@ -254,6 +254,26 @@ func test_two_scripts_can_share_an_instance_command():
 	assert_eq(second_node.get("heard"), "second")
 
 
+func test_optional_parameters_before_a_token_can_be_left_out():
+	var container := _make_discovering_runner()
+	await get_tree().process_frame
+
+	var node := Node.new()
+	node.name = "OptionalNode"
+	node.set_script(_command_script("extends Node\n\nvar prefix := \"unset\"\nvar got_token := false\n\n\nfunc _yarn_command_optional_ping(text: String = \"default\", token: YarnCancellationToken = null) -> void:\n\tprefix = text\n\tgot_token = token != null\n"))
+	container.add_child(node)
+
+	var without: Dictionary = await _runner._dispatch_command_with_discovery("optional_ping OptionalNode")
+	assert_true(without.handled)
+	assert_eq(node.get("prefix"), "default")
+	assert_true(node.get("got_token"))
+
+	var with_text: Dictionary = await _runner._dispatch_command_with_discovery("optional_ping OptionalNode hello")
+	assert_true(with_text.handled)
+	assert_eq(node.get("prefix"), "hello")
+	assert_true(node.get("got_token"))
+
+
 func test_duplicate_static_commands_are_reported():
 	var container := _make_discovering_runner()
 	await get_tree().process_frame

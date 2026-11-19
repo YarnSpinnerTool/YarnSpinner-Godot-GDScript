@@ -849,6 +849,11 @@ func _coerce_call_args(method_info: Dictionary, args: Array, command_name: Strin
 				"error": "can't convert parameter %d of %s: %s" % [i, command_name, out.error], "args": coerced}
 		coerced[i] = out.value
 	if wants_token:
+		var defaults: Array = method_info.get("default_args", [])
+		var first_default := expected_args.size() + 1 - defaults.size()
+		for i in range(coerced.size(), expected_args.size()):
+			if i - first_default >= 0 and i - first_default < defaults.size():
+				coerced.append(defaults[i - first_default])
 		coerced.append(current_cancellation_token())
 	return {"success": true, "status": CommandDispatchStatus.SUCCESS, "error": "", "args": coerced}
 
