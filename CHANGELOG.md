@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Removed
+
+## [3.3.3] - 2026-11-19
+
+### Early Access 3.3.2
+
+### Added
+
 - A function or command that takes any number of arguments (`...items: Array`) can now say what type they are, with a line in its `##` comment: `@yarn_variadic string`, `@yarn_variadic number` or `@yarn_variadic bool`. GDScript doesn't allow a type on a `...` parameter, so without this line the function can't be declared, and calls to it don't compile in a version 5 Yarn Project. They can also be node names, with `@yarn_variadic node`, or the cases of a Yarn enum, with `@yarn_variadic enum FoodType`, and the VS Code extension suggests them for every extra argument. A type it doesn't know shows a warning, and the arguments are left untyped.
 
 ### Changed
@@ -23,8 +35,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - A function with a parameter marked `@yarn_node` now compiles in a version 5 Yarn Project. Previously the compiler dropped the parameter, so every call failed with "expects 0 parameters, not 1".
 - A Presenter whose `on_dialogue_started()` or `on_dialogue_completed()` waits for something no longer causes a "Trying to call an async function without await" error. The Dialogue Runner now waits for it to finish.
 - A Command or Function with optional parameters followed by a `YarnCancellationToken` now gets the token when the optional parameters are left out. Previously the token was passed in place of the first missing parameter, and the Command didn't run.
-
-### Removed
 
 ## [3.3.2] - 2026-11-18
 
