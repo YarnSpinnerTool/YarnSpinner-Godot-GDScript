@@ -175,28 +175,6 @@ func scan_node(node: Node, recursive: bool = true) -> void:
 			scan_node(child, true)
 
 
-## When true, instance parameters are written as strings. Projects older
-## than file version 5 can't declare functions that take instances.
-var instance_parameters_as_strings := false
-
-
-func _with_instances_as_strings(entries: Array) -> Array:
-	var result: Array = []
-	for entry: Dictionary in entries:
-		var copy := entry.duplicate(true)
-		for param: Dictionary in copy.get("parameters", []):
-			if param.get("type", "") == "instance":
-				param["type"] = "string"
-				param.erase("subtype")
-			elif param.get("type", "") == "enum":
-				param["type"] = param.get("rawType", "any")
-				param.erase("subtype")
-			elif param.get("type", "") == "node":
-				param["type"] = param.get("rawType", "string")
-		result.append(copy)
-	return result
-
-
 func _without_raw_types(entries: Array) -> Array:
 	var result: Array = []
 	for entry: Dictionary in entries:
@@ -207,6 +185,21 @@ func _without_raw_types(entries: Array) -> Array:
 				for copied: Dictionary in copy.get("parameters", []):
 					copied.erase("rawType")
 				break
+		result.append(copy)
+	return result
+
+
+# yarn can't type check a call to a function when a paramater's type is unknown
+func _flag_untyped_functions(entries: Array) -> Array:
+	var result: Array = []
+	for entry: Dictionary in entries:
+		var copy := entry
+		if not entry.get("containsErrors", false):
+			for param: Dictionary in entry.get("parameters", []):
+				if str(param.get("type", "any")) == "any":
+					copy = entry.duplicate(true)
+					copy["containsErrors"] = true
+					break
 		result.append(copy)
 	return result
 
@@ -231,11 +224,8 @@ func generate_ysls_dict() -> Dictionary:
 		if not _functions.has(builtin_function["yarnName"]):
 			functions_array.append(builtin_function)
 
-	if instance_parameters_as_strings:
-		commands_array = _with_instances_as_strings(commands_array)
-		functions_array = _with_instances_as_strings(functions_array)
 	commands_array = _without_raw_types(commands_array)
-	functions_array = _without_raw_types(functions_array)
+	functions_array = _flag_untyped_functions(_without_raw_types(functions_array))
 
 	return {
 		"version": YSLS_VERSION,
@@ -251,63 +241,6 @@ func generate_ysls_file_dict() -> Dictionary:
 		"commands": data["commands"],
 		"functions": data["functions"]
 	}
-
-
-static func legacy_functions(functions: Array) -> Array:
-	var result: Array = []
-	for info: Variant in functions:
-		if info is Dictionary:
-			result.append(_legacy_function(info))
-	return result
-
-
-static func _legacy_function(info: Dictionary) -> Dictionary:
-	var parameters: Array = []
-	var source_parameters: Variant = info.get("parameters", [])
-	for param: Variant in source_parameters if source_parameters is Array else []:
-		if not param is Dictionary:
-			continue
-		var file_param := {
-			"Name": param.get("name", ""),
-			"Type": _definition_type(str(param.get("type", "any"))),
-			"IsParamsArray": param.get("isParamsArray", false)
-		}
-		if param.has("subtype"):
-			file_param["Subtype"] = param["subtype"]
-		if param.has("defaultValue"):
-			file_param["DefaultValue"] = param["defaultValue"]
-		if param.has("documentation"):
-			file_param["Documentation"] = param["documentation"]
-		parameters.append(file_param)
-
-	var return_info: Variant = info.get("return", {})
-	var return_type := "any"
-	if return_info is Dictionary:
-		return_type = str((return_info as Dictionary).get("type", "any"))
-	elif return_info is String:
-		return_type = return_info
-	var result := {
-		"YarnName": info.get("yarnName", ""),
-		"DefinitionName": info.get("definitionName", ""),
-		"FileName": info.get("fileName", ""),
-		"Language": info.get("language", "gdscript"),
-		"Documentation": info.get("documentation", ""),
-		"Parameters": parameters,
-		"ReturnType": _definition_type(return_type)
-	}
-	if info.has("signature"):
-		result["Signature"] = info["signature"]
-	if info.has("location"):
-		result["Location"] = info["location"]
-	if info.has("containsErrors"):
-		result["containsErrors"] = info["containsErrors"]
-	if info.has("errorCodes"):
-		result["errorCodes"] = info["errorCodes"]
-	return result
-
-
-static func _definition_type(type: String) -> String:
-	return type if type in ["string", "number", "bool", "any"] else "any"
 
 
 func generate_ysls_json(pretty: bool = true) -> String:
@@ -958,13 +891,7 @@ const _YARN_COMPATIBLE_TYPE_NAMES: Array[String] = ["", "Variant", "bool", "int"
 
 
 static func _set_error_codes(info: Dictionary, codes: PackedStringArray) -> void:
-	var unique := PackedStringArray()
-	for code in codes:
-		if not unique.has(code):
-			unique.append(code)
-	info["containsErrors"] = not unique.is_empty()
-	if not unique.is_empty():
-		info["errorCodes"] = Array(unique)
+	info["containsErrors"] = not codes.is_empty()
 
 
 func _parameter_error_codes(method_info: Dictionary, source_method: Dictionary) -> PackedStringArray:
@@ -1879,3 +1806,7 @@ static func generate_from_runner(yarn_project_path: String, dialogue_runner) -> 
 	var generator := YarnYSLSGenerator.new()
 	generator.scan_dialogue_runner(dialogue_runner)
 	return generator.save_ysls_for_project(yarn_project_path)
+
+
+
+
