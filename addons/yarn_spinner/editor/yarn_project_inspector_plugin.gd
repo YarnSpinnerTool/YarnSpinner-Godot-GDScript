@@ -283,6 +283,7 @@ func _show_unapplied_changes_prompt(project_path: String) -> void:
 # Section Builders
 # =========================================================================
 
+# use the proejct_version_message so its consistent
 func _add_upgrade_section(container: VBoxContainer, project_path: String) -> void:
 	var abs_path := ProjectSettings.globalize_path(project_path)
 	var version := YarnProjectImporter.project_language_version(abs_path)
@@ -290,17 +291,16 @@ func _add_upgrade_section(container: VBoxContainer, project_path: String) -> voi
 		_add_message(container, ("This Yarn Project uses file version %d, which is newer than this version of Yarn Spinner supports (%d). " +
 			"Update Yarn Spinner for Godot to use it.") % [version, YarnProjectImporter.CURRENT_PROJECT_FILE_VERSION], "warning")
 		return
-	if version <= 0 or version == YarnProjectImporter.CURRENT_PROJECT_FILE_VERSION:
+	if version == YarnProjectImporter.CURRENT_PROJECT_FILE_VERSION:
 		return
-	_add_message(container, ("This Yarn Project uses file version %d. Upgrade it to version %d to use every Yarn Spinner 3.3 feature. " +
-		"After upgrading, calling a Function that isn't declared is an error, not a warning.") % [version, YarnProjectImporter.CURRENT_PROJECT_FILE_VERSION], "warning")
+	_add_message(container, YarnProjectImporter.project_version_message(version) +
+		" After upgrading, calling a Function that isn't declared is an error, not a warning.", "warning")
 	var upgrade_button := Button.new()
 	upgrade_button.text = "Upgrade Yarn Project"
 	upgrade_button.pressed.connect(func() -> void:
 		_upgrade_project(project_path)
 	)
 	container.add_child(upgrade_button)
-
 
 func _upgrade_project(project_path: String) -> void:
 	var data := YarnProjectUtility.read_project_json(project_path)
