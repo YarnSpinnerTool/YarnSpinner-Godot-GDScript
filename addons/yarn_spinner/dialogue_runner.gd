@@ -1918,7 +1918,19 @@ func _regenerate_ysls_pressed() -> void:
 	regenerate_ysls()
 
 
+static func _get_key_any_case(dict: Dictionary, key: String, default_value: Variant = null) -> Variant:
+	if dict.has(key):
+		return dict[key]
+	for existing: Variant in dict.keys():
+		if existing is String and (existing as String).nocasecmp_to(key) == 0:
+			return dict[existing]
+	return default_value
+
+
+
+
 func _ysls_parameter_count_hint(parsed: Array) -> String:
+	
 	if parsed.is_empty() or yarn_project == null or yarn_project.resource_path.is_empty():
 		return ""
 	var ysls_path := yarn_project.resource_path.get_basename() + ".ysls.json"
