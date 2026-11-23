@@ -126,40 +126,48 @@ func _get_icon() -> Texture2D:
 
 
 func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> Error:
+	# basically we now refuse anything that isn't a project v5...
+	# if we're not a v5 we stop with a diagnostic.
 	var abs_path := ProjectSettings.globalize_path(source_file)
 	var source_dir := abs_path.get_base_dir()
 	var source_files := parse_project_sources(abs_path, source_dir)
 
 	var resource: YarnProjectResource = null
 
+
+
 	# Scan the project's scripts for commands and functions before compiling,
 	# so the compiler gets each function's types. The .ysls.json below is
 	# written from the same scan.
 	var generator := _scan_yarn_actions(source_file, ysls_scan_path_option(options.get("ysls_scan_path", "")))
 	var project_version := project_language_version(abs_path)
-	generator.instance_parameters_as_strings = project_version > 0 and project_version < CURRENT_PROJECT_FILE_VERSION
 
-	# Write the .ysls.json and list it in the project's "definitions" before
-	# compiling. The ysc fallback reads each function's types from it.
-	if options.get("generate_ysls", true):
-		_save_ysls_file(generator, source_file)
-		_add_ysls_to_definitions(source_file)
+	if project_version != CURRENT_PROJECT_FILE_VERSION:
+		resource = YarnProjectResource.new()
+		resource.source_files = source_files
+		# use consistent version message everywhere :)
+		resource.diagnostics = [_diagnostic(project_version_message(project_version))]
+	else:
+		# Write the .ysls.json and list it in the project's "definitions" before
+		# compiling. The ysc fallback reads each function's types from it.
+		if options.get("generate_ysls", true):
+			_save_ysls_file(generator, source_file)
+			_add_ysls_to_definitions(source_file)
 
-	# Try native compiler first
-	if YarnNativeCompiler.is_available():
-		var language_version := project_language_version(abs_path)
-		var result := _compile_native(source_file, abs_path, source_files, _function_declarations(generator, abs_path, language_version), language_version)
-		resource = result.resource
-		if resource != null and resource.diagnostics.is_empty():
-			_generate_variables_source(source_file, options, result.declarations, result.enums)
-		elif resource == null:
-			# Native compiler failed — fall through to ysc CLI
-			print("yarn project importer: native compiler failed, falling back to ysc CLI")
+		# Try native compiler first
+		if YarnNativeCompiler.is_available():
+			var result := _compile_native(source_file, abs_path, source_files, _function_declarations(generator, abs_path), CURRENT_PROJECT_FILE_VERSION)
+			resource = result.resource
+			if resource != null and resource.diagnostics.is_empty():
+				_generate_variables_source(source_file, options, result.declarations, result.enums)
+			elif resource == null:
+				# Native compiler failed — fall through to ysc CLI
+				print("yarn project importer: native compiler failed, falling back to ysc CLI")
 
-	if resource == null:
-		resource = _compile_ysc(source_file, abs_path, source_files, options)
+		if resource == null:
+			resource = _compile_ysc(source_file, abs_path, source_files, options)
 
-	_explain_undeclarable_functions(resource, generator)
+	_explain_undeclarable_functions(resource, generator, abs_path)
 
 	for diag: Dictionary in resource.diagnostics:
 		var location := ""
