@@ -71,10 +71,11 @@ static func is_available() -> bool:
 ##
 ## Input: array of dictionaries [{ "fileName": "X.yarn", "source": "..." }]
 ## declarations (optional): functions the game provides, so the compiler
-##   knows their types, as [{ name, parameters: [type, ...], returnType,
+##   knows their types, as [{ name, parameters: [type or { name, type,
+##   subtype (optional), defaultValue: true (optional) }, ...], returnType,
 ##   variadicParameterType (optional), description (optional) }]. Types are
-##   "string", "number", "bool" or "any". Entries with a missing or "any"
-##   return type are ignored.
+##   "string", "number", "bool", "enum", "instance" or "any". Entries with a
+##   missing or "any" return type are ignored.
 ## Returns: Dictionary with:
 ##   success: bool
 ##   program: PackedByteArray (compiled protobuf, empty on error)
@@ -83,6 +84,7 @@ static func is_available() -> bool:
 ##   declarations: Array of { name, type, isEnum, description, isInlineExpansion, sourceFileName, defaultValue }
 ##   enums: Array of { name, description, rawType, cases: [{ name, description, value }] }
 ##   diagnostics: Array of { message, severity, fileName, line, column, code }
+## TODO: break this up a bit, as it's getting confusing..? not sure how yet.
 static func compile(files: Array[Dictionary], declarations: Array[Dictionary] = [], language_version: int = 0) -> Dictionary:
 	if not is_available():
 		return _error_result("Native compiler not available for this platform")
