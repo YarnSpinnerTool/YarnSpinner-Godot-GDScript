@@ -249,8 +249,23 @@ func _on_filesystem_changed() -> void:
 	_schedule_reimport_for_changed_definitions()
 	if not _startup_check_done:
 		_startup_check_done = true
+		# so we need to run the startup checks after the first frame has been processed...
+		_run_startup_checks()
+
+## this is because when we were reimporting files immediately, it would interfere with Godot's progress dialog.
+## and it seems that by deferring the reimport until after the first frame, we avoid this conflict...
+## TODO: not sure if this is good practice or not.
+func _run_startup_checks() -> void:
+	## if running in headless mode, defer the startup checks to avoid progress dialog issues...
+	if DisplayServer.get_name() == "headless":
+		## we defer, which means the startup checks will run after the current frame, avoiding progress dialog conflicts in headless mode..
 		_check_stale_yarnprojects_at_startup.call_deferred()
 		_reimport_files_with_stale_type.call_deferred()
+		return
+	# otherwise, run the startup checks immediately after the first frame, which seems to be fine
+	await get_tree().process_frame
+	_check_stale_yarnprojects_at_startup()
+	_reimport_files_with_stale_type()
 
 
 func _on_resources_reimported(resources: PackedStringArray) -> void:
@@ -402,17 +417,29 @@ func _is_yarnproject_stale(yarnproject_path: String) -> bool:
 	if not FileAccess.file_exists(imported_abs):
 		return true
 
-	if ResourceLoader.exists(yarnproject_path, "Resource"):
-		var res := ResourceLoader.load(yarnproject_path)
-		if res is YarnProjectResource and (res as YarnProjectResource).compiled_program.is_empty():
-			return true
-
 	var imported_mtime := FileAccess.get_modified_time(imported_abs)
 	var abs_yp := ProjectSettings.globalize_path(yarnproject_path)
 	var sources := YarnProjectImporter.parse_project_sources(abs_yp, abs_yp.get_base_dir())
 	for s in sources:
 		if FileAccess.get_modified_time(s) > imported_mtime:
 			return true
+	# added check for .ysls.json and definition files to determine staleness
+	# this is necessary because changes to the .ysls.json or definition files could affect the compiled output, making the project stale..
+	var own_ysls := abs_yp.get_basename() + ".ysls.json"
+
+	## we interate over all definition files resolved by the YarnProjectImporter and check if any of them have been modified more recently than the imported file..
+	for d in YarnProjectImporter.resolve_definitions_files(abs_yp):
+		# if the definition file is not the project's own .ysls.json and has been modified more recently than the imported file, the project is stale.
+		if d != own_ysls and FileAccess.get_modified_time(d) > imported_mtime:
+			return true
+
+	# A failed import with nothing changed would only fail the same way again,
+	# unless a compiler has been installed or updated since.
+	if ResourceLoader.exists(yarnproject_path, "Resource"):
+		var res := ResourceLoader.load(yarnproject_path)
+		if res is YarnProjectResource and (res as YarnProjectResource).compiled_program.is_empty():
+			var options := {"ysc_path": YarnProjectImporter.ysls_import_option(yarnproject_path, "ysc_path", "")}
+			return (res as YarnProjectResource).toolchain != YarnProjectImporter.toolchain_fingerprint(options)
 	return false
 
 
