@@ -193,6 +193,8 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 			location = "%s:%d: " % [diag.file, diag.get("line", 0)]
 		push_error("yarn project importer: %s%s" % [location, diag.get("message", "unknown error")])
 
+	## added toolchain fingerprint to the resource before saving
+	resource.toolchain = toolchain_fingerprint(options)
 	var save_file := save_path + "." + _get_save_extension()
 	var save_err := ResourceSaver.save(resource, save_file)
 
@@ -397,7 +399,7 @@ static func explain_ysc_failure(output_text: String, label: String, abs_project_
 
 	if output_text.contains("has invalid JSON"):
 		return "%s couldn't read this Yarn Project. It's probably older than the format the project uses. %s" % [label, update]
-	
+
 	# Check for functions with untyped parameters.
 	# which are a problem in older versions of ysc?
 	# this regex looks for the string that ysc outputs when it encounters an untyped parameter. 
@@ -418,7 +420,7 @@ static func explain_ysc_failure(output_text: String, label: String, abs_project_
 
 
 func _compile_ysc(source_file: String, abs_path: String, source_files: PackedStringArray, options: Dictionary) -> YarnProjectResource:
-	# for 3.3.4+ we no longer copy a project, but we use tehe real one 
+	# for 3.3.4+ we no longer copy a project, but we use tehe real one
 	# and we only support v5...
 	var resource := YarnProjectResource.new()
 	resource.source_files = source_files
@@ -720,7 +722,23 @@ static func _localize(path: String) -> String:
 	return ProjectSettings.localize_path(path)
 
 
-func _find_ysc_path(options: Dictionary) -> String:
+## Identifies the installed compilers by path and modification time, so
+## installing, updating or swapping either one changes it...
+## TODO: figure out if we can do some sort of sub-asset thing like Unity?
+## TODO: also look at turning it into a dependencies record, with the source, definitions, etc.? And hash at compilation time? Something like that.
+static func toolchain_fingerprint(options: Dictionary) -> String:
+	## the way this works is it records the modification times of the native compiler and the ysc compiler, so any changes to these files will result in a different fingerprint..
+	var parts := PackedStringArray()
+	var native_path := YarnNativeCompiler.get_native_bin_path()
+	if not native_path.is_empty():
+		var abs_native := ProjectSettings.globalize_path(native_path)
+		parts.append("native:%d" % (FileAccess.get_modified_time(abs_native) if FileAccess.file_exists(abs_native) else 0))
+	var ysc_path := _find_ysc_path(options)
+	parts.append("ysc:%s@%d" % [ysc_path, FileAccess.get_modified_time(ysc_path) if not ysc_path.is_empty() else 0])
+	return "|".join(parts)
+
+
+static func _find_ysc_path(options: Dictionary) -> String:
 	var option_path: String = options.get("ysc_path", "")
 	if not option_path.is_empty() and option_path != "ysc":
 		if FileAccess.file_exists(option_path):
