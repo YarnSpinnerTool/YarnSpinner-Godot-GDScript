@@ -48,6 +48,12 @@ const _YarnProgramParser := preload("res://addons/yarn_spinner/core/yarn_program
 ## variable name -> type name: "Number", "String", "Bool", or an enum's name
 @export var variable_types: Dictionary = {}
 
+## Which compilers were installed when this was imported. A failed import is
+## retried at startup only when this no longer matches..
+## Tracking this seems to be the best way to determine if a reimport is necessary?
+## TODO: Consider adding more detailed tracking of the toolchain components and their versions to improve reimport accuracy?
+@export var toolchain: String = ""
+
 var _cached_program: YarnProgram
 
 
