@@ -22,7 +22,30 @@ extends EditorImportPlugin
 
 const YarnProjectResource := preload("res://addons/yarn_spinner/yarn_project_resource.gd")
 const YarnProjectUtility := preload("res://addons/yarn_spinner/editor/yarn_project_utility.gd")
+
+# expose a godot variable for the ysc path setting
 const SETTING_YSC_PATH := "yarn_spinner/compiler/ysc_path"
+
+# if we ever need to push them to a specific version, update this
+const YSC_UPDATE_COMMAND := "dotnet tool update -g YarnSpinner.Console"
+
+# bump this when a newer ysc is requried. compared against what `ysc --version` reports 
+# the assembly or whatever, or nuget, version, may report differently.
+const MIN_YSC_VERSION := "3.3.4"
+
+# cache of ysc versions for different paths to avoid repeatedly calling `ysc --version`
+static var _ysc_versions: Dictionary[String, String] = {}
+
+# environment variable for the workspace root, used by ysc, to locate the project files correctly. 
+# set by the user or the Godot editor environment when running ysc...
+const YSC_WORKSPACE_ROOT_ENV := "YARN_SPINNER_WORKSPACE_ROOT"
+
+#Placeholder for the workspace root in paths, replaced with the actual workspace root at runtime.
+const WORKSPACE_ROOT_PLACEHOLDER := "${workspaceRoot}"
+
+# keep track of the current project file version for compatibility checks, pls.
+const CURRENT_PROJECT_FILE_VERSION := 5
+
 
 
 func _get_importer_name() -> String:
@@ -126,15 +149,11 @@ func _get_icon() -> Texture2D:
 
 
 func _import(source_file: String, save_path: String, options: Dictionary, platform_variants: Array[String], gen_files: Array[String]) -> Error:
-	# basically we now refuse anything that isn't a project v5...
-	# if we're not a v5 we stop with a diagnostic.
 	var abs_path := ProjectSettings.globalize_path(source_file)
 	var source_dir := abs_path.get_base_dir()
 	var source_files := parse_project_sources(abs_path, source_dir)
 
 	var resource: YarnProjectResource = null
-
-
 
 	# Scan the project's scripts for commands and functions before compiling,
 	# so the compiler gets each function's types. The .ysls.json below is
@@ -145,7 +164,6 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 	if project_version != CURRENT_PROJECT_FILE_VERSION:
 		resource = YarnProjectResource.new()
 		resource.source_files = source_files
-		# use consistent version message everywhere :)
 		resource.diagnostics = [_diagnostic(project_version_message(project_version))]
 	else:
 		# Write the .ysls.json and list it in the project's "definitions" before
@@ -181,29 +199,83 @@ func _import(source_file: String, save_path: String, options: Dictionary, platfo
 	return save_err
 
 
-func _explain_undeclarable_functions(resource: YarnProjectResource, generator: YarnYSLSGenerator) -> void:
+## The definitions file that lists a function by this Yarn name, or "".
+## i.e. we find which file declares what function.
+static func definitions_file_listing(abs_project_path: String, yarn_name: String) -> String:
+	# look at all the definfitions files.
+	for path in resolve_definitions_files(abs_project_path):
+		# make the file JSON.
+		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if not data is Dictionary:
+			continue
+		# get the functions.
+		var functions: Variant = _get_key(data as Dictionary, "functions", [])
+		# iterate over the functions to find a match with the yarn_name.
+		for info: Variant in functions if functions is Array else []:
+			# find the function that matches the yarn_name we want and return its path.
+			if info is Dictionary and str(_get_key(info as Dictionary, "yarnName", "")) == yarn_name:
+				return path
+	return ""
+
+
+func _explain_undeclarable_functions(resource: YarnProjectResource, generator: YarnYSLSGenerator, abs_path: String) -> void:
 	if resource == null or resource.diagnostics.is_empty():
 		return
-	var untyped: Dictionary = {}
+	var scanned: Dictionary = {}
 	for info: Dictionary in generator.generate_ysls_dict().get("functions", []):
-		var return_info: Dictionary = info.get("return", {})
-		if str(return_info.get("type", "any")) == "any":
-			untyped[str(info.get("yarnName", ""))] = info
-	if untyped.is_empty():
-		return
-	var pattern := RegEx.create_from_string("no declaration found for (\\S+)")
+		scanned[str(info.get("yarnName", ""))] = info
+	var pattern := RegEx.create_from_string("no declaration found for ([A-Za-z_][A-Za-z0-9_.]*)")
 	var diagnostics: Array = resource.diagnostics
 	for i in diagnostics.size():
 		var diag: Dictionary = diagnostics[i]
 		var found := pattern.search(str(diag.get("message", "")))
-		if found == null or not untyped.has(found.get_string(1)):
+		if found == null:
 			continue
-		var info: Dictionary = untyped[found.get_string(1)]
-		diag["message"] = ("%s. The function %s (%s in %s) doesn't declare a return type Yarn can use, so the compiler can't check calls to it. " +
-			"Give it a typed return, for example -> String, and if it needs to wait, await inside it rather than returning a Signal.") % [
-			diag.get("message", ""), found.get_string(1), info.get("definitionName", ""), info.get("fileName", "")]
+		var yarn_name := found.get_string(1)
+		var reason := undeclarable_reason(scanned.get(yarn_name, {}), yarn_name)
+		if not scanned.has(yarn_name):
+			var listed_in := definitions_file_listing(abs_path, yarn_name)
+			if not listed_in.is_empty():
+				reason = "%s is listed in %s, but the compiler couldn't use that entry. Check that every parameter has a type and that it has a return type." % [yarn_name, listed_in]
+		if reason.is_empty():
+			continue
+		diag["message"] = "%s. %s" % [str(diag.get("message", "")).trim_suffix("."), reason]
 		diagnostics[i] = diag
 	resource.diagnostics = diagnostics
+
+
+## Why the compiler has no declaration for a function the scan found (or
+## didn't find). Empty when the scan has nothing useful to add..
+static func undeclarable_reason(info: Dictionary, yarn_name: String) -> String:
+	# first we check if the scan found any information for this function)
+	if info.is_empty():
+		# TODO: we have too many messages, they shoudl be a table of strings somewhere.
+		return ("Yarn Spinner didn't find %s in this project's scripts, so the compiler doesn't know its types. " +
+			"If you register it with add_function(), the compiler can't see that. Declare it with a _yarn_function_%s method, a YarnCommandBinding, or in a .ysls.json listed in the project's \"definitions\".") % [yarn_name, yarn_name]
+	# if we have information, we construct a description of where it was found.
+	var where := "%s in %s" % [info.get("definitionName", yarn_name), info.get("fileName", "its script")]
+	# we include the definition name and file name to help the user locate the function.
+	# so we iterate over the parameters to check if any of them lack a usable type..
+	for param: Dictionary in info.get("parameters", []):
+		# if the parameter has a type other than "any", we can skip it (because it's usable)
+		if str(param.get("type", "any")) != "any":
+			continue
+		# and if it's a variadic parameter with no type, we can't check calls to it..
+		if param.get("isParamsArray", false):
+			return ("The function %s (%s) takes extra arguments (...%s) with no type, so the compiler can't check calls to it. " +
+				"Add a line like ## @yarn_variadic number to its ## comment (string, bool, node and enum <Name> work too).") % [yarn_name, where, param.get("name", "args")]
+		return ("The function %s (%s) has a parameter, %s, with no type Yarn can use, so the compiler can't check calls to it. " +
+			"Give it a type, for example %s: String.") % [yarn_name, where, param.get("name", "?"), param.get("name", "value")]
+	# if we get here, all parameters have usable types, so we check the return type next.
+	var return_info: Variant = info.get("return", {})
+	# if the return type is "any" or not specified, we can't check calls to this function.
+	# per internal YS discussions, a return type of "any" is considered unusable
+	# even tho Godot could technically handle an "any" return type, Yarn Spinner treats it as unusable for type checking.
+	if return_info is Dictionary and str((return_info as Dictionary).get("type", "any")) == "any":
+		return ("The function %s (%s) doesn't declare a return type Yarn can use, so the compiler can't check calls to it. " +
+			"Give it a typed return, for example -> String, and if it needs to wait, await inside it rather than returning a Signal.") % [yarn_name, where]
+	return ""
+
 
 
 func _run_ysc(ysc_path: String, project_path: String, temp_dir: String, output_name: String, output: Array) -> int:
@@ -213,81 +285,16 @@ func _run_ysc(ysc_path: String, project_path: String, temp_dir: String, output_n
 		"-o", temp_dir,
 		"-n", output_name,
 	])
-	return OS.execute(ysc_path, args, output, true)
+	# ysc otherwise guesses ${workspaceRoot} by looking for engine project files
+	var previous := OS.get_environment(YSC_WORKSPACE_ROOT_ENV)
+	OS.set_environment(YSC_WORKSPACE_ROOT_ENV, workspace_root())
+	var exit_code := OS.execute(ysc_path, args, output, true)
+	if previous.is_empty():
+		OS.unset_environment(YSC_WORKSPACE_ROOT_ENV)
+	else:
+		OS.set_environment(YSC_WORKSPACE_ROOT_ENV, previous)
+	return exit_code
 
-
-func _hit_null_declarations_bug(output: Array) -> bool:
-	for chunk in output:
-		var text := str(chunk)
-		if text.contains("ArgumentNullException") and text.contains("GetCompilationJob"):
-			return true
-	return false
-
-
-static func _ysc_project_copy_path(abs_path: String) -> String:
-	return abs_path.get_base_dir().path_join("." + abs_path.get_file().get_basename() + ".ysc.yarnproject")
-
-
-static func _write_ysc_project_copy(abs_path: String, temp_dir: String, output_name: String) -> Dictionary:
-	if resolve_definitions_files(abs_path).is_empty():
-		return {}
-	var functions: Array = []
-	for declaration in definitions_function_declarations(abs_path, project_language_version(abs_path)):
-		functions.append(_ysls_function_from_declaration(declaration))
-	var definitions_path := temp_dir.path_join("%s.definitions.ysls.json" % output_name)
-	var definitions := {
-		"version": YarnYSLSGenerator.YSLS_VERSION,
-		"commands": [],
-		"functions": functions,
-		"Functions": YarnYSLSGenerator.legacy_functions(functions),
-	}
-	if YarnProjectUtility.write_project_json(definitions_path, definitions) != OK:
-		return {}
-
-	var project := YarnProjectUtility.read_project_json(abs_path)
-	project["definitions"] = definitions_path if project.get("definitions") is String else [definitions_path]
-	var project_path := _ysc_project_copy_path(abs_path)
-	if YarnProjectUtility.write_project_json(project_path, project) != OK:
-		DirAccess.remove_absolute(definitions_path)
-		return {}
-	return {"project": project_path, "files": [definitions_path, project_path]}
-
-
-static func _ysls_function_from_declaration(declaration: Dictionary) -> Dictionary:
-	var parameters: Array = []
-	for parameter: Variant in declaration.get("parameters", []):
-		parameters.append(_ysls_parameter(parameter, "p%d" % parameters.size(), false))
-	if declaration.has("variadicParameterType"):
-		parameters.append(_ysls_parameter(declaration["variadicParameterType"], "p%d" % parameters.size(), true))
-	var result := {
-		"yarnName": declaration["name"],
-		"parameters": parameters,
-		"return": {"type": str(declaration.get("returnType", "any"))},
-	}
-	if declaration.has("description"):
-		result["documentation"] = declaration["description"]
-	return result
-
-
-static func _ysls_parameter(parameter: Variant, fallback_name: String, is_params_array: bool) -> Dictionary:
-	var entry := {"name": fallback_name, "type": "any", "isParamsArray": is_params_array}
-	if parameter is String:
-		entry["type"] = compiler_parameter_type(parameter)
-	elif parameter is Dictionary:
-		var info := parameter as Dictionary
-		if not str(info.get("name", "")).is_empty():
-			entry["name"] = str(info["name"])
-		entry["type"] = compiler_parameter_type(str(info.get("type", "any")))
-		if info.has("subtype"):
-			entry["subtype"] = str(info["subtype"])
-		if info.get("defaultValue", false):
-			entry["defaultValue"] = ""
-	return entry
-
-
-const YSC_UPDATE_COMMAND := "dotnet tool update -g YarnSpinner.Console"
-
-static var _ysc_versions: Dictionary[String, String] = {}
 
 
 static func ysc_version(ysc_path: String) -> String:
@@ -310,6 +317,49 @@ static func parse_ysc_version(text: String) -> String:
 	return found.get_string(1)
 
 
+## Compares major.minor.patch only!
+## this is used to check if the installed ysc version meets the minimum required version.
+static func ysc_version_supported(version: String) -> bool:
+	# strip any prerelease or build metadata from the version string as it was breaking things
+	var have := version.get_slice("-", 0).split(".")
+
+	var need := MIN_YSC_VERSION.split(".")
+
+	for i in need.size():
+		var a := int(have[i]) if i < have.size() else 0
+		var b := int(need[i])
+		if a != b:
+			return a > b
+	return true
+
+## The start of a ncier message system, in some ways.
+## Returns a user-friendly message about the project file version.
+static func project_version_message(version: int) -> String:
+	if version <= 0:
+		return ("This Yarn Project doesn't say which file version it uses. Yarn Spinner for Godot needs file version %d. " +
+			"Set \"projectFileVersion\": %d in the .yarnproject, or use Upgrade Yarn Project in the Inspector, then reimport.") % [CURRENT_PROJECT_FILE_VERSION, CURRENT_PROJECT_FILE_VERSION]
+	if version > CURRENT_PROJECT_FILE_VERSION:
+		return "This Yarn Project uses file version %d, which is newer than this version of Yarn Spinner for Godot supports (%d). Update Yarn Spinner for Godot to use it." % [version, CURRENT_PROJECT_FILE_VERSION]
+	return ("This Yarn Project uses file version %d, and Yarn Spinner for Godot needs file version %d. " +
+		"Use Upgrade Yarn Project in the Inspector, or set \"projectFileVersion\": %d in the .yarnproject, then reimport.") % [version, CURRENT_PROJECT_FILE_VERSION, CURRENT_PROJECT_FILE_VERSION]
+
+
+## The first definitions file listed in the project that isn't valid JSON, as
+## { path, error }, or an empty dictionary when they all parse..
+static func broken_definitions_file(abs_project_path: String) -> Dictionary:
+	# Return an empty dictionary if the project path is empty.
+	if abs_project_path.is_empty():
+		return {}
+	# Check each definitions file for validity.
+	# we do this by attempting to parse each file as JSON.
+	# and returning the first one that fails.
+	for path in resolve_definitions_files(abs_project_path):
+		var json := JSON.new()
+		if json.parse(FileAccess.get_file_as_string(path)) != OK:
+			return {"path": path, "error": "%s at line %d" % [json.get_error_message(), json.get_error_line() + 1]}
+	return {}
+
+
 static func ysc_label(ysc_path: String, version: String) -> String:
 	if version.is_empty():
 		return "ysc (%s)" % ysc_path
@@ -325,8 +375,13 @@ static func native_compiler_status() -> String:
 	return "The bundled compiler (%s) couldn't run, so Yarn Spinner used ysc instead. Check the errors above for why." % bin_path
 
 
-static func explain_ysc_failure(output_text: String, label: String) -> String:
-	var update := "Update ysc with: %s" % YSC_UPDATE_COMMAND
+static func explain_ysc_failure(output_text: String, label: String, abs_project_path: String = "") -> String:
+	var update := "Update ysc with: %s." % YSC_UPDATE_COMMAND
+
+	if output_text.contains("JsonReaderException") or output_text.contains("JsonException"):
+		var broken := broken_definitions_file(abs_project_path)
+		if not broken.is_empty():
+			return "%s couldn't read the definitions file %s, because it isn't valid JSON: %s. Fix the JSON in that file, then reimport." % [label, broken["path"], broken["error"]]
 
 	if output_text.contains("You must install or update .NET"):
 		var runtime := RegEx.create_from_string("Framework: 'Microsoft\\.NETCore\\.App', version '([^']+)'").search(output_text)
@@ -340,13 +395,21 @@ static func explain_ysc_failure(output_text: String, label: String) -> String:
 		return "%s can only open Yarn Projects up to file version %s, and this one is version %s. %s" % [
 			label, file_version.get_string(1), file_version.get_string(2), update]
 
-	var duplicate := RegEx.create_from_string("An item with the same key has already been added\\. Key: (\\S+)").search(output_text)
-	if duplicate != null:
-		return "%s stopped because %s is declared twice. Versions of ysc before 3.3 do this when a definitions file declares a function ysc already declares itself. %s, or remove %s from the definitions files." % [
-			label, duplicate.get_string(1), update, duplicate.get_string(1)]
-
 	if output_text.contains("has invalid JSON"):
 		return "%s couldn't read this Yarn Project. It's probably older than the format the project uses. %s" % [label, update]
+	
+	# Check for functions with untyped parameters.
+	# which are a problem in older versions of ysc?
+	# this regex looks for the string that ysc outputs when it encounters an untyped parameter. 
+	# TODO: is there a better way of doing this?
+	# the syntax of the call to RegEx.create_from_string is: RegEx.create_from_string(pattern: String) -> RegEx
+	var untyped := RegEx.create_from_string("Error in function (\\S+): Parameter has an unresolved type of \"any\"").search(output_text)
+	if untyped != null:
+		return "%s stopped because the function %s has a parameter with no type. Give that parameter a type, or update ysc to 3.3.4 or later, which reports this only where the function is called. %s" % [
+			label, untyped.get_string(1), update]
+
+	if output_text.contains("KeyNotFoundException") and output_text.contains("Yarn.Compiler.Definitions"):
+		return "%s couldn't read one of the definitions files listed in this Yarn Project. Versions of ysc before 3.3.4 need every key in lower camelCase (\"yarnName\", not \"YarnName\") and stop when a key is missing. %s" % [label, update]
 
 	if output_text.contains("Unhandled exception") or output_text.contains("Failed to compile because of the following error"):
 		return "%s crashed while compiling, so this is a problem with ysc, not with your Yarn scripts. %s" % [label, update]
@@ -355,6 +418,8 @@ static func explain_ysc_failure(output_text: String, label: String) -> String:
 
 
 func _compile_ysc(source_file: String, abs_path: String, source_files: PackedStringArray, options: Dictionary) -> YarnProjectResource:
+	# for 3.3.4+ we no longer copy a project, but we use tehe real one 
+	# and we only support v5...
 	var resource := YarnProjectResource.new()
 	resource.source_files = source_files
 
@@ -364,30 +429,29 @@ func _compile_ysc(source_file: String, abs_path: String, source_files: PackedStr
 		resource.diagnostics = [_diagnostic("No compiler is available. The bundled compiler isn't there for %s on %s, and ysc isn't installed. Reinstall the addons folder from a Yarn Spinner for Godot release, or install ysc with: dotnet tool install -g YarnSpinner.Console" % [OS.get_name(), Engine.get_architecture_name()])]
 		return resource
 
-	var label := ysc_label(ysc_path, ysc_version(ysc_path))
+	var version := ysc_version(ysc_path)
+	var label := ysc_label(ysc_path, version)
+	if version.is_empty():
+		push_warning("yarn project importer: couldn't tell which version %s is. Yarn Spinner for Godot needs ysc %s or later, so compiling may fail. Update ysc with: %s" % [label, MIN_YSC_VERSION, YSC_UPDATE_COMMAND])
+	elif not ysc_version_supported(version):
+		resource.diagnostics = [_diagnostic("%s is too old. Yarn Spinner for Godot needs ysc %s or later. Update it with: %s. %s" % [label, MIN_YSC_VERSION, YSC_UPDATE_COMMAND, native_compiler_status()])]
+		return resource
 	print("yarn project importer: using %s" % label)
+
+	for entry in definition_entries(YarnProjectUtility.read_project_json(abs_path)):
+		var trimmed := entry.strip_edges()
+		if trimmed.begins_with("res://"):
+			push_warning("yarn project importer: %s lists the definitions file \"%s\", but ysc can't read res:// paths, so it's ignored. Use \"%s/%s\" instead." % [source_file, entry, WORKSPACE_ROOT_PLACEHOLDER, trimmed.trim_prefix("res://")])
+		elif trimmed.begins_with("user://"):
+			push_warning("yarn project importer: %s lists the definitions file \"%s\", but ysc can't read user:// paths, so it's ignored. Use a path relative to the .yarnproject, or one starting with %s." % [source_file, entry, WORKSPACE_ROOT_PLACEHOLDER])
 
 	var temp_dir := OS.get_temp_dir().path_join("yarn_spinner_compile")
 	DirAccess.make_dir_recursive_absolute(temp_dir)
 
 	var output_name := source_file.get_file().get_basename()
 
-	var ysc_copy := _write_ysc_project_copy(abs_path, temp_dir, output_name)
 	var output: Array = []
-	var exit_code := _run_ysc(ysc_path, ysc_copy.get("project", abs_path), temp_dir, output_name, output)
-	for path: String in ysc_copy.get("files", []):
-		DirAccess.remove_absolute(path)
-
-	if exit_code != 0 and _hit_null_declarations_bug(output):
-		var stripped_path := _ysc_project_copy_path(abs_path)
-		var data := YarnProjectUtility.read_project_json(abs_path)
-		data.erase("definitions")
-		if YarnProjectUtility.write_project_json(stripped_path, data) == OK:
-			var consequence := "calls to those functions fail as unknown functions" if project_language_version(abs_path) >= CURRENT_PROJECT_FILE_VERSION else "calls to those functions aren't type checked"
-			push_warning("yarn project importer: %s can't read function declarations from the definitions in %s, so it compiled without them, and %s. This is a bug in ysc 3.3.0 that's fixed in later versions, so update ysc with: %s once a newer version is out. %s" % [label, source_file, consequence, YSC_UPDATE_COMMAND, native_compiler_status()])
-			output.clear()
-			exit_code = _run_ysc(ysc_path, stripped_path, temp_dir, output_name, output)
-			DirAccess.remove_absolute(stripped_path)
+	var exit_code := _run_ysc(ysc_path, abs_path, temp_dir, output_name, output)
 
 	if exit_code != 0:
 		if exit_code == 127:
@@ -396,7 +460,7 @@ func _compile_ysc(source_file: String, abs_path: String, source_files: PackedStr
 		var output_text := ""
 		for chunk in output:
 			output_text += str(chunk)
-		var explanation := explain_ysc_failure(output_text, label)
+		var explanation := explain_ysc_failure(output_text, label, abs_path)
 		if not explanation.is_empty():
 			print("yarn project importer: %s output:\n%s" % [label, output_text])
 			resource.diagnostics = [_diagnostic("%s %s" % [explanation, native_compiler_status()])]
@@ -819,7 +883,7 @@ static func ysls_import_option(yarn_project_path: String, option: String, defaul
 ## already know about, then every function the scan found. Without these the
 ## compiler can only work out a function's types from where it's used, so a
 ## call inside a line, like {coin_count()}, wouldn't compile.
-static func _function_declarations(generator: YarnYSLSGenerator, abs_project_path: String, language_version: int = 0) -> Array[Dictionary]:
+static func _function_declarations(generator: YarnYSLSGenerator, abs_project_path: String) -> Array[Dictionary]:
 	var declarations: Array[Dictionary] = []
 	var declared: Dictionary[String, bool] = {}
 
@@ -852,14 +916,20 @@ static func _function_declarations(generator: YarnYSLSGenerator, abs_project_pat
 				else:
 					declaration["variadicParameterType"] = parameter_type
 				break
-			if parameter.has("subtype"):
-				declaration["parameters"].append({"name": str(parameter.get("name", "")), "type": parameter_type, "subtype": str(parameter["subtype"])})
+			# same shape as _declaration_from_definition, so both routes declare defaults alike
+			if parameter.has("subtype") or parameter.has("defaultValue"):
+				var entry := {"name": str(parameter.get("name", "")), "type": parameter_type}
+				if parameter.has("subtype"):
+					entry["subtype"] = str(parameter["subtype"])
+				if parameter.has("defaultValue"):
+					entry["defaultValue"] = true
+				declaration["parameters"].append(entry)
 			else:
 				declaration["parameters"].append(parameter_type)
 		declarations.append(declaration)
 		declared[yarn_name] = true
 
-	for declaration: Dictionary in definitions_function_declarations(abs_project_path, language_version):
+	for declaration: Dictionary in definitions_function_declarations(abs_project_path):
 		if declared.has(declaration["name"]):
 			continue
 		declarations.append(declaration)
@@ -867,12 +937,6 @@ static func _function_declarations(generator: YarnYSLSGenerator, abs_project_pat
 
 	return declarations
 
-
-const WORKSPACE_ROOT_PLACEHOLDER := "${workspaceRoot}"
-const CURRENT_PROJECT_FILE_VERSION := 5
-const ENUM_AND_INSTANCE_MIN_VERSION := 5
-const WORKSPACE_ROOT_MIN_VERSION := 5
-const SINGLE_DEFINITION_MAX_VERSION := 3
 
 
 static func workspace_root() -> String:
@@ -956,7 +1020,7 @@ static func project_language_version(abs_project_path: String) -> int:
 	return 0
 
 
-static func definitions_function_declarations(abs_project_path: String, language_version: int = 0) -> Array[Dictionary]:
+static func definitions_function_declarations(abs_project_path: String) -> Array[Dictionary]:
 	var declarations: Array[Dictionary] = []
 	var declared := {}
 	for path in resolve_definitions_files(abs_project_path, true):
@@ -968,7 +1032,7 @@ static func definitions_function_declarations(abs_project_path: String, language
 		var err := json.parse(file.get_as_text())
 		file.close()
 		if err != OK:
-			push_warning("yarn project importer: couldn't read the definitions file %s: %s at line %d" % [path, json.get_error_message(), json.get_error_line()])
+			push_warning("yarn project importer: couldn't read the definitions file %s: %s at line %d" % [path, json.get_error_message(), json.get_error_line() + 1])
 			continue
 		if not json.data is Dictionary:
 			push_warning("yarn project importer: the definitions file %s doesn't contain a JSON object" % path)
@@ -982,7 +1046,7 @@ static func definitions_function_declarations(abs_project_path: String, language
 		for info: Variant in functions as Array:
 			if not info is Dictionary:
 				continue
-			var declaration := _declaration_from_definition(info as Dictionary, language_version, path)
+			var declaration := _declaration_from_definition(info as Dictionary)
 			if declaration.is_empty() or declared.has(declaration["name"]):
 				continue
 			declared[declaration["name"]] = true
@@ -990,7 +1054,7 @@ static func definitions_function_declarations(abs_project_path: String, language
 	return declarations
 
 
-static func _declaration_from_definition(info: Dictionary, language_version: int = 0, path: String = "") -> Dictionary:
+static func _declaration_from_definition(info: Dictionary) -> Dictionary:
 	var yarn_name := str(_get_key(info, "yarnName", ""))
 	if yarn_name.is_empty():
 		return {}
@@ -1026,11 +1090,6 @@ static func _declaration_from_definition(info: Dictionary, language_version: int
 		var parameter_type := str(_get_key(parameter, "type", "any")).to_lower()
 		if parameter_type == "any":
 			return {}
-		if parameter_type == "enum" or parameter_type == "instance":
-			var effective_version := language_version if language_version > 0 else CURRENT_PROJECT_FILE_VERSION
-			if effective_version < ENUM_AND_INSTANCE_MIN_VERSION:
-				push_warning("yarn project importer: %s in %s has an %s parameter, which needs project file version %d or later. This project is version %d, so %s isn't declared." % [yarn_name, path, parameter_type, ENUM_AND_INSTANCE_MIN_VERSION, effective_version, yarn_name])
-				return {}
 		var entry := {"type": compiler_parameter_type(parameter_type)}
 		var subtype: Variant = _get_key(parameter, "subtype")
 		if subtype is String:
@@ -1096,19 +1155,9 @@ func _add_ysls_to_definitions(yarn_project_path: String) -> void:
 		if resolved == target or (fold_case and resolved.nocasecmp_to(target) == 0):
 			return
 
-	var version := project_language_version(ProjectSettings.globalize_path(yarn_project_path))
-	var entry_to_add := ysls_name
-	if version >= WORKSPACE_ROOT_MIN_VERSION:
-		entry_to_add = WORKSPACE_ROOT_PLACEHOLDER + "/" + (yarn_project_path.get_basename() + ".ysls.json").trim_prefix("res://")
-
-	if version > 0 and version <= SINGLE_DEFINITION_MAX_VERSION and not existing is Array:
-		if not definitions.is_empty() and not (definitions[0] as String).strip_edges().is_empty():
-			push_warning("yarn project importer: %s is a version %d Yarn Project, which can list only one definitions file, and it already lists %s, so %s wasn't added. To list more than one, upgrade the project to version 4 or later." % [yarn_project_path, version, definitions[0], ysls_name])
-			return
-		data["definitions"] = entry_to_add
-	else:
-		definitions.append(entry_to_add)
-		data["definitions"] = definitions
+	var entry_to_add := WORKSPACE_ROOT_PLACEHOLDER + "/" + (yarn_project_path.get_basename() + ".ysls.json").trim_prefix("res://")
+	definitions.append(entry_to_add)
+	data["definitions"] = definitions
 	var err := YarnProjectUtility.write_project_json(yarn_project_path, data)
 	if err != OK:
 		push_warning("yarn project importer: couldn't add %s to the definitions in %s: %s" % [entry_to_add, yarn_project_path, error_string(err)])
