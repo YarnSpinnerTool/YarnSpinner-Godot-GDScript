@@ -501,15 +501,15 @@ static func generate_variables_source(project_path: String, variables_class: Str
 			setter = "set_value(%s, %s[value])" % [JSON.stringify(yarn_name), info.values]
 		elif yarn_type == "Number":
 			type_name = "float"
-			getter = "float(get_value_or_default(%s, 0.0))" % JSON.stringify(yarn_name)
+			getter = "get_float(%s, 0.0)" % JSON.stringify(yarn_name) 
 			setter = "set_value(%s, value)" % JSON.stringify(yarn_name)
 		elif yarn_type == "String":
 			type_name = "String"
-			getter = "str(get_value_or_default(%s, \"\"))" % JSON.stringify(yarn_name)
+			getter = "get_string(%s, \"\")" % JSON.stringify(yarn_name)
 			setter = "set_value(%s, value)" % JSON.stringify(yarn_name)
 		elif yarn_type == "Bool":
 			type_name = "bool"
-			getter = "bool(get_value_or_default(%s, false))" % JSON.stringify(yarn_name)
+			getter = "get_bool(%s, false)" % JSON.stringify(yarn_name)
 			setter = "set_value(%s, value)" % JSON.stringify(yarn_name)
 		else:
 			push_warning("yarn project: can't generate a property for %s, because its type (%s) isn't supported" % [yarn_name, yarn_type])

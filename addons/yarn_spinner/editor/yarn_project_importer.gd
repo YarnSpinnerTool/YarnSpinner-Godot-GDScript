@@ -85,20 +85,20 @@ func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
 		{
 			"name": "ysc_path",
 			"default_value": "ysc",
-			"hint": PROPERTY_HINT_GLOBAL_FILE,
+			"property_hint": PROPERTY_HINT_GLOBAL_FILE,
 			"hint_string": "",
 			"usage": PROPERTY_USAGE_EDITOR
 		},
 		{
 			"name": "generate_ysls",
 			"default_value": true,
-			"hint": PROPERTY_HINT_NONE,
+			"property_hint": PROPERTY_HINT_NONE,
 			"usage": PROPERTY_USAGE_EDITOR
 		},
 		{
 			"name": "ysls_scan_path",
 			"default_value": "",
-			"hint": PROPERTY_HINT_DIR,
+			"property_hint": PROPERTY_HINT_DIR,
 			"usage": PROPERTY_USAGE_EDITOR
 		},
 		{
