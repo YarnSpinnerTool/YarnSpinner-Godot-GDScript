@@ -47,7 +47,6 @@ const WORKSPACE_ROOT_PLACEHOLDER := "${workspaceRoot}"
 const CURRENT_PROJECT_FILE_VERSION := 5
 
 
-
 func _get_importer_name() -> String:
 	return "yarn_spinner.project"
 
@@ -65,10 +64,11 @@ func _get_save_extension() -> String:
 
 
 func _get_resource_type() -> String:
-	# Must stay "Resource". Returning a script class name (or any non-ClassDB
-	# type) puts the file's importer roundtrip check into a state Godot 4.6
-	# can't resolve, which makes "No loader found" errors fire on startup and
-	# disables the right-click "Reimport" menu item.
+	# Must stay "Resource"! Returning a script class name (or any non-ClassDB
+	# type) puts the file's importer into a state Godot 4.6 still
+	# can't resolve which makes "No loader found" errors fire on startup and
+	# disables the right-click "Reimport" menu item...
+	# TODO: Update, checked again in November 2026, still no better way to do this in Godot 4.7 or newer.
 	return "Resource"
 
 
